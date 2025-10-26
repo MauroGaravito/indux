@@ -45,7 +45,8 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
       - MAIL_FROM=${MAIL_FROM}
-      - FRONTEND_URL=${FRONTEND_URL}
+      - FRONTEND_URL=${FRONTEND_URL}  # 👈 importante para CORS
+      - VITE_API_URL=${VITE_API_URL}  # 👈 opcional, útil para debug
       - SEED=${SEED}
     expose:
       - "8080"  # interno, accesible solo por Caddy o Dokploy proxy
