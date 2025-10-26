@@ -1,7 +1,6 @@
 version: "3.9"
 
 services:
-  # --- Database ---
   mongo:
     image: mongo:7
     restart: unless-stopped
@@ -10,7 +9,6 @@ services:
     volumes:
       - mongo_data:/data/db
 
-  # --- Object storage (S3-compatible) ---
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
@@ -23,7 +21,6 @@ services:
     volumes:
       - minio_data:/data
 
-  # --- API Backend (Express + TS + Mongoose) ---
   api:
     build: ./api
     environment:
@@ -45,26 +42,23 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASS=${SMTP_PASS}
       - MAIL_FROM=${MAIL_FROM}
-      - FRONTEND_URL=${FRONTEND_URL}  # 👈 importante para CORS
-      - VITE_API_URL=${VITE_API_URL}  # 👈 opcional, útil para debug
+      - FRONTEND_URL=${FRONTEND_URL}
       - SEED=${SEED}
     expose:
-      - "8080"  # interno, accesible solo por Caddy o Dokploy proxy
+      - "8080"
     depends_on:
       - mongo
       - minio
 
-  # --- Frontend (Vite + React + MUI + Nginx) ---
   frontend:
     build: ./frontend
     environment:
       - VITE_API_URL=${VITE_API_URL}
     expose:
-      - "80"  # Nginx sirve el build estático
+      - "80"
     depends_on:
       - api
 
-# --- Persistent volumes ---
 volumes:
   mongo_data:
   minio_data:
