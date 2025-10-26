@@ -1,4 +1,7 @@
+version: "3.9"
+
 services:
+  # --- Database ---
   mongo:
     image: mongo:7
     restart: unless-stopped
@@ -7,6 +10,7 @@ services:
     volumes:
       - mongo_data:/data/db
 
+  # --- Object storage (S3-compatible) ---
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
@@ -19,6 +23,7 @@ services:
     volumes:
       - minio_data:/data
 
+  # --- API Backend (Express + TS + Mongoose) ---
   api:
     build: ./api
     environment:
@@ -43,20 +48,22 @@ services:
       - FRONTEND_URL=${FRONTEND_URL}
       - SEED=${SEED}
     expose:
-      - "8080"   # solo exposición interna; Dokploy y Caddy acceden directamente
+      - "8080"  # interno, accesible solo por Caddy o Dokploy proxy
     depends_on:
       - mongo
       - minio
 
+  # --- Frontend (Vite + React + MUI + Nginx) ---
   frontend:
     build: ./frontend
     environment:
       - VITE_API_URL=${VITE_API_URL}
     expose:
-      - "80"     # servido por Nginx en el contenedor
+      - "80"  # Nginx sirve el build estático
     depends_on:
       - api
 
+# --- Persistent volumes ---
 volumes:
   mongo_data:
   minio_data:
