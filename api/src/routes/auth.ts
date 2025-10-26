@@ -13,7 +13,7 @@ router.post('/login', async (req, res) => {
   const { email, password } = parsed.data;
   const user = await User.findOne({ email });
   if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-  const ok = await bcrypt.compare(password, user.passwordHash);
+  const ok = await bcrypt.compare(password, user.password);
   if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
   const accessToken = signAccessToken({ _id: (user as any).id as string, role: user.role });
