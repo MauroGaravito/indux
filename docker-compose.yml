@@ -21,8 +21,6 @@ services:
 
   api:
     build: ./api
-    env_file:
-      - .env
     environment:
       - NODE_ENV=${NODE_ENV}
       - PORT=${PORT}
@@ -44,20 +42,18 @@ services:
       - MAIL_FROM=${MAIL_FROM}
       - FRONTEND_URL=${FRONTEND_URL}
       - SEED=${SEED}
-    ports:
-      - "8085:8080"
+    expose:
+      - "8080"   # solo exposición interna; Dokploy y Caddy acceden directamente
     depends_on:
       - mongo
       - minio
 
   frontend:
     build: ./frontend
-    env_file:
-      - .env
     environment:
       - VITE_API_URL=${VITE_API_URL}
     expose:
-      - "80"
+      - "80"     # servido por Nginx en el contenedor
     depends_on:
       - api
 
