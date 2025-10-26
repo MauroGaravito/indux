@@ -45,7 +45,7 @@ services:
       - FRONTEND_URL=${FRONTEND_URL}
       - SEED=${SEED}
     ports:
-      - "8080:8080"
+      - "8085:8080"
     depends_on:
       - mongo
       - minio
@@ -55,7 +55,7 @@ services:
     env_file:
       - .env
     environment:
-      - VITE_API_URL=http://localhost:8080
+      - VITE_API_URL=${VITE_API_URL}
     ports:
       - "5173:5173"
     depends_on:
