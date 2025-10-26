@@ -1,9 +1,16 @@
 version: "3.9"
 
+networks:
+  shared_caddy_net:
+    external: true
+
+volumes:
+  mongo_data:
+  minio_data:
+
 services:
   mongo:
     image: mongo:7
-    container_name: indux-mongo
     restart: unless-stopped
     ports:
       - "27017:27017"
@@ -14,7 +21,6 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: indux-minio
     command: server /data --console-address ":9001"
     environment:
       - MINIO_ROOT_USER=${S3_ACCESS_KEY}
@@ -29,8 +35,6 @@ services:
 
   api:
     build: ./api
-    container_name: indux-api
-    restart: unless-stopped
     environment:
       - NODE_ENV=${NODE_ENV}
       - PORT=${PORT}
@@ -51,6 +55,7 @@ services:
       - SMTP_PASS=${SMTP_PASS}
       - MAIL_FROM=${MAIL_FROM}
       - FRONTEND_URL=${FRONTEND_URL}
+      - VITE_API_URL=${VITE_API_URL}
       - SEED=${SEED}
     expose:
       - "8080"
@@ -62,8 +67,6 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: indux-frontend
-    restart: unless-stopped
     environment:
       - VITE_API_URL=${VITE_API_URL}
     expose:
@@ -72,11 +75,3 @@ services:
       - api
     networks:
       - shared_caddy_net
-
-volumes:
-  mongo_data:
-  minio_data:
-
-networks:
-  shared_caddy_net:
-    external: true
