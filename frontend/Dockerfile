@@ -1,19 +1,27 @@
 # syntax=docker/dockerfile:1
-FROM node:20-alpine AS deps
-WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps
 
-FROM node:20-alpine AS build
+# 1️⃣ Build stage
+FROM node:20-alpine AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+COPY package*.json ./
+RUN npm install
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine AS runtime
-WORKDIR /app
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY package.json ./package.json
-EXPOSE 5173
-CMD ["npm", "run", "preview"]
+# 2️⃣ Serve stage (Nginx)
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Opcional: agrega compresión y cache básica
+RUN echo 'server { \
+    listen 80; \
+    server_name _; \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    location / { \
+        try_files $uri /index.html; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
