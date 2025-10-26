@@ -8,6 +8,7 @@ import projectRoutes from './routes/projects.js';
 import submissionRoutes from './routes/submissions.js';
 import uploadRoutes from './routes/uploads.js';
 import reviewRoutes from './routes/reviews.js';
+import userRoutes from './routes/users.js';
 import { seedAll } from './seed.js';
 
 const app = express();
@@ -31,6 +32,7 @@ app.use('/projects', projectRoutes);
 app.use('/submissions', submissionRoutes);
 app.use('/uploads', uploadRoutes);
 app.use('/reviews', reviewRoutes);
+app.use('/users', userRoutes);
 
 async function start() {
   await connectDB();

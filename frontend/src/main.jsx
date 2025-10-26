@@ -3,18 +3,26 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
 import { CssBaseline, AppBar, Toolbar, Typography, Container, Button } from '@mui/material'
 import Login from './pages/Login.jsx'
+import Landing from './pages/Landing.jsx'
 import InductionWizard from './pages/InductionWizard.jsx'
 import ReviewQueue from './pages/ReviewQueue.jsx'
-import AdminConsole from './pages/AdminConsole.jsx'
+import AdminLayout from './pages/admin/AdminLayout.jsx'
+import AdminDashboard from './pages/admin/AdminDashboard.jsx'
+import AdminProjects from './pages/admin/Projects.jsx'
+import AdminReviews from './pages/admin/Reviews.jsx'
+import AdminUsers from './pages/admin/Users.jsx'
+import AdminSettings from './pages/admin/Settings.jsx'
 import { useAuthStore } from './store/auth.js'
 
 function Nav() {
   const { user, logout } = useAuthStore()
+  const dashboardPath = user?.role === 'admin' ? '/admin' : user?.role === 'manager' ? '/review' : user ? '/wizard' : '/login'
   return (
     <AppBar position="static">
       <Toolbar>
         <Typography variant="h6" sx={{ flexGrow: 1 }}>Indux</Typography>
         <Button color="inherit" component={Link} to="/">Home</Button>
+        <Button color="inherit" component={Link} to={dashboardPath}>Dashboard</Button>
         {user?.role !== 'worker' && (
           <Button color="inherit" component={Link} to="/review">Review</Button>
         )}
@@ -38,10 +46,17 @@ function App() {
       <Nav />
       <Container sx={{ mt: 2 }}>
         <Routes>
-          <Route path="/" element={<InductionWizard />} />
+          <Route path="/" element={<Landing />} />
+          <Route path="/wizard" element={<InductionWizard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/review" element={<ReviewQueue />} />
-          <Route path="/admin" element={<AdminConsole />} />
+          <Route path="/admin" element={<AdminGuard><AdminLayout /></AdminGuard>}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="projects" element={<AdminProjects />} />
+            <Route path="reviews" element={<AdminReviews />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="settings" element={<AdminSettings />} />
+          </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Container>
@@ -49,5 +64,11 @@ function App() {
   )
 }
 
-createRoot(document.getElementById('root')).render(<App />)
+function AdminGuard({ children }) {
+  const { user } = useAuthStore()
+  if (!user) return <Navigate to="/login" replace />
+  if (user.role !== 'admin') return <Navigate to="/" replace />
+  return children
+}
 
+createRoot(document.getElementById('root')).render(<App />)

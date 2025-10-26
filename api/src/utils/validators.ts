@@ -27,3 +27,17 @@ export const SubmissionCreateSchema = z.object({
   quiz: z.object({ total: z.number(), correct: z.number() }),
   signatureDataUrl: z.string().optional()
 });
+
+export const UserCreateSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1),
+  role: z.enum(['admin','manager','worker']),
+  password: z.string().min(6)
+});
+
+export const UserUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  role: z.enum(['admin','manager','worker']).optional(),
+  password: z.string().min(6).optional(),
+  disabled: z.boolean().optional()
+});
