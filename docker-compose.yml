@@ -65,13 +65,17 @@ services:
     networks:
       - shared_caddy_net
 
-  frontend:
-    build: ./frontend
-    environment:
-      - VITE_API_URL=${VITE_API_URL}
-    expose:
-      - "80"
-    depends_on:
-      - api
-    networks:
-      - shared_caddy_net
+    frontend:
+      build:
+        context: ./frontend
+        args:
+          - VITE_API_URL=${VITE_API_URL}
+      environment:
+        - VITE_API_URL=${VITE_API_URL}
+      expose:
+        - "80"
+      depends_on:
+        - api
+      networks:
+        - shared_caddy_net
+
