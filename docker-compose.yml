@@ -45,21 +45,22 @@ services:
       - FRONTEND_URL=${FRONTEND_URL}
       - SEED=${SEED}
     ports:
-      - "8085:8080"
+      - "8080:8080"
     depends_on:
       - mongo
       - minio
 
-  frontend:
-    build: ./frontend
-    env_file:
-      - .env
-    environment:
-      - VITE_API_URL=${VITE_API_URL}
-    ports:
-      - "5173:80"   # Servirá desde Nginx en el puerto interno 80
-    depends_on:
-      - api
+    frontend:
+      build: ./frontend
+      env_file:
+        - .env
+      environment:
+        - VITE_API_URL=${VITE_API_URL}
+      expose:
+        - "80"  # Solo expone internamente el puerto 80
+      depends_on:
+        - api
+
 
 volumes:
   mongo_data:
