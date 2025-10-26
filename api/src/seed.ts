@@ -14,7 +14,7 @@ export async function seedAll() {
     const exists = await User.findOne({ email: u.email });
     if (!exists) {
       const passwordHash = await bcrypt.hash(u.password, 10);
-      await User.create({ email: u.email, name: u.name, role: u.role, passwordHash });
+      await User.create({ email: u.email, name: u.name, role: u.role, password: passwordHash });
       console.log('Seeded user', u.email);
     }
   }
