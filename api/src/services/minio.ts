@@ -16,6 +16,30 @@ export const minio = new Client({
   region
 });
 
+// Optional public signer client for generating presigned URLs pointing to a public HTTPS endpoint
+function buildPublicSigner(): Client | null {
+  const pub = process.env.PUBLIC_S3_ENDPOINT;
+  if (!pub) return null;
+  try {
+    const u = new URL(pub);
+    const isSSL = u.protocol === 'https:';
+    const port = u.port ? Number(u.port) : (isSSL ? 443 : 80);
+    return new Client({
+      endPoint: u.hostname,
+      port,
+      useSSL: isSSL,
+      accessKey,
+      secretKey,
+      region
+    });
+  } catch {
+    // Fallback silently to internal client if PUBLIC_S3_ENDPOINT is malformed
+    return null;
+  }
+}
+
+const publicSigner = buildPublicSigner();
+
 export async function ensureBucket() {
   const exists = await minio.bucketExists(bucket).catch(() => false);
   if (!exists) {
@@ -25,5 +49,6 @@ export async function ensureBucket() {
 }
 
 export async function presignPutUrl(key: string) {
-  return minio.presignedPutObject(bucket, key, 60 * 10);
+  const client = publicSigner || minio;
+  return client.presignedPutObject(bucket, key, 60 * 10);
 }
