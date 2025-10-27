@@ -2,7 +2,8 @@ import React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { TextField, Button, Stack, Typography, Alert } from '@mui/material'
+import { TextField, Stack, Typography, Alert } from '@mui/material'
+import AsyncButton from '../components/AsyncButton.jsx'
 import { useAuthStore } from '../store/auth.js'
 import { useNavigate } from 'react-router-dom'
 
@@ -33,7 +34,7 @@ export default function Login() {
       {errors.root && <Alert severity="error">{errors.root.message}</Alert>}
       <TextField label="Email" type="email" {...register('email')} error={!!errors.email} helperText={errors.email?.message} />
       <TextField label="Password" type="password" {...register('password')} error={!!errors.password} helperText={errors.password?.message} />
-      <Button variant="contained" onClick={handleSubmit(onSubmit)}>Login</Button>
+      <AsyncButton variant="contained" onClick={handleSubmit(onSubmit)}>Login</AsyncButton>
       <Typography variant="body2">Demo users: admin@indux.local / admin123, manager@indux.local / manager123, worker@indux.local / worker123</Typography>
     </Stack>
   )

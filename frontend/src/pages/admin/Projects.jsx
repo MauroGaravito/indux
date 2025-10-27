@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Box, Grid, Card, CardContent, Typography, Button, Stack, TextField, MenuItem, Divider, Tabs, Tab } from '@mui/material'
 import api from '../../utils/api.js'
+import AsyncButton from '../../components/AsyncButton.jsx'
 import ProjectInfoSection from '../../components/admin/ProjectInfoSection.jsx'
 import PersonalDetailsSection from '../../components/admin/PersonalDetailsSection.jsx'
 import SlidesSection from '../../components/admin/SlidesSection.jsx'
@@ -40,7 +41,6 @@ export default function Projects() {
   const sendForReview = async () => {
     if (!selectedId) return
     await api.post('/reviews/projects', { projectId: selectedId, data: config })
-    alert('Project sent for review')
   }
 
   return (
@@ -61,7 +61,7 @@ export default function Projects() {
               <TextField size="small" label="Name" value={name} onChange={e=> setName(e.target.value)} />
               <TextField size="small" label="Description" value={desc} onChange={e=> setDesc(e.target.value)} />
             </Stack>
-            <Button sx={{ mt: 1 }} variant="contained" onClick={createProject} disabled={!name}>Create</Button>
+                <AsyncButton sx={{ mt: 1 }} variant="contained" onClick={createProject} disabled={!name}>Create</AsyncButton>
           </CardContent>
         </Card>
       </Grid>
@@ -71,8 +71,8 @@ export default function Projects() {
             <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={1}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Edit Project</Typography>
               <Stack direction="row" spacing={1}>
-                <Button variant="outlined" onClick={saveConfig} disabled={!selectedId}>Save</Button>
-                <Button variant="contained" onClick={sendForReview} disabled={!selectedId}>Send For Review</Button>
+                <AsyncButton variant="outlined" onClick={saveConfig} disabled={!selectedId}>Save</AsyncButton>
+                <AsyncButton variant="contained" onClick={sendForReview} disabled={!selectedId}>Send For Review</AsyncButton>
               </Stack>
             </Stack>
             {selectedId ? (
@@ -105,4 +105,3 @@ export default function Projects() {
     </Grid>
   )
 }
-

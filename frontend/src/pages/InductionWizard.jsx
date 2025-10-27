@@ -4,9 +4,11 @@ import SignaturePad from '../components/SignaturePad.jsx'
 import { useWizardStore } from '../store/wizard.js'
 import { useAuthStore } from '../store/auth.js'
 import api from '../utils/api.js'
-import { presign, uploadToPresigned } from '../utils/upload.js'
+import { uploadFile } from '../utils/upload.js'
+import AsyncButton from '../components/AsyncButton.jsx'
 
 function DynamicField({ field, value, onChange }) {
+  const [progress, setProgress] = React.useState(null)
   if (field.type === 'textarea') {
     return <TextField fullWidth multiline minRows={3} label={field.label} value={value||''} onChange={e=> onChange(e.target.value)} />
   }
@@ -27,11 +29,12 @@ function DynamicField({ field, value, onChange }) {
         <Button variant="outlined" component="label">Upload Image
           <input hidden type="file" accept="image/*" onChange={async (e)=>{
             const file = e.target.files?.[0]; if (!file) return;
-            const { key, url } = await presign('worker-uploads/')
-            await uploadToPresigned(url, file)
+            const { key } = await uploadFile('worker-uploads/', file, { onProgress: setProgress })
             onChange(key)
+            setProgress(null)
           }} />
         </Button>
+        {progress!=null && <LinearProgress variant="determinate" value={progress} />}
         {value && <Chip label={`Uploaded: ${value}`} size="small" />}
       </Stack>
     )
@@ -45,6 +48,7 @@ function DynamicField({ field, value, onChange }) {
 function CameraCapture({ label, value, onChange }) {
   const videoRef = useRef(null)
   const [streaming, setStreaming] = useState(false)
+  const [progress, setProgress] = useState(null)
   const start = async () => {
     const s = await navigator.mediaDevices.getUserMedia({ video: true })
     videoRef.current.srcObject = s
@@ -57,9 +61,9 @@ function CameraCapture({ label, value, onChange }) {
     canvas.width = video.videoWidth; canvas.height = video.videoHeight
     const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0)
     const blob = await new Promise(res=> canvas.toBlob(res, 'image/png'))
-    const { key, url } = await presign('worker-uploads/')
-    await uploadToPresigned(url, blob)
+    const { key } = await uploadFile('worker-uploads/', blob, { onProgress: setProgress })
     onChange(key)
+    setProgress(null)
   }
   const stop = () => {
     const s = videoRef.current?.srcObject; if (s) s.getTracks().forEach(t=> t.stop()); setStreaming(false)
@@ -74,6 +78,7 @@ function CameraCapture({ label, value, onChange }) {
             <Button variant="outlined" onClick={capture}>Capture</Button>
             <Button onClick={stop}>Close</Button>
           </Stack>
+          {progress!=null && <LinearProgress variant="determinate" value={progress} />}
         </Stack>
       )}
       {value && <Chip label={`Captured: ${value}`} size="small" />}
@@ -228,7 +233,7 @@ export default function InductionWizard() {
           {status==='submitting' && <LinearProgress sx={{ my: 1 }} />}
           <Stack direction="row" spacing={1}>
             <Button onClick={prevStep}>Back</Button>
-            <Button variant="contained" onClick={submit} disabled={status==='submitting'}>Submit</Button>
+            <AsyncButton variant="contained" onClick={submit} disabled={status==='submitting'}>Submit</AsyncButton>
           </Stack>
           {status==='done' && <Alert severity="success" sx={{ mt: 2 }}>Submission sent! A manager will review it.</Alert>}
           {status==='error' && <Alert severity="error" sx={{ mt: 2 }}>Error submitting. Try again.</Alert>}

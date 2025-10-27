@@ -4,6 +4,7 @@ import {
   DialogContent, DialogActions, TextField, Grid, Box
 } from '@mui/material'
 import api from '../utils/api.js'
+import AsyncButton from '../components/AsyncButton.jsx'
 import { useAuthStore } from '../store/auth.js'
 
 function StatusChip({ status }) {
@@ -69,7 +70,7 @@ export default function ReviewQueue() {
                   <Stack direction="row" spacing={1}>
                     <Button variant="outlined" onClick={()=> openView('Project Configuration', pr.data)}>View</Button>
                     <Button color="error" variant="outlined" onClick={()=> openDecline('project', pr._id)}>Decline</Button>
-                    <Button color="success" variant="contained" onClick={()=> approveProject(pr._id)}>Approve</Button>
+                    <AsyncButton color="success" variant="contained" onClick={()=> approveProject(pr._id)}>Approve</AsyncButton>
                   </Stack>
                 </Stack>
               </Paper>
@@ -97,7 +98,7 @@ export default function ReviewQueue() {
                   <Stack direction="row" spacing={1}>
                     <Button variant="outlined" onClick={()=> openView('Worker Submission', s)}>View</Button>
                     <Button color="error" variant="outlined" onClick={()=> openDecline('submission', s._id)}>Decline</Button>
-                    <Button color="success" variant="contained" onClick={()=> approveSubmission(s._id)}>Approve</Button>
+                    <AsyncButton color="success" variant="contained" onClick={()=> approveSubmission(s._id)}>Approve</AsyncButton>
                   </Stack>
                 </Stack>
               </Paper>
@@ -126,7 +127,7 @@ export default function ReviewQueue() {
         </DialogContent>
         <DialogActions>
           <Button onClick={closeDecline}>Cancel</Button>
-          <Button color="error" variant="contained" onClick={declineKind==='project' ? declineProject : declineSubmission}>Decline</Button>
+          <AsyncButton color="error" variant="contained" onClick={declineKind==='project' ? declineProject : declineSubmission}>Decline</AsyncButton>
         </DialogActions>
       </Dialog>
     </Stack>
