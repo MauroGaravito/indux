@@ -11,7 +11,11 @@ router.post('/presign', requireAuth, async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const key = `${parsed.data.prefix}${uuidv4()}`;
+  // Normalize prefix: remove leading slashes and ensure trailing slash
+  const raw = parsed.data.prefix || 'uploads/';
+  const normalizedPrefix = (raw.replace(/^\/+/, '') || 'uploads/').replace(/([^/])$/, '$1/');
+
+  const key = `${normalizedPrefix}${uuidv4()}`; // keys never start with '/'
   const url = await presignPutUrl(key);
   res.json({ key, url });
 });

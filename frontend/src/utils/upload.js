@@ -1,7 +1,9 @@
 import api from './api.js'
 
 export async function presign(prefix='uploads/') {
-  const { data } = await api.post('/uploads/presign', { prefix })
+  // Normalize: no leading '/', ensure trailing '/'
+  const clean = (prefix || 'uploads/').replace(/^\/+/, '').replace(/([^/])$/, '$1/')
+  const { data } = await api.post('/uploads/presign', { prefix: clean })
   return data // { key, url }
 }
 
