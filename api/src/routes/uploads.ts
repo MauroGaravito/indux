@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
-import { presignPutUrl } from '../services/minio.js';
+import { presignPutUrl, ensureBucket } from '../services/minio.js';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 
@@ -15,6 +15,8 @@ router.post('/presign', requireAuth, async (req, res) => {
   const raw = parsed.data.prefix || 'uploads/';
   const normalizedPrefix = (raw.replace(/^\/+/, '') || 'uploads/').replace(/([^/])$/, '$1/');
 
+  // Ensure bucket exists before signing; prevents 404 NoSuchBucket on PUT
+  await ensureBucket();
   const key = `${normalizedPrefix}${uuidv4()}`; // keys never start with '/'
   const url = await presignPutUrl(key);
   res.json({ key, url });
