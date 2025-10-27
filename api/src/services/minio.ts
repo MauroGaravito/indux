@@ -50,5 +50,8 @@ export async function ensureBucket() {
 
 export async function presignPutUrl(key: string) {
   const client = publicSigner || minio;
-  return client.presignedPutObject(bucket, key, 60 * 10, { 'Content-Type': '' });
+  // MinIO v7 presignedPutObject signature accepts (bucket, key, expiry) only.
+  // To avoid signature/content-type mismatches, do not constrain Content-Type
+  // and ensure the client does not set it manually.
+  return client.presignedPutObject(bucket, key, 60 * 10);
 }
