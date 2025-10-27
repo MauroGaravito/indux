@@ -53,7 +53,8 @@ async function main() {
     advice.push('Create .env by copying .env.example: cp .env.example .env');
   }
 
-  const API = 'http://localhost:' + (env.PORT || '8080');
+  // Allow overriding API base (e.g., https://indux.downundersolutions.com/api)
+  const API = process.env.BASE_URL || ('http://localhost:' + (env.PORT || '8080'));
 
   // Helper fetch wrapper
   async function jfetch(url, opts = {}) {
@@ -171,4 +172,3 @@ main().catch((e) => {
   console.error('Health check error:', e);
   process.exit(1);
 });
-

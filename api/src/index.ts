@@ -10,6 +10,7 @@ import uploadRoutes from './routes/uploads.js';
 import reviewRoutes from './routes/reviews.js';
 import userRoutes from './routes/users.js';
 import { seedAll } from './seed.js';
+import { ensureBucket } from './services/minio.js';
 
 const app = express();
 
@@ -66,6 +67,13 @@ app.use('/users', userRoutes);
 async function start() {
   try {
     await connectDB();
+
+    // Ensure S3 bucket exists before serving requests that presign
+    try {
+      await ensureBucket();
+    } catch (e) {
+      console.warn('S3 bucket ensure failed (continuing):', (e as Error)?.message);
+    }
 
     // Seed inicial (solo si SEED=true)
     if ((process.env.SEED || '').toLowerCase() === 'true') {
