@@ -6,7 +6,9 @@ networks:
 
 volumes:
   mongo_data:
+    name: indux_mongo_data
   minio_data:
+    name: indux_minio_data
 
 services:
   mongo:
@@ -35,6 +37,7 @@ services:
 
   api:
     build: ./api
+    restart: unless-stopped
     environment:
       - NODE_ENV=${NODE_ENV}
       - PORT=${PORT}
@@ -70,6 +73,7 @@ services:
       context: ./frontend
       args:
         - VITE_API_URL=${VITE_API_URL}
+    restart: unless-stopped
     environment:
       - VITE_API_URL=${VITE_API_URL}
     expose:
