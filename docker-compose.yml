@@ -6,11 +6,14 @@ networks:
 
 volumes:
   mongo_data:
+    name: indux_mongo_data
   minio_data:
+    name: indux_minio_data
 
 services:
   mongo:
     image: mongo:7
+    container_name: indux_mongo
     restart: unless-stopped
     ports:
       - "27017:27017"
@@ -21,6 +24,7 @@ services:
 
   minio:
     image: minio/minio:latest
+    container_name: indux_minio
     command: server /data --console-address ":9001"
     environment:
       - MINIO_ROOT_USER=${S3_ACCESS_KEY}
@@ -35,6 +39,8 @@ services:
 
   api:
     build: ./api
+    container_name: indux_api
+    restart: unless-stopped
     environment:
       - NODE_ENV=${NODE_ENV}
       - PORT=${PORT}
@@ -70,6 +76,8 @@ services:
       context: ./frontend
       args:
         - VITE_API_URL=${VITE_API_URL}
+    container_name: indux_frontend
+    restart: unless-stopped
     environment:
       - VITE_API_URL=${VITE_API_URL}
     expose:
