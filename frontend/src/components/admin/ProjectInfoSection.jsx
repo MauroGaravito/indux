@@ -14,7 +14,8 @@ import {
   Chip,
   InputAdornment,
   Tooltip,
-  IconButton
+  IconButton,
+  Divider
 } from '@mui/material'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import BusinessIcon from '@mui/icons-material/Business'
@@ -22,6 +23,8 @@ import LocationOnIcon from '@mui/icons-material/LocationOn'
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
+import ContentPasteIcon from '@mui/icons-material/ContentPaste'
+import ImageIcon from '@mui/icons-material/Image'
 import { uploadFile } from '../../utils/upload.js'
 
 export default function ProjectInfoSection({ value, onChange }) {
@@ -40,10 +43,46 @@ export default function ProjectInfoSection({ value, onChange }) {
     setProgress(null)
   }
 
+  const uploadMapFile = async (file) => {
+    if (!file) return
+    const { key } = await uploadFile('maps/', file, { onProgress: setProgress })
+    set('projectMapKey', key)
+    setProgress(null)
+  }
+
   const openInMaps = () => {
     if (!v.projectAddress) return
     const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.projectAddress)}`
     window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const extractAddressFromMapsUrl = (text) => {
+    try {
+      const url = new URL(text)
+      const host = url.hostname
+      if (host.includes('google') && url.pathname.includes('/maps')) {
+        const q = url.searchParams.get('q') || url.searchParams.get('query')
+        if (q) return decodeURIComponent(q.replace(/\+/g, ' '))
+        const parts = url.pathname.split('/').filter(Boolean)
+        const placeIdx = parts.indexOf('place')
+        if (placeIdx !== -1 && parts[placeIdx+1]) return decodeURIComponent(parts[placeIdx+1].replace(/\+/g, ' '))
+      }
+      // Short links or other hosts fall through to raw text
+      return text
+    } catch (_) {
+      return text
+    }
+  }
+
+  const pasteAddressFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (!text) return
+      const addr = extractAddressFromMapsUrl(text)
+      set('projectAddress', addr)
+    } catch (err) {
+      // ignore permission errors; user can paste manually
+    }
   }
 
   return (
@@ -139,13 +178,23 @@ export default function ProjectInfoSection({ value, onChange }) {
                 ),
                 endAdornment: (
                   <InputAdornment position="end">
-                    <Tooltip title={v.projectAddress ? 'Open in Google Maps' : 'Enter an address'}>
-                      <span>
-                        <IconButton size="small" onClick={openInMaps} disabled={!v.projectAddress} aria-label="Open in Google Maps">
-                          <OpenInNewIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      <Tooltip title="Paste from clipboard">
+                        <span>
+                          <IconButton size="small" onClick={pasteAddressFromClipboard} aria-label="Paste address">
+                            <ContentPasteIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Divider flexItem orientation="vertical" sx={{ mx: 0.5 }} />
+                      <Tooltip title={v.projectAddress ? 'Open in Google Maps' : 'Enter an address'}>
+                        <span>
+                          <IconButton size="small" onClick={openInMaps} disabled={!v.projectAddress} aria-label="Open in Google Maps">
+                            <OpenInNewIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </Stack>
                   </InputAdornment>
                 )
               }}
@@ -162,6 +211,18 @@ export default function ProjectInfoSection({ value, onChange }) {
                 transition: 'border-color 0.2s ease, background 0.2s ease',
                 '&:hover': { borderColor: accent }
               }}
+              onPaste={(e)=>{
+                const items = e.clipboardData?.items || []
+                for (let i=0; i<items.length; i++) {
+                  const it = items[i]
+                  if (it.type && it.type.startsWith('image/')) {
+                    const file = it.getAsFile()
+                    if (file) uploadMapFile(file)
+                    e.preventDefault()
+                    break
+                  }
+                }
+              }}
             >
               <Stack
                 direction={{ xs: 'column', sm: 'row' }}
@@ -176,7 +237,7 @@ export default function ProjectInfoSection({ value, onChange }) {
                       Upload Project Map
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      PNG, JPG. Max 10MB.
+                      PNG, JPG. Max 10MB. Tip: paste a screenshot here.
                     </Typography>
                   </Box>
                 </Stack>
