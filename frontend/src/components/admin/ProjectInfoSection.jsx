@@ -15,7 +15,9 @@ import {
   InputAdornment,
   Tooltip,
   IconButton,
-  Divider
+  Divider,
+  Dialog,
+  DialogContent
 } from '@mui/material'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import BusinessIcon from '@mui/icons-material/Business'
@@ -24,6 +26,7 @@ import MonetizationOnIcon from '@mui/icons-material/MonetizationOn'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import ContentPasteIcon from '@mui/icons-material/ContentPaste'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import { uploadFile, presignGet } from '../../utils/upload.js'
 
 export default function ProjectInfoSection({ value, onChange }) {
@@ -32,6 +35,8 @@ export default function ProjectInfoSection({ value, onChange }) {
 
   const [progress, setProgress] = React.useState(null)
   const [mapPreview, setMapPreview] = React.useState('')
+  const [previewOpen, setPreviewOpen] = React.useState(false)
+  const fileInputRef = React.useRef(null)
 
   const accent = '#1976d2'
 
@@ -48,6 +53,11 @@ export default function ProjectInfoSection({ value, onChange }) {
     const { key } = await uploadFile('maps/', file, { onProgress: setProgress })
     set('projectMapKey', key)
     setProgress(null)
+  }
+
+  const removeMap = () => {
+    set('projectMapKey', '')
+    setMapPreview('')
   }
 
   const openInMaps = () => {
@@ -277,12 +287,25 @@ export default function ProjectInfoSection({ value, onChange }) {
                           component="img"
                           src={mapPreview}
                           alt="Project map preview"
-                          sx={{ width: 96, height: 64, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider' }}
+                          onClick={() => setPreviewOpen(true)}
+                          sx={{ width: 96, height: 64, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider', cursor: 'zoom-in' }}
                         />
                       )}
+                      {mapPreview && (
+                        <Tooltip title="Open image in new tab">
+                          <span>
+                            <IconButton size="small" onClick={() => window.open(mapPreview, '_blank', 'noopener,noreferrer')} aria-label="Open image">
+                              <OpenInNewIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
+                      <Button size="small" variant="outlined" onClick={() => fileInputRef.current?.click()} sx={{ textTransform: 'none' }}>Replace</Button>
+                      <Button size="small" color="error" variant="text" startIcon={<DeleteOutlineIcon />} onClick={removeMap} sx={{ textTransform: 'none' }}>Remove</Button>
+                      <input ref={fileInputRef} hidden type="file" accept="image/*" onChange={uploadMap} />
                     </Stack>
                   )}
-                </Stack>
+              </Stack>
               </Stack>
 
               {progress != null && (
@@ -301,6 +324,13 @@ export default function ProjectInfoSection({ value, onChange }) {
           </Grid>
         </Grid>
       </CardContent>
+      <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} maxWidth="lg">
+        <DialogContent sx={{ p: 0, bgcolor: 'black' }}>
+          {mapPreview && (
+            <Box component="img" src={mapPreview} alt="Project map" sx={{ display: 'block', maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', m: 0 }} />
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
