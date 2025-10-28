@@ -107,7 +107,17 @@ export default function InductionWizard() {
   const validatePersonal = () => personalFields.every(f => !f.required || (personalValues[f.key] != null && personalValues[f.key] !== ''))
   const nextStep = () => setStep(s => s + 1)
   const prevStep = () => setStep(s => Math.max(0, s - 1))
-  const startProject = (id) => { const p = projects.find(x => x._id === id); setProject(p || null); setStep(1) }
+  // Only select project here; advance with an explicit Continue
+  const selectProject = (id) => {
+    const p = projects.find(x => x._id === id)
+    setProject(p || null)
+    // Reset dependent state when project changes
+    setPersonalValues({})
+    setAnswers([])
+    setScore(null)
+    setPassed(null)
+    setSignature(null)
+  }
   const finishQuiz = () => {
     const correct = answers.reduce((acc, a, i) => acc + (a === questions[i]?.correctIndex ? 1 : 0), 0)
     const pct = Math.round((correct / (totalQ || 1)) * 100)
@@ -148,10 +158,13 @@ export default function InductionWizard() {
       {step===0 && (
         <Paper sx={{ p:2 }}>
           <Typography variant="subtitle1">Select Project</Typography>
-          <TextField fullWidth select SelectProps={{ native: true }} value={project?._id || ''} onChange={(e)=> startProject(e.target.value)} sx={{ mt: 1 }}>
+          <TextField fullWidth select SelectProps={{ native: true }} value={project?._id || ''} onChange={(e)=> selectProject(e.target.value)} sx={{ mt: 1 }}>
             <option value="">Choose a project</option>
             {projects.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
           </TextField>
+          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+            <Button variant="contained" onClick={nextStep} disabled={!project}>Continue</Button>
+          </Stack>
         </Paper>
       )}
 
