@@ -12,13 +12,16 @@ import {
   LinearProgress,
   Paper,
   Chip,
-  InputAdornment
+  InputAdornment,
+  Tooltip,
+  IconButton
 } from '@mui/material'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import BusinessIcon from '@mui/icons-material/Business'
 import LocationOnIcon from '@mui/icons-material/LocationOn'
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
+import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import { uploadFile } from '../../utils/upload.js'
 
 export default function ProjectInfoSection({ value, onChange }) {
@@ -35,6 +38,12 @@ export default function ProjectInfoSection({ value, onChange }) {
     const { key } = await uploadFile('maps/', file, { onProgress: setProgress })
     set('projectMapKey', key)
     setProgress(null)
+  }
+
+  const openInMaps = () => {
+    if (!v.projectAddress) return
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.projectAddress)}`
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -127,6 +136,17 @@ export default function ProjectInfoSection({ value, onChange }) {
                   <InputAdornment position="start">
                     <LocationOnIcon color="action" />
                   </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <Tooltip title={v.projectAddress ? 'Open in Google Maps' : 'Enter an address'}>
+                      <span>
+                        <IconButton size="small" onClick={openInMaps} disabled={!v.projectAddress} aria-label="Open in Google Maps">
+                          <OpenInNewIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </InputAdornment>
                 )
               }}
             />
@@ -203,4 +223,3 @@ export default function ProjectInfoSection({ value, onChange }) {
     </Card>
   )
 }
-
