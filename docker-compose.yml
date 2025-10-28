@@ -28,12 +28,9 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:-supersecurepassword}
     volumes:
       - mongo_data:/data/db
-      # backup diario automático
-      - ./mongo-backups:/backups
     networks:
       - shared_caddy_net
-    command: >
-      bash -c "crontab -l | { cat; echo '0 2 * * * mongodump --archive=/backups/backup-$(date +\%F).gz --gzip --username=${MONGO_USER:-admin} --password=${MONGO_PASS:-supersecurepassword} --authenticationDatabase=admin'; } | crontab - && cron && exec docker-entrypoint.sh mongod"
+    command: ["mongod"]
 
   # 📁 MinIO (S3-compatible)
   minio:
@@ -51,7 +48,7 @@ services:
     networks:
       - shared_caddy_net
 
-  # ⚙️ Backend (Express + TS)
+  # ⚙️ Backend (Express + TypeScript)
   api:
     build: ./api
     container_name: indux-api
@@ -80,7 +77,7 @@ services:
       MAIL_FROM: ${MAIL_FROM}
       # --- URLs y CORS ---
       FRONTEND_URL: ${FRONTEND_URL}
-      # --- Seed ---
+      # --- Seed inicial ---
       SEED: ${SEED}
     expose:
       - "8080"
