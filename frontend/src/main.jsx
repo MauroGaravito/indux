@@ -45,7 +45,7 @@ function App() {
     <BrowserRouter>
       <CssBaseline />
       <Nav />
-      <Container sx={{ mt: 2 }}>
+      <Container maxWidth={false} disableGutters sx={{ mt: 2, px: { xs: 2, md: 3 } }}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/wizard" element={<InductionWizard />} />
