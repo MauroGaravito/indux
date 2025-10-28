@@ -234,7 +234,8 @@ export default function ProjectInfoSection({ value, onChange }) {
                 borderStyle: 'dashed',
                 borderColor: v.projectMapKey ? accent : 'divider',
                 transition: 'border-color 0.2s ease, background 0.2s ease',
-                '&:hover': { borderColor: accent }
+                '&:hover': { borderColor: accent },
+                overflow: 'hidden'
               }}
               onPaste={(e)=>{
                 const items = e.clipboardData?.items || []
@@ -252,13 +253,15 @@ export default function ProjectInfoSection({ value, onChange }) {
               <Stack
                 direction={{ xs: 'column', sm: 'row' }}
                 spacing={2}
-                alignItems="center"
-                justifyContent="space-between"
+                alignItems="flex-start"
+                justifyContent="flex-start"
+                flexWrap
+                sx={{ rowGap: 1 }}
               >
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 240 }}>
                   <CloudUploadIcon sx={{ color: accent }} />
                   <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
                       Upload Project Map
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -267,7 +270,7 @@ export default function ProjectInfoSection({ value, onChange }) {
                   </Box>
                 </Stack>
 
-                <Stack direction="row" spacing={2} alignItems="center">
+                <Stack direction="row" spacing={1.5} alignItems="center" flexWrap useFlexGap sx={{ rowGap: 1 }}>
                   <Button
                     variant="contained"
                     component="label"
@@ -288,7 +291,7 @@ export default function ProjectInfoSection({ value, onChange }) {
                           src={mapPreview}
                           alt="Project map preview"
                           onClick={() => setPreviewOpen(true)}
-                          sx={{ width: 96, height: 64, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider', cursor: 'zoom-in' }}
+                          sx={{ width: 112, height: 72, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider', cursor: 'zoom-in' }}
                         />
                       )}
                       {mapPreview && (
