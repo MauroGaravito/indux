@@ -232,3 +232,4 @@ BASE_URL=http://localhost:8080 node check-health.js
   - Revisa `PUBLIC_S3_ENDPOINT` y que Caddy preserve el path del bucket, sin strip.
   - Hora correcta en servidor y URL vigente (10 min por defecto).
 - Rebuild limpio: `docker compose build --no-cache api frontend && docker compose up -d`.
+edicion
