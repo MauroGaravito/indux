@@ -14,6 +14,21 @@ import { ensureBucket } from './services/minio.js';
 
 const app = express();
 
+// Trust reverse proxies when X-Forwarded-* is present
+// Configure via TRUST_PROXY (true/false/number/IP). Defaults to 1 in non-dev.
+(() => {
+  const tp = process.env.TRUST_PROXY;
+  if (tp != null && tp !== '') {
+    let val: any = tp;
+    if (tp === 'true') val = true;
+    else if (tp === 'false') val = false;
+    else if (!Number.isNaN(Number(tp))) val = Number(tp);
+    app.set('trust proxy', val as any);
+  } else if ((process.env.NODE_ENV || '').toLowerCase() !== 'development') {
+    app.set('trust proxy', 1);
+  }
+})();
+
 // --- Server port ---
 const PORT = Number(process.env.PORT || 8080);
 
