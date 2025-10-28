@@ -4,7 +4,8 @@ import SignaturePad from '../components/SignaturePad.jsx'
 import { useWizardStore } from '../store/wizard.js'
 import { useAuthStore } from '../store/auth.js'
 import api from '../utils/api.js'
-import { uploadFile } from '../utils/upload.js'
+import { uploadFile, presignGet } from '../utils/upload.js'
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import AsyncButton from '../components/AsyncButton.jsx'
 
 function DynamicField({ field, value, onChange }) {
@@ -186,16 +187,7 @@ export default function InductionWizard() {
       )}
 
       {step===2 && project && (
-        <Paper sx={{ p:2 }}>
-          <Typography variant="subtitle1" sx={{ mb: 1 }}>Slides</Typography>
-          <Typography variant="body2" sx={{ mb: 1 }}>
-            {project?.config?.slides?.pptKey ? `Slides file: ${project.config.slides.pptKey} (preview not available in demo)` : 'No slides configured.'}
-          </Typography>
-          <Stack direction="row" spacing={1}>
-            <Button onClick={prevStep}>Back</Button>
-            <Button variant="contained" onClick={nextStep}>Continue</Button>
-          </Stack>
-        </Paper>
+        <SlidesStep project={project} onBack={prevStep} onNext={nextStep} />
       )}
 
       {step===3 && project && (
@@ -253,5 +245,52 @@ export default function InductionWizard() {
         </Paper>
       )}
     </Stack>
+  )
+}
+
+function SlidesStep({ project, onBack, onNext }) {
+  const slides = project?.config?.slides || {}
+  const pptKey = slides.pptKey
+  const thumbKey = slides.thumbKey
+  const [thumbUrl, setThumbUrl] = React.useState('')
+  const name = `${project?.name || 'Slides'}`
+
+  React.useEffect(() => {
+    let cancelled = false
+    async function load() {
+      if (!thumbKey) { setThumbUrl(''); return }
+      try { const { url } = await presignGet(thumbKey); if (!cancelled) setThumbUrl(url) } catch { if (!cancelled) setThumbUrl('') }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [thumbKey])
+
+  const openViewer = () => {
+    if (!pptKey) return
+    const ext = (pptKey.split('.').pop() || 'pptx').toLowerCase()
+    const params = new URLSearchParams({ key: pptKey, name, ext })
+    window.open(`/slides-viewer?${params.toString()}`, '_blank', 'noopener,noreferrer')
+  }
+
+  return (
+    <Paper sx={{ p:2 }}>
+      <Typography variant="subtitle1" sx={{ mb: 1 }}>Slides</Typography>
+      {pptKey ? (
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1 }}>
+          {thumbUrl ? (
+            <Box component="img" src={thumbUrl} alt="Slides preview" sx={{ width: 140, height: 90, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider', cursor: 'pointer' }} onClick={openViewer} />
+          ) : (
+            <Chip icon={<InsertDriveFileIcon />} label="Open Viewer" onClick={openViewer} variant="outlined" />
+          )}
+          <Typography variant="body2" color="text.secondary">Your slides are ready. Open the viewer to proceed.</Typography>
+        </Stack>
+      ) : (
+        <Typography variant="body2">No slides configured.</Typography>
+      )}
+      <Stack direction="row" spacing={1}>
+        <Button onClick={onBack}>Back</Button>
+        <Button variant="contained" onClick={onNext}>Continue</Button>
+      </Stack>
+    </Paper>
   )
 }
