@@ -24,14 +24,14 @@ import MonetizationOnIcon from '@mui/icons-material/MonetizationOn'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import ContentPasteIcon from '@mui/icons-material/ContentPaste'
-import ImageIcon from '@mui/icons-material/Image'
-import { uploadFile } from '../../utils/upload.js'
+import { uploadFile, presignGet } from '../../utils/upload.js'
 
 export default function ProjectInfoSection({ value, onChange }) {
   const v = value || {}
   const set = (k, val) => onChange({ ...v, [k]: val })
 
   const [progress, setProgress] = React.useState(null)
+  const [mapPreview, setMapPreview] = React.useState('')
 
   const accent = '#1976d2'
 
@@ -84,6 +84,21 @@ export default function ProjectInfoSection({ value, onChange }) {
       // ignore permission errors; user can paste manually
     }
   }
+
+  React.useEffect(() => {
+    let cancelled = false
+    async function loadPreview() {
+      if (!v.projectMapKey) { setMapPreview(''); return }
+      try {
+        const { url } = await presignGet(v.projectMapKey)
+        if (!cancelled) setMapPreview(url)
+      } catch {
+        if (!cancelled) setMapPreview('')
+      }
+    }
+    loadPreview()
+    return () => { cancelled = true }
+  }, [v.projectMapKey])
 
   return (
     <Card
@@ -255,12 +270,17 @@ export default function ProjectInfoSection({ value, onChange }) {
                   </Button>
 
                   {v.projectMapKey && (
-                    <Chip
-                      icon={<CheckCircleOutlineIcon />}
-                      color="success"
-                      variant="outlined"
-                      label="Uploaded"
-                    />
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Chip icon={<CheckCircleOutlineIcon />} color="success" variant="outlined" label="Uploaded" />
+                      {mapPreview && (
+                        <Box
+                          component="img"
+                          src={mapPreview}
+                          alt="Project map preview"
+                          sx={{ width: 96, height: 64, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider' }}
+                        />
+                      )}
+                    </Stack>
                   )}
                 </Stack>
               </Stack>

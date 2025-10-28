@@ -55,3 +55,9 @@ export async function presignPutUrl(key: string) {
   // and ensure the client does not set it manually.
   return client.presignedPutObject(bucket, key, 60 * 10);
 }
+
+export async function presignGetUrl(key: string) {
+  const client = publicSigner || minio;
+  // Short-lived GET for displaying thumbnails or downloading assets
+  return client.presignedGetObject(bucket, key, 60 * 10);
+}

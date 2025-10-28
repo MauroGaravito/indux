@@ -45,3 +45,8 @@ export async function uploadFile(prefix, file, { onProgress } = {}) {
     throw e
   }
 }
+
+export async function presignGet(key) {
+  const { data } = await api.post('/uploads/presign-get', { key })
+  return data // { url }
+}
