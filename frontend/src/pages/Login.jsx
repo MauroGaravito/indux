@@ -29,13 +29,15 @@ export default function Login() {
   }
 
   return (
-    <Stack spacing={2} maxWidth={400}>
-      <Typography variant="h5">Login</Typography>
-      {errors.root && <Alert severity="error">{errors.root.message}</Alert>}
-      <TextField label="Email" type="email" {...register('email')} error={!!errors.email} helperText={errors.email?.message} />
-      <TextField label="Password" type="password" {...register('password')} error={!!errors.password} helperText={errors.password?.message} />
-      <AsyncButton variant="contained" onClick={handleSubmit(onSubmit)}>Login</AsyncButton>
-      <Typography variant="body2">Demo users: admin@indux.local / admin123, manager@indux.local / manager123, worker@indux.local / worker123</Typography>
-    </Stack>
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <Stack spacing={2} maxWidth={400}>
+        <Typography variant="h5">Login</Typography>
+        {errors.root && <Alert severity="error">{errors.root.message}</Alert>}
+        <TextField label="Email" type="email" {...register('email')} error={!!errors.email} helperText={errors.email?.message} />
+        <TextField label="Password" type="password" {...register('password')} error={!!errors.password} helperText={errors.password?.message} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit(onSubmit)() } }} />
+        <AsyncButton type="submit" variant="contained" onClick={handleSubmit(onSubmit)}>Login</AsyncButton>
+        <Typography variant="body2">Demo users: admin@indux.local / admin123, manager@indux.local / manager123, worker@indux.local / worker123</Typography>
+      </Stack>
+    </form>
   )
 }
