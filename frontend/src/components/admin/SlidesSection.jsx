@@ -8,18 +8,21 @@ import {
   Typography,
   Button,
   LinearProgress,
-  Paper
+  Paper,
+  Chip
 } from '@mui/material'
 import SlideshowIcon from '@mui/icons-material/Slideshow'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
-import { uploadFile } from '../../utils/upload.js'
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
+import { uploadFile, presignGet } from '../../utils/upload.js'
 
 export default function SlidesSection({ value, onChange }) {
   const v = value || {}
   const set = (k, val) => onChange({ ...v, [k]: val })
   const [localName, setLocalName] = useState('')
   const [progress, setProgress] = useState(null)
+  const [thumbUrl, setThumbUrl] = useState('')
 
   const accent = '#1976d2'
 
@@ -30,9 +33,66 @@ export default function SlidesSection({ value, onChange }) {
     set('pptKey', key)
     setLocalName(file.name)
     setProgress(null)
+
+    // If PDF, try to generate a thumbnail of the first page
+    const ext = (file.name.split('.').pop() || '').toLowerCase()
+    if (ext === 'pdf') {
+      try {
+        const { url } = await presignGet(key)
+        const blob = await renderPdfFirstPageToBlob(url, 300)
+        if (blob) {
+          const { key: tkey } = await uploadFile('slides/', blob, { onProgress: undefined })
+          set('thumbKey', tkey)
+          const { url: turl } = await presignGet(tkey)
+          setThumbUrl(turl)
+        }
+      } catch {
+        // ignore thumbnail failures
+      }
+    }
   }
 
   const uploadedLabel = localName || v.pptKey
+  
+  React.useEffect(() => {
+    let cancelled = false
+    async function loadThumb() {
+      if (!v.thumbKey) { setThumbUrl(''); return }
+      try { const { url } = await presignGet(v.thumbKey); if (!cancelled) setThumbUrl(url) } catch { if (!cancelled) setThumbUrl('') }
+    }
+    loadThumb()
+    return () => { cancelled = true }
+  }, [v.thumbKey])
+
+  const openViewer = () => {
+    const ext = (localName || '').split('.').pop()?.toLowerCase() || 'pptx'
+    const params = new URLSearchParams({ key: v.pptKey || '', name: localName || 'slides', ext })
+    window.open(`/slides-viewer?${params.toString()}`, '_blank', 'noopener,noreferrer')
+  }
+
+  async function renderPdfFirstPageToBlob(pdfUrl, width = 300) {
+    if (!window.pdfjsLib) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script')
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+        s.onload = resolve
+        s.onerror = reject
+        document.body.appendChild(s)
+      })
+    }
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+    const pdf = await window.pdfjsLib.getDocument(pdfUrl).promise
+    const page = await pdf.getPage(1)
+    const viewport = page.getViewport({ scale: 1 })
+    const scale = width / viewport.width
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    canvas.width = Math.floor(viewport.width * scale)
+    canvas.height = Math.floor(viewport.height * scale)
+    const renderContext = { canvasContext: ctx, viewport: page.getViewport({ scale }) }
+    await page.render(renderContext).promise
+    return await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+  }
 
   return (
     <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -42,8 +102,8 @@ export default function SlidesSection({ value, onChange }) {
             <SlideshowIcon fontSize="small" />
           </Box>
         }
-        title={<Typography variant="h6" sx={{ fontWeight: 600 }}>Section 3 â€” Induction Slides</Typography>}
-        subheader={<Typography variant="body2" color="text.secondary">Upload a PowerPoint file (.ppt or .pptx)</Typography>}
+        title={<Typography variant="h6" sx={{ fontWeight: 600 }}>Section 3 — Induction Slides</Typography>}
+        subheader={<Typography variant="body2" color="text.secondary">Upload PDF or PowerPoint</Typography>}
         sx={{ pb: 0 }}
       />
       <CardContent>
@@ -55,7 +115,7 @@ export default function SlidesSection({ value, onChange }) {
             <Stack direction="row" spacing={1} alignItems="center">
               <CloudUploadIcon sx={{ color: accent }} />
               <Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Upload PPT</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Upload Slides</Typography>
                 <Typography variant="body2" color="text.secondary">.ppt, .pptx up to 20MB</Typography>
               </Box>
             </Stack>
@@ -71,7 +131,7 @@ export default function SlidesSection({ value, onChange }) {
                 <input
                   hidden
                   type="file"
-                  accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                  accept=".pdf,.ppt,.pptx,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                   onChange={uploadPPT}
                 />
               </Button>
@@ -82,7 +142,16 @@ export default function SlidesSection({ value, onChange }) {
                   <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>Uploaded: {uploadedLabel}</Typography>
                 </Stack>
               )}
-            </Stack>
+
+              {(thumbUrl || uploadedLabel) && (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  {thumbUrl ? (
+                    <Box component="img" src={thumbUrl} alt="Slides preview" sx={{ width: 112, height: 72, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider', cursor: 'pointer' }} onClick={openViewer} />
+                  ) : (
+                    <Chip icon={<InsertDriveFileIcon />} label="Open Viewer" onClick={openViewer} variant="outlined" />
+                  )}
+                </Stack>
+              )}            </Stack>
           </Stack>
 
           {progress != null && (
@@ -96,4 +165,12 @@ export default function SlidesSection({ value, onChange }) {
     </Card>
   )
 }
+
+
+
+
+
+
+
+
 

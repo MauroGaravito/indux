@@ -7,6 +7,7 @@ import './setupAxiosNotifications'
 import Landing from './pages/Landing.jsx'
 import InductionWizard from './pages/InductionWizard.jsx'
 import ReviewQueue from './pages/ReviewQueue.jsx'
+import SlidesViewer from './pages/SlidesViewer.jsx'
 import AdminLayout from './pages/admin/AdminLayout.jsx'
 import AdminDashboard from './pages/admin/AdminDashboard.jsx'
 import AdminProjects from './pages/admin/Projects.jsx'
@@ -51,6 +52,7 @@ function App() {
           <Route path="/wizard" element={<InductionWizard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/review" element={<ReviewQueue />} />
+          <Route path="/slides-viewer" element={<SlidesViewer />} />
           <Route path="/admin" element={<AdminGuard><AdminLayout /></AdminGuard>}>
             <Route index element={<AdminDashboard />} />
             <Route path="projects" element={<AdminProjects />} />
