@@ -5,7 +5,7 @@ networks:
   shared_caddy_net:
     external: true
 
-# 📦 VOLÚMENES PERSISTENTES (no se borran en redeploy)
+# 📦 VOLÚMENES PERSISTENTES
 volumes:
   mongo_data:
     external: true
@@ -15,17 +15,25 @@ volumes:
     name: indux_minio_data
 
 services:
-  # 🧱 MongoDB (persistente)
+  # 🧱 MongoDB (seguro y persistente)
   mongo:
     image: mongo:7
     container_name: indux-mongo
     restart: unless-stopped
-    ports:
-      - "27017:27017"
+    # ❌ NUNCA publicar el puerto al exterior
+    # ports:
+    #   - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:-supersecurepassword}
     volumes:
       - mongo_data:/data/db
+      # backup diario automático
+      - ./mongo-backups:/backups
     networks:
       - shared_caddy_net
+    command: >
+      bash -c "crontab -l | { cat; echo '0 2 * * * mongodump --archive=/backups/backup-$(date +\%F).gz --gzip --username=${MONGO_USER:-admin} --password=${MONGO_PASS:-supersecurepassword} --authenticationDatabase=admin'; } | crontab - && cron && exec docker-entrypoint.sh mongod"
 
   # 📁 MinIO (S3-compatible)
   minio:
@@ -51,7 +59,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV}
       PORT: ${PORT}
-      MONGO_URI: ${MONGO_URI}
+      MONGO_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:-supersecurepassword}@mongo:27017/indux?authSource=admin
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL}
