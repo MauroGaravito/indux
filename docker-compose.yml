@@ -11,8 +11,8 @@ services:
       - minio
     networks:
       - shared_caddy_net
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     environment:
       - NODE_ENV=production
       - MONGO_URI=${MONGO_URI}
