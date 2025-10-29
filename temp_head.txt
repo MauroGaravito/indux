@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Box, Button, Card, CardContent, Chip, Grid, LinearProgress, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography, FormControl, FormLabel, RadioGroup, Radio, FormControlLabel } from '@mui/material'
+import { Alert, Box, Button, Card, CardContent, Chip, Grid, LinearProgress, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material'
 import SignaturePad from '../components/SignaturePad.jsx'
 import { useWizardStore } from '../store/wizard.js'
 import { useAuthStore } from '../store/auth.js'
@@ -104,8 +104,6 @@ export default function InductionWizard() {
   const personalFields = useMemo(() => project?.config?.personalDetails?.fields || [], [project])
   const questions = useMemo(() => project?.config?.questions || [], [project])
   const totalQ = questions.length
-  const answeredCount = React.useMemo(() => answers.filter(a => a !== undefined && a !== null).length, [answers])
-  const canFinish = totalQ > 0 && answeredCount === totalQ
 
   const validatePersonal = () => personalFields.every(f => !f.required || (personalValues[f.key] != null && personalValues[f.key] !== ''))
   const nextStep = () => setStep(s => s + 1)
@@ -133,10 +131,7 @@ export default function InductionWizard() {
     try {
       setStatus('submitting')
       const uploadFields = personalFields.filter(f => ['image','camera'].includes(f.type))
-      // Map image/camera fields to uploaded object keys (if present)
-      const uploads = uploadFields
-        .map(f => ({ type: f.type, key: personalValues[f.key] }))
-        .filter(u => typeof u.key === 'string' && u.key.length > 0)
+      const uploads = uploadFields.map(f => ({ type: f.type, docId: undefined }))
       const body = {
         projectId: project?._id,
         personal: personalValues,
@@ -199,46 +194,23 @@ export default function InductionWizard() {
         <Paper sx={{ p:2 }}>
           <Typography variant="subtitle1" sx={{ mb: 1 }}>Test</Typography>
           {!questions.length && <Alert severity="info">No questions configured.</Alert>}
-          {questions.length > 0 && (
-            <Stack spacing={1} sx={{ mb: 2 }}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <Typography variant="body2" color="text.secondary">{answeredCount}/{totalQ} answered</Typography>
-              </Stack>
-              <LinearProgress variant="determinate" value={(answeredCount/totalQ)*100} />
-            </Stack>
-          )}
           <Stack spacing={2}>
             {questions.map((q, qi) => (
               <Card key={qi} variant="outlined">
                 <CardContent>
                   <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Q{qi+1}. {q.questionText}</Typography>
-                  <FormControl component="fieldset" fullWidth>
-                    <RadioGroup
-                      name={`q-${qi}`}
-                      value={typeof answers[qi] === 'number' ? String(answers[qi]) : ''}
-                      onChange={(e)=> {
-                        const ai = parseInt(e.target.value, 10)
-                        setAnswers(prev=> { const n=[...prev]; n[qi]=ai; return n })
-                      }}
-                    >
-                      {q.answers.map((a, ai) => (
-                        <FormControlLabel
-                          key={ai}
-                          value={String(ai)}
-                          control={<Radio />}
-                          label={a}
-                          sx={{ my: 0.25 }}
-                        />
-                      ))}
-                    </RadioGroup>
-                  </FormControl>
+                  <Stack>
+                    {q.answers.map((a, ai) => (
+                      <Button key={ai} variant={answers[qi]===ai? 'contained':'outlined'} onClick={()=> setAnswers(prev=> { const n=[...prev]; n[qi]=ai; return n })} sx={{ justifyContent:'flex-start', mb: 1 }}>{a}</Button>
+                    ))}
+                  </Stack>
                 </CardContent>
               </Card>
             ))}
           </Stack>
           <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
             <Button onClick={prevStep}>Back</Button>
-            <Button variant="contained" onClick={finishQuiz} disabled={!canFinish}>Finish Test</Button>
+            <Button variant="contained" onClick={finishQuiz}>Finish Test</Button>
           </Stack>
         </Paper>
       )}
@@ -276,49 +248,3 @@ export default function InductionWizard() {
   )
 }
 
-function SlidesStep({ project, onBack, onNext }) {
-  const slides = project?.config?.slides || {}
-  const pptKey = slides.pptKey
-  const thumbKey = slides.thumbKey
-  const [thumbUrl, setThumbUrl] = React.useState('')
-  const name = `${project?.name || 'Slides'}`
-
-  React.useEffect(() => {
-    let cancelled = false
-    async function load() {
-      if (!thumbKey) { setThumbUrl(''); return }
-      try { const { url } = await presignGet(thumbKey); if (!cancelled) setThumbUrl(url) } catch { if (!cancelled) setThumbUrl('') }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [thumbKey])
-
-  const openViewer = () => {
-    if (!pptKey) return
-    const ext = (pptKey.split('.').pop() || 'pptx').toLowerCase()
-    const params = new URLSearchParams({ key: pptKey, name, ext })
-    window.open(`/slides-viewer?${params.toString()}`, '_blank', 'noopener,noreferrer')
-  }
-
-  return (
-    <Paper sx={{ p:2 }}>
-      <Typography variant="subtitle1" sx={{ mb: 1 }}>Slides</Typography>
-      {pptKey ? (
-        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1 }}>
-          {thumbUrl ? (
-            <Box component="img" src={thumbUrl} alt="Slides preview" sx={{ width: 140, height: 90, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider', cursor: 'pointer' }} onClick={openViewer} />
-          ) : (
-            <Chip icon={<InsertDriveFileIcon />} label="Open Viewer" onClick={openViewer} variant="outlined" />
-          )}
-          <Typography variant="body2" color="text.secondary">Your slides are ready. Open the viewer to proceed.</Typography>
-        </Stack>
-      ) : (
-        <Typography variant="body2">No slides configured.</Typography>
-      )}
-      <Stack direction="row" spacing={1}>
-        <Button onClick={onBack}>Back</Button>
-        <Button variant="contained" onClick={onNext}>Continue</Button>
-      </Stack>
-    </Paper>
-  )
-}

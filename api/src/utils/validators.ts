@@ -23,7 +23,8 @@ export const ProjectSchema = z.object({
 export const SubmissionCreateSchema = z.object({
   projectId: z.string().min(1),
   personal: z.record(z.any()),
-  uploads: z.array(z.object({ docId: z.string(), type: z.string() })).default([]),
+  // Store uploaded object keys instead of DB doc ids
+  uploads: z.array(z.object({ key: z.string(), type: z.string() })).default([]),
   quiz: z.object({ total: z.number(), correct: z.number() }),
   signatureDataUrl: z.string().optional()
 });
