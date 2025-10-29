@@ -13,12 +13,21 @@ const router = Router();
 
 // Worker creates a submission (requires worker login)
 router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
-  const parsed = SubmissionCreateSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const userId = req.user!.sub;
-  const body = parsed.data;
-  const sub = await Submission.create({ ...body, userId, status: 'pending' });
-  res.status(201).json(sub);
+  try {
+    // Tolerate "uploads" arriving as JSON string and parse it
+    if (typeof req.body?.uploads === 'string') {
+      try { req.body.uploads = JSON.parse(req.body.uploads); } catch {}
+    }
+    const parsed = SubmissionCreateSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    const userId = req.user!.sub;
+    const body = parsed.data;
+    const sub = await Submission.create({ ...body, userId, status: 'pending' });
+    res.status(201).json(sub);
+  } catch (e: any) {
+    const msg = (e && e.message) || 'Submission failed';
+    res.status(400).json({ error: msg });
+  }
 });
 
 // Manager list pending submissions
@@ -61,4 +70,3 @@ router.post('/:id/decline', requireAuth, requireRole('manager', 'admin'), async 
 });
 
 export default router;
-

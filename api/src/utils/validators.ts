@@ -20,11 +20,22 @@ export const ProjectSchema = z.object({
   config: z.record(z.any()).optional()
 });
 
+// Accept both legacy array-of-strings (keys) and new array-of-objects
+// and normalize to array of { key, type }
+const UploadsUnion = z.union([
+  z.array(z.object({ key: z.string(), type: z.string() })),
+  z.array(z.string())
+]).transform((val) => {
+  if (Array.isArray(val) && typeof val[0] === 'string') {
+    return (val as string[]).map((k) => ({ key: k, type: 'file' }))
+  }
+  return val as Array<{ key: string; type: string }>
+});
+
 export const SubmissionCreateSchema = z.object({
   projectId: z.string().min(1),
   personal: z.record(z.any()),
-  // Store uploaded object keys instead of DB doc ids
-  uploads: z.array(z.object({ key: z.string(), type: z.string() })).default([]),
+  uploads: UploadsUnion.default([]),
   quiz: z.object({ total: z.number(), correct: z.number() }),
   signatureDataUrl: z.string().optional()
 });
