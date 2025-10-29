@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Box, Button, Card, CardContent, Chip, Grid, LinearProgress, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Card, CardContent, Chip, Grid, LinearProgress, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography, FormControl, FormLabel, RadioGroup, Radio, FormControlLabel } from '@mui/material'
 import SignaturePad from '../components/SignaturePad.jsx'
 import { useWizardStore } from '../store/wizard.js'
 import { useAuthStore } from '../store/auth.js'
@@ -104,6 +104,8 @@ export default function InductionWizard() {
   const personalFields = useMemo(() => project?.config?.personalDetails?.fields || [], [project])
   const questions = useMemo(() => project?.config?.questions || [], [project])
   const totalQ = questions.length
+  const answeredCount = React.useMemo(() => answers.filter(a => a !== undefined && a !== null).length, [answers])
+  const canFinish = totalQ > 0 && answeredCount === totalQ
 
   const validatePersonal = () => personalFields.every(f => !f.required || (personalValues[f.key] != null && personalValues[f.key] !== ''))
   const nextStep = () => setStep(s => s + 1)
@@ -194,23 +196,46 @@ export default function InductionWizard() {
         <Paper sx={{ p:2 }}>
           <Typography variant="subtitle1" sx={{ mb: 1 }}>Test</Typography>
           {!questions.length && <Alert severity="info">No questions configured.</Alert>}
+          {questions.length > 0 && (
+            <Stack spacing={1} sx={{ mb: 2 }}>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography variant="body2" color="text.secondary">{answeredCount}/{totalQ} answered</Typography>
+              </Stack>
+              <LinearProgress variant="determinate" value={(answeredCount/totalQ)*100} />
+            </Stack>
+          )}
           <Stack spacing={2}>
             {questions.map((q, qi) => (
               <Card key={qi} variant="outlined">
                 <CardContent>
                   <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Q{qi+1}. {q.questionText}</Typography>
-                  <Stack>
-                    {q.answers.map((a, ai) => (
-                      <Button key={ai} variant={answers[qi]===ai? 'contained':'outlined'} onClick={()=> setAnswers(prev=> { const n=[...prev]; n[qi]=ai; return n })} sx={{ justifyContent:'flex-start', mb: 1 }}>{a}</Button>
-                    ))}
-                  </Stack>
+                  <FormControl component="fieldset" fullWidth>
+                    <RadioGroup
+                      name={`q-${qi}`}
+                      value={typeof answers[qi] === 'number' ? String(answers[qi]) : ''}
+                      onChange={(e)=> {
+                        const ai = parseInt(e.target.value, 10)
+                        setAnswers(prev=> { const n=[...prev]; n[qi]=ai; return n })
+                      }}
+                    >
+                      {q.answers.map((a, ai) => (
+                        <FormControlLabel
+                          key={ai}
+                          value={String(ai)}
+                          control={<Radio />}
+                          label={a}
+                          sx={{ my: 0.25 }}
+                        />
+                      ))}
+                    </RadioGroup>
+                  </FormControl>
                 </CardContent>
               </Card>
             ))}
           </Stack>
           <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
             <Button onClick={prevStep}>Back</Button>
-            <Button variant="contained" onClick={finishQuiz}>Finish Test</Button>
+            <Button variant="contained" onClick={finishQuiz} disabled={!canFinish}>Finish Test</Button>
           </Stack>
         </Paper>
       )}
