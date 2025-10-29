@@ -36,7 +36,6 @@ export default function Login() {
         <TextField label="Email" type="email" {...register('email')} error={!!errors.email} helperText={errors.email?.message} />
         <TextField label="Password" type="password" {...register('password')} error={!!errors.password} helperText={errors.password?.message} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit(onSubmit)() } }} />
         <AsyncButton type="submit" variant="contained" onClick={handleSubmit(onSubmit)}>Login</AsyncButton>
-        <Typography variant="body2">Demo users: admin@indux.local / admin123, manager@indux.local / manager123, worker@indux.local / worker123</Typography>
       </Stack>
     </form>
   )

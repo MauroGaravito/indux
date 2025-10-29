@@ -14,6 +14,9 @@ Incluye:
 - App: https://indux.downundersolutions.com/
 - API (via Caddy): https://indux-api.downundersolutions.com/
 
+Despliegue recomendado: Dokploy + Caddy (o cualquier reverse proxy) con Docker Compose.
+En Dokploy, importa este repositorio como aplicación Docker Compose y configura las variables descritas abajo.
+
 ---
 
 ## Arquitectura y servicios
@@ -73,13 +76,50 @@ FRONTEND_URL=http://localhost:5173
 # Frontend (solo build del frontend)
 VITE_API_URL=https://indux-api.downundersolutions.com
 
-# Seed inicial
+# Seed inicial (solo primer despliegue)
 SEED=true
 ```
 
 Notas:
 - `PUBLIC_S3_ENDPOINT` ahora es soportado por `api/src/services/minio.ts` y se usa para firmar URLs presignadas accesibles desde el navegador. Si no lo defines, se firma contra el endpoint interno y los uploads pueden fallar desde el browser.
-- `VITE_API_URL` lo consume el frontend en build/preview/dev (ver `frontend/src/utils/api.js`).
+- `VITE_API_URL` lo consume el frontend en build/preview/dev (ver `frontend/src/utils/api.js`). En Dokploy, pasa `VITE_API_URL` como ARG/ENV al construir el contenedor del frontend (por ejemplo `https://indux-api.downundersolutions.com`).
+- `SEED=true` solo para el primer despliegue: crea usuarios de demo si no existen. Luego cambia a `SEED=false` y vuelve a desplegar para desactivar el sembrado automático.
+
+---
+
+## Despliegue en Dokploy (pasos sugeridos)
+
+1) Red de Docker compartida (si usas Caddy externo)
+```
+docker network create shared_caddy_net
+```
+Conecta Caddy a esa red (`docker network connect shared_caddy_net caddy`).
+
+2) Importa la app Docker Compose en Dokploy
+- Usa este repo y el `docker-compose.yml` del proyecto.
+- Asegúrate de que la red `shared_caddy_net` exista y esté marcada como externa en Dokploy.
+
+3) Variables/Secrets mínimos
+- API:
+  - `NODE_ENV=production`
+  - `PORT=8080`
+  - `MONGO_URI=mongodb://mongo:27017/indux`
+  - `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` (valores seguros)
+  - `FRONTEND_URL` (orígenes permitidos, separa por comas; ej. `https://indux.downundersolutions.com`)
+  - `S3_*` y `PUBLIC_S3_ENDPOINT` (dominio público del MinIO/S3)
+  - `SEED=true` solo en el primer despliegue
+- Frontend:
+  - `VITE_API_URL=https://indux-api.downundersolutions.com`
+
+4) Volúmenes
+- Mongo: persiste `/data/db`.
+- MinIO: persiste `/data`.
+
+5) Despliega
+- Primer despliegue con `SEED=true`. Revisa logs de la API en Dokploy y verifica entradas como `Seeded user admin@indux.local`.
+- Luego, cambia `SEED=false` y vuelve a desplegar para evitar recrear credenciales de demo en el futuro.
+
+6) Proxy (Caddy) – ejemplos más abajo
 
 ---
 
@@ -135,11 +175,23 @@ Scripts de ayuda (Windows PowerShell):
 
 ---
 
-## Usuarios de demo (seed)
+## Primer inicio de sesión / Usuarios de demo
 
+Durante el primer despliegue con `SEED=true`, se crearán automáticamente usuarios de demo (si no existen):
 - Admin: `admin@indux.local` / `admin123`
 - Manager: `manager@indux.local` / `manager123`
 - Worker: `worker@indux.local` / `worker123`
+
+Recomendaciones de seguridad:
+- Tras validar el acceso, cambia las contraseñas o elimina los usuarios de demo desde el panel de Admin.
+- Desactiva el seed cambiando `SEED=false` y redeploy.
+
+Entrar por primera vez:
+- Frontend: inicia sesión en `/login` con un usuario seed (Admin recomendado).
+- Navegación según rol:
+  - Admin: `/admin` (dashboard y gestión)
+  - Manager: `/review`
+  - Worker: `/wizard`
 
 ---
 
@@ -232,4 +284,5 @@ BASE_URL=http://localhost:8080 node check-health.js
   - Revisa `PUBLIC_S3_ENDPOINT` y que Caddy preserve el path del bucket, sin strip.
   - Hora correcta en servidor y URL vigente (10 min por defecto).
 - Rebuild limpio: `docker compose build --no-cache api frontend && docker compose up -d`.
+- Login redirige al refrescar: el frontend hidrata el estado de autenticación desde `localStorage` al iniciar. Si se borra el storage o el navegador lo bloquea, volverás a `/login`. Asegúrate de no estar en modo privado restrictivo y de que tu dominio esté en `FRONTEND_URL`.
 edicion
