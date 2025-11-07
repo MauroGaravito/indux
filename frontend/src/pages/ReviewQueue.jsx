@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
   Alert, Button, Paper, Stack, Typography, Tabs, Tab, Chip, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, Grid, Box
+  DialogContent, DialogActions, TextField, Grid, Box, Divider, List, ListItem, ListItemText
 } from '@mui/material'
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import api from '../utils/api.js'
 import AsyncButton from '../components/AsyncButton.jsx'
 import { useAuthStore } from '../store/auth.js'
@@ -112,7 +113,81 @@ export default function ReviewQueue() {
       <Dialog open={viewOpen} onClose={closeView} maxWidth="md" fullWidth>
         <DialogTitle>{viewTitle}</DialogTitle>
         <DialogContent>
-          <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{viewJson ? JSON.stringify(viewJson, null, 2) : ''}</pre>
+          {viewTitle === 'Worker Submission' && viewJson ? (
+            <Box sx={{ py: 1 }}>
+              {/* Personal Details */}
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Personal Details</Typography>
+              <Grid container spacing={2}>
+                {Object.entries(viewJson.personal || {}).map(([key, val]) => {
+                  const labelMap = {
+                    name: 'Name',
+                    dob: 'Date of Birth',
+                    phone: 'Phone',
+                    address: 'Address',
+                    medicalIssues: 'Medical Issues',
+                    nextOfKin: 'Next of Kin',
+                    nextOfKinPhone: 'Next of Kin Phone',
+                    isIndigenous: 'Is Indigenous',
+                    isApprentice: 'Is Apprentice'
+                  }
+                  const prettify = (k) => labelMap[k] || String(k)
+                    .replace(/([a-z])([A-Z])/g, '$1 $2')
+                    .replace(/[-_]/g, ' ')
+                    .replace(/^\w/, (c) => c.toUpperCase())
+                  const display = typeof val === 'object' && val != null ? JSON.stringify(val) : String(val ?? '')
+                  return (
+                    <Grid key={key} item xs={12} sm={6}>
+                      <Typography variant="subtitle2" color="text.secondary">{prettify(key)}</Typography>
+                      <Typography variant="body1">{display}</Typography>
+                    </Grid>
+                  )
+                })}
+              </Grid>
+
+              {/* Signature */}
+              {viewJson.signatureDataUrl && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Signature</Typography>
+                  <Box component="img" src={viewJson.signatureDataUrl} alt="Signature"
+                       sx={{ maxWidth: '200px', borderRadius: 1, border: '1px solid', borderColor: 'divider' }} />
+                </Box>
+              )}
+
+              <Divider sx={{ my: 2 }} />
+
+              {/* Quiz Summary */}
+              {viewJson.quiz && (
+                <Typography variant="body1" sx={{ mb: 1 }}>
+                  {`${viewJson.quiz.correct ?? 0}/${viewJson.quiz.total ?? 0} correct answers `}
+                  {(viewJson.quiz.total && viewJson.quiz.correct === viewJson.quiz.total) ? '✅' : ''}
+                </Typography>
+              )}
+
+              {/* Uploads */}
+              {Array.isArray(viewJson.uploads) && viewJson.uploads.length > 0 && (
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Uploads</Typography>
+                  <List dense>
+                    {viewJson.uploads.map((u, idx) => {
+                      const key = typeof u === 'string' ? u : (u?.key || '')
+                      const type = typeof u === 'string' ? undefined : u?.type
+                      return (
+                        <ListItem key={`${key}-${idx}`} sx={{ py: 0.5 }}>
+                          <InsertDriveFileIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                          <ListItemText
+                            primary={key || '(missing key)'}
+                            secondary={type ? `Type: ${type}` : undefined}
+                          />
+                        </ListItem>
+                      )
+                    })}
+                  </List>
+                </Box>
+              )}
+            </Box>
+          ) : (
+            <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{viewJson ? JSON.stringify(viewJson, null, 2) : ''}</pre>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={closeView}>Close</Button>
