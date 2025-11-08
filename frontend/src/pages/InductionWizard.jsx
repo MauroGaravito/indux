@@ -141,7 +141,7 @@ export default function InductionWizard() {
         projectId: project?._id,
         personal: personalValues,
         uploads,
-        quiz: { total: totalQ, correct: Math.round(((score||0) / 100) * (totalQ||0)) },
+        quiz: { total: totalQ, correct: Math.round(((score||0) / 100) * (totalQ||0)), answers },
         signatureDataUrl: signature || undefined
       }
       await api.post('/submissions', body)

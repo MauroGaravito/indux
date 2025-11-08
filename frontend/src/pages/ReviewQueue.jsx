@@ -19,6 +19,7 @@ export default function ReviewQueue() {
   const [tab, setTab] = useState(0)
   const [subs, setSubs] = useState([])
   const [projReviews, setProjReviews] = useState([])
+  const [projects, setProjects] = useState([])
   const [viewOpen, setViewOpen] = useState(false)
   const [viewTitle, setViewTitle] = useState('')
   const [viewJson, setViewJson] = useState(null)
@@ -32,6 +33,7 @@ export default function ReviewQueue() {
     api.get('/reviews/projects').then(r => setProjReviews(r.data || []))
   ])
   useEffect(()=> { if (user) load() }, [user])
+  useEffect(()=> { api.get('/projects').then(r => setProjects(r.data || [])) }, [])
 
   if (!user) return <Alert severity="info">Please log in as manager/admin.</Alert>
   if (user.role === 'worker') return <Alert severity="warning">Managers/Admins only.</Alert>
@@ -162,6 +164,43 @@ export default function ReviewQueue() {
                   {(viewJson.quiz.total && viewJson.quiz.correct === viewJson.quiz.total) ? '✅' : ''}
                 </Typography>
               )}
+
+              {/* Quiz Details */}
+              {(() => {
+                const project = projects.find(p => p._id === (viewJson.projectId || viewJson.project?._id))
+                const questions = project?.config?.questions || []
+                const answers = viewJson?.quiz?.answers
+                if (!questions.length) return null
+                return (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Questionnaire</Typography>
+                    <Stack spacing={1}>
+                      {questions.map((q, qi) => {
+                        const selectedIdx = Array.isArray(answers) ? answers[qi] : undefined
+                        const correctIdx = q?.correctIndex
+                        const selectedText = typeof selectedIdx === 'number' ? q?.answers?.[selectedIdx] : undefined
+                        const correctText = typeof correctIdx === 'number' ? q?.answers?.[correctIdx] : undefined
+                        const isCorrect = typeof selectedIdx === 'number' && selectedIdx === correctIdx
+                        return (
+                          <Paper key={qi} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>Q{qi+1}. {q?.questionText}</Typography>
+                            {selectedText != null ? (
+                              <Typography variant="body2" color={isCorrect ? 'success.main' : 'error.main'}>
+                                Selected: {selectedText} {isCorrect ? '✓' : '✗'}
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">No stored answer</Typography>
+                            )}
+                            {(!isCorrect && correctText != null) && (
+                              <Typography variant="body2" color="text.secondary">Correct: {correctText}</Typography>
+                            )}
+                          </Paper>
+                        )
+                      })}
+                    </Stack>
+                  </Box>
+                )
+              })()}
 
               {/* Uploads */}
               {Array.isArray(viewJson.uploads) && viewJson.uploads.length > 0 && (

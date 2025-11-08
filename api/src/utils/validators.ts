@@ -36,7 +36,11 @@ export const SubmissionCreateSchema = z.object({
   projectId: z.string().min(1),
   personal: z.record(z.any()),
   uploads: UploadsUnion.default([]),
-  quiz: z.object({ total: z.number(), correct: z.number() }),
+  quiz: z.object({
+    total: z.number(),
+    correct: z.number(),
+    answers: z.array(z.number()).optional()
+  }),
   signatureDataUrl: z.string().optional()
 });
 

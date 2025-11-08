@@ -6,7 +6,7 @@ export interface ISubmission extends Document {
   personal: Record<string, any>;
   // Allow legacy string keys or new key/type objects
   uploads: Array<{ key: string; type: string } | string>;
-  quiz: { total: number; correct: number };
+  quiz: { total: number; correct: number; answers?: number[] };
   signatureDataUrl?: string;
   status: 'pending' | 'approved' | 'declined';
   reviewedBy?: mongoose.Types.ObjectId;
@@ -20,7 +20,7 @@ const SubmissionSchema = new Schema<ISubmission>({
   personal: { type: Schema.Types.Mixed, default: {} },
   // Be permissive to support legacy payloads and new structured items
   uploads: { type: [Schema.Types.Mixed], default: [] },
-  quiz: { total: Number, correct: Number },
+  quiz: { total: Number, correct: Number, answers: { type: [Number], default: undefined } },
   signatureDataUrl: { type: String },
   status: { type: String, enum: ['pending', 'approved', 'declined'], default: 'pending' },
   reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
