@@ -101,7 +101,15 @@ export default function ReviewQueue() {
                       <StatusChip status={s.status || 'pending'} />
                       <Typography variant="caption" sx={{ opacity: 0.7 }}>Date: {new Date(s.createdAt).toLocaleString()}</Typography>
                     </Stack>
-                    <Typography variant="caption" sx={{ opacity: 0.8 }}>Project: {s.projectId} | User: {s.userId}</Typography>
+                    {(() => {
+                      const workerName = s?.userId?.name || s?.user?.name || String(s.userId || '')
+                      const projectName = s?.projectId?.name || String(s.projectId || '')
+                      return (
+                        <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                          Project: {projectName} | User: {workerName}
+                        </Typography>
+                      )
+                    })()}
                   </Box>
                   <Stack direction="row" spacing={1}>
                     <Button variant="outlined" onClick={()=> openView('Worker Submission', s)}>View</Button>
@@ -229,7 +237,8 @@ export default function ReviewQueue() {
 
               {/* Quiz Details */}
               {(() => {
-                const project = projects.find(p => p._id === (viewJson.projectId || viewJson.project?._id))
+                const subProjId = typeof viewJson.projectId === 'string' ? viewJson.projectId : (viewJson.projectId && viewJson.projectId._id)
+                const project = projects.find(p => p._id === subProjId)
                 const questions = project?.config?.questions || []
                 const answers = viewJson?.quiz?.answers
                 if (!questions.length) return null
