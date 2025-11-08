@@ -53,6 +53,16 @@ function CameraCapture({ label, value, onChange }) {
   const [previewUrl, setPreviewUrl] = useState('')
   const [previewBlob, setPreviewBlob] = useState(null)
 
+  // Cleanup media stream on unmount
+  useEffect(() => {
+    return () => {
+      const s = videoRef.current?.srcObject
+      if (s) {
+        try { s.getTracks().forEach(t => t.stop()) } catch {}
+      }
+    }
+  }, [])
+
   const start = async () => {
     const s = await navigator.mediaDevices.getUserMedia({ video: true })
     videoRef.current.srcObject = s
@@ -102,17 +112,27 @@ function CameraCapture({ label, value, onChange }) {
       )}
       {streaming && !previewUrl && (
         <Stack spacing={1}>
-          <video ref={videoRef} style={{ maxWidth: '100%', borderRadius: 8 }} />
-          <Stack direction="row" spacing={1}>
+          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: '100%', maxWidth: 480, borderRadius: 8, background: '#000' }}
+            />
+          </Box>
+          <Stack direction="row" spacing={1} justifyContent="center">
             <Button variant="outlined" onClick={capture}>Capture</Button>
-            <Button onClick={cancel}>Close</Button>
+            <Button onClick={cancel}>Cancel</Button>
           </Stack>
         </Stack>
       )}
       {streaming && !!previewUrl && (
         <Stack spacing={1}>
-          <Box component="img" src={previewUrl} alt="Preview" sx={{ maxWidth: '100%', borderRadius: 1, border: '1px solid', borderColor: 'divider' }} />
-          <Stack direction="row" spacing={1}>
+          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+            <Box component="img" src={previewUrl} alt="Preview" sx={{ width: '100%', maxWidth: 480, borderRadius: 1, border: '1px solid', borderColor: 'divider' }} />
+          </Box>
+          <Stack direction="row" spacing={1} justifyContent="center">
             <Button onClick={retake}>Retake</Button>
             <Button onClick={cancel}>Cancel</Button>
             <Button variant="contained" onClick={accept} disabled={progress!=null}>Accept</Button>
