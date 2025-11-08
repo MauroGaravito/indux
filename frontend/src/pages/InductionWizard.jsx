@@ -1,16 +1,4 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
-  )
-    </Paper>
-
-  // After successful submission, show success then redirect
-  useEffect(() => {
-    if (status === 'done') {
-      const t = setTimeout(() => navigate('/wizard'), 2000)
-      return () => clearTimeout(t)
-    }
-  }, [status, navigate])
-  )
-import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Alert, Box, Button, Card, CardContent, Chip, Grid, LinearProgress, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography, FormControl, FormLabel, RadioGroup, Radio, FormControlLabel, Select, MenuItem, Collapse, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
 import SignaturePad from '../components/SignaturePad.jsx'
