@@ -75,6 +75,7 @@ function MedicalField({ label, value, onChange }) {
       </Collapse>
     </FormControl>
   )
+}
 
 function CameraCapture({ label, value, onChange }) {
   const videoRef = useRef(null)
@@ -213,7 +214,8 @@ function CameraCapture({ label, value, onChange }) {
       )}
       {value && <Chip label={`Captured: ${value}`} size="small" />}
     </Stack>
-  )
+   )
+}
 
 export default function InductionWizard() {
   const navigate = useNavigate()
