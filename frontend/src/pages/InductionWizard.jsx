@@ -443,8 +443,8 @@ export default function InductionWizard() {
       setStatus('done')
 
       // ✅ Redirigir y refrescar para limpiar el estado
-      navigate('/wizard')
-      window.location.reload()
+      navigate(0)
+      
     } catch (e) {
       setStatus('error')
     }
