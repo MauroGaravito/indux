@@ -440,6 +440,10 @@ function SlidesStep({ project, onBack, onNext }) {
   const pptKey = slides.pptKey
   const thumbKey = slides.thumbKey
   const [thumbUrl, setThumbUrl] = React.useState('')
+  const [totalSlides, setTotalSlides] = React.useState(1)
+  const [slideIndex, setSlideIndex] = React.useState(1)
+  const [blocked, setBlocked] = React.useState(true)
+  const [countdown, setCountdown] = React.useState(5)
   const name = `${project?.name || 'Slides'}`
 
   React.useEffect(() => {
@@ -459,24 +463,95 @@ function SlidesStep({ project, onBack, onNext }) {
     window.open(`/slides-viewer?${params.toString()}`, '_blank', 'noopener,noreferrer')
   }
 
+  // Try to detect slide count for PDFs; default to 1 otherwise
+  React.useEffect(() => {
+    let cancelled = false
+    async function detectSlides() {
+      setTotalSlides(1)
+      setSlideIndex(1)
+      setBlocked(true)
+      setCountdown(5)
+      if (!pptKey) return
+      const ext = (pptKey.split('.').pop() || 'pptx').toLowerCase()
+      if (ext !== 'pdf') return
+      try {
+        const { url } = await presignGet(pptKey)
+        // Lazy load pdf.js if not present
+        if (!window.pdfjsLib) {
+          await new Promise((resolve, reject) => {
+            const s = document.createElement('script')
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+            s.onload = resolve
+            s.onerror = reject
+            document.body.appendChild(s)
+          })
+        }
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+        const pdf = await window.pdfjsLib.getDocument(url).promise
+        if (!cancelled) setTotalSlides(Math.max(1, pdf.numPages || 1))
+      } catch {
+        // ignore failures; keep default 1
+      }
+    }
+    detectSlides()
+    return () => { cancelled = true }
+  }, [pptKey])
+
+  // Block Next Slide for 5 seconds per slide
+  React.useEffect(() => {
+    setBlocked(true)
+    setCountdown(5)
+    let secs = 5
+    const tick = setInterval(() => {
+      secs -= 1
+      setCountdown(secs)
+      if (secs <= 0) {
+        clearInterval(tick)
+        setBlocked(false)
+      }
+    }, 1000)
+    return () => clearInterval(tick)
+  }, [slideIndex])
+
+  const nextSlide = () => {
+    if (slideIndex < totalSlides) setSlideIndex(slideIndex + 1)
+  }
+  const prevSlide = () => {
+    if (slideIndex > 1) setSlideIndex(slideIndex - 1)
+  }
+
   return (
     <Paper sx={{ p:2 }}>
       <Typography variant="subtitle1" sx={{ mb: 1 }}>Slides</Typography>
       {pptKey ? (
-        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1 }}>
-          {thumbUrl ? (
-            <Box component="img" src={thumbUrl} alt="Slides preview" sx={{ width: 140, height: 90, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider', cursor: 'pointer' }} onClick={openViewer} />
-          ) : (
-            <Chip icon={<InsertDriveFileIcon />} label="Open Viewer" onClick={openViewer} variant="outlined" />
-          )}
-          <Typography variant="body2" color="text.secondary">Your slides are ready. Open the viewer to proceed.</Typography>
+        <Stack spacing={2} sx={{ mb: 1 }}>
+          <Stack direction="row" spacing={2} alignItems="center">
+            {thumbUrl ? (
+              <Box component="img" src={thumbUrl} alt="Slides preview" sx={{ width: 140, height: 90, borderRadius: 1, objectFit: 'cover', border: '1px solid', borderColor: 'divider', cursor: 'pointer' }} onClick={openViewer} />
+            ) : (
+              <Chip icon={<InsertDriveFileIcon />} label="Open Viewer" onClick={openViewer} variant="outlined" />
+            )}
+            <Typography variant="body2" color="text.secondary">Manual slides navigation enabled below.</Typography>
+          </Stack>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Chip label={`Slide ${slideIndex} of ${totalSlides}`} />
+            {blocked ? (
+              <Typography variant="body2" color="warning.main">Please review this slide (Next available in {countdown}s)</Typography>
+            ) : (
+              <Typography variant="body2" color="success.main">You can go next</Typography>
+            )}
+          </Stack>
+          <Stack direction="row" spacing={1}>
+            <Button onClick={prevSlide} disabled={slideIndex===1}>Previous</Button>
+            <Button variant="outlined" onClick={nextSlide} disabled={blocked || slideIndex===totalSlides}>Next Slide</Button>
+          </Stack>
         </Stack>
       ) : (
         <Typography variant="body2">No slides configured.</Typography>
       )}
       <Stack direction="row" spacing={1}>
         <Button onClick={onBack}>Back</Button>
-        <Button variant="contained" onClick={onNext}>Continue</Button>
+        <Button variant="contained" onClick={onNext} disabled={!pptKey ? false : (slideIndex < totalSlides || blocked)}>Continue</Button>
       </Stack>
     </Paper>
   )
