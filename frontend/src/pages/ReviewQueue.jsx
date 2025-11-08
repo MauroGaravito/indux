@@ -6,6 +6,7 @@ import {
 } from '@mui/material'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import api from '../utils/api.js'
+import { presignGet } from '../utils/upload.js'
 import AsyncButton from '../components/AsyncButton.jsx'
 import { useAuthStore } from '../store/auth.js'
 
@@ -30,6 +31,7 @@ export default function ReviewQueue() {
   const [declineId, setDeclineId] = useState(null)
   const [declineKind, setDeclineKind] = useState('submission')
   const [declineReason, setDeclineReason] = useState('Not adequate')
+  const [viewUploadUrls, setViewUploadUrls] = useState({}) // { [key:string]: url }
 
   const load = () => Promise.all([
     api.get('/submissions').then(r => setSubs(r.data || [])), // pending only (default)
@@ -42,7 +44,7 @@ export default function ReviewQueue() {
   if (!user) return <Alert severity="info">Please log in as manager/admin.</Alert>
   if (user.role === 'worker') return <Alert severity="warning">Managers/Admins only.</Alert>
 
-  const openView = (title, data) => { setViewTitle(title); setViewJson(data); setViewOpen(true) }
+  const openView = (title, data) => { setViewTitle(title); setViewJson(data); setViewUploadUrls({}); setViewOpen(true) }
   const closeView = () => setViewOpen(false)
   const openDecline = (kind, id) => { setDeclineKind(kind); setDeclineId(id); setDeclineOpen(true) }
   const closeDecline = () => setDeclineOpen(false)
@@ -51,6 +53,32 @@ export default function ReviewQueue() {
   const declineSubmission = async () => { if(!declineId) return; await api.post(`/submissions/${declineId}/decline`, { reason: declineReason }); closeDecline(); await load() }
   const approveProject = async (id) => { await api.post(`/reviews/projects/${id}/approve`); await load() }
   const declineProject = async () => { if(!declineId) return; await api.post(`/reviews/projects/${declineId}/decline`, { reason: declineReason }); closeDecline(); await load() }
+
+  // When viewing a worker submission, pre-sign image uploads so we can preview them
+  useEffect(() => {
+    let cancelled = false
+    async function hydrateUploadUrls() {
+      try {
+        if (!viewOpen || viewTitle !== 'Worker Submission' || !viewJson) return
+        const uploads = Array.isArray(viewJson.uploads) ? viewJson.uploads : []
+        const imageLike = uploads
+          .map((u) => (typeof u === 'string' ? { key: u, type: undefined } : u))
+          .filter((u) => u && typeof u.key === 'string' && u.key && (u.type === 'image' || u.type === 'camera'))
+        if (!imageLike.length) { setViewUploadUrls({}); return }
+        const entries = await Promise.all(imageLike.map(async (u) => {
+          try {
+            const { url } = await presignGet(u.key)
+            return [u.key, url]
+          } catch {
+            return [u.key, '']
+          }
+        }))
+        if (!cancelled) setViewUploadUrls(Object.fromEntries(entries))
+      } catch {}
+    }
+    hydrateUploadUrls()
+    return () => { cancelled = true }
+  }, [viewOpen, viewTitle, viewJson])
 
   return (
     <Stack spacing={2}>
@@ -298,9 +326,15 @@ export default function ReviewQueue() {
                     {viewJson.uploads.map((u, idx) => {
                       const key = typeof u === 'string' ? u : (u?.key || '')
                       const type = typeof u === 'string' ? undefined : u?.type
+                      const imgUrl = (type === 'image' || type === 'camera') ? (viewUploadUrls[key] || '') : ''
                       return (
-                        <ListItem key={`${key}-${idx}`} sx={{ py: 0.5 }}>
-                          <InsertDriveFileIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                        <ListItem key={`${key}-${idx}`} sx={{ py: 0.5, alignItems: 'flex-start' }}>
+                          {imgUrl ? (
+                            <Box component="img" src={imgUrl} alt={key}
+                                 sx={{ width: 96, height: 72, objectFit: 'cover', borderRadius: 1, border: '1px solid', borderColor: 'divider', mr: 1 }} />
+                          ) : (
+                            <InsertDriveFileIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary', mt: '2px' }} />
+                          )}
                           <ListItemText
                             primary={key || '(missing key)'}
                             secondary={type ? `Type: ${type}` : undefined}
