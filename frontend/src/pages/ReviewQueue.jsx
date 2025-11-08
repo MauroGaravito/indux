@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import {
   Alert, Button, Paper, Stack, Typography, Tabs, Tab, Chip, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Grid, Box, Divider, List, ListItem, ListItemText
-} from '@mui/material'
+} from '@mui/material'\nimport { Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import api from '../utils/api.js'
 import AsyncButton from '../components/AsyncButton.jsx'
@@ -18,6 +18,8 @@ export default function ReviewQueue() {
   const { user } = useAuthStore()
   const [tab, setTab] = useState(0)
   const [subs, setSubs] = useState([])
+  const [allSubs, setAllSubs] = useState([])
+  const [historyFilter, setHistoryFilter] = useState('all') // all | pending | approved | declined
   const [projReviews, setProjReviews] = useState([])
   const [projects, setProjects] = useState([])
   const [viewOpen, setViewOpen] = useState(false)
@@ -29,7 +31,8 @@ export default function ReviewQueue() {
   const [declineReason, setDeclineReason] = useState('Not adequate')
 
   const load = () => Promise.all([
-    api.get('/submissions').then(r => setSubs(r.data || [])),
+    api.get('/submissions').then(r => setSubs(r.data || [])), // pending only (default)
+    api.get('/submissions?status=all').then(r => setAllSubs(r.data || [])),
     api.get('/reviews/projects').then(r => setProjReviews(r.data || []))
   ])
   useEffect(()=> { if (user) load() }, [user])
@@ -54,6 +57,7 @@ export default function ReviewQueue() {
       <Tabs value={tab} onChange={(_,v)=> setTab(v)} sx={{ borderBottom: '1px solid #eee' }}>
         <Tab label="Project Reviews" />
         <Tab label="Worker Submissions" />
+        <Tab label="All Submissions" />
       </Tabs>
 
       {/* Project Reviews */}
@@ -109,6 +113,63 @@ export default function ReviewQueue() {
           ))}
         </Grid>
         {!subs.length && <Alert severity="info" sx={{ mt: 2 }}>No pending worker submissions.</Alert>}
+      </Box>
+
+      {/* All Submissions (History) */}
+      <Box hidden={tab!==2}>
+        {(() => {
+          const counts = allSubs.reduce((acc, s) => {
+            acc.all++
+            acc[s.status] = (acc[s.status] || 0) + 1
+            return acc
+          }, { all: 0, pending: 0, approved: 0, declined: 0 })
+          const filtered = allSubs.filter(s => historyFilter==='all' ? true : s.status===historyFilter)
+          const statusColor = (st) => st==='approved' ? 'success' : st==='declined' ? 'error' : 'warning'
+          return (
+            <Stack spacing={2} sx={{ mt: 2 }}>
+              <Tabs value={historyFilter} onChange={(_,v)=> setHistoryFilter(v)} variant="scrollable" scrollButtons allowScrollButtonsMobile>
+                <Tab value="all" label={`All (${counts.all})`} />
+                <Tab value="pending" label={`Pending (${counts.pending})`} />
+                <Tab value="approved" label={`Approved (${counts.approved})`} />
+                <Tab value="declined" label={`Declined (${counts.declined})`} />
+              </Tabs>
+              <Paper sx={{ width: '100%', overflowX: 'auto' }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Worker</TableCell>
+                      <TableCell>Project</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Submitted At</TableCell>
+                      <TableCell>Reviewed By</TableCell>
+                      <TableCell align="right">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filtered.map((s) => {
+                      const workerName = s?.userId?.name || s?.user?.name || String(s.userId || '')
+                      const projectName = s?.projectId?.name || String(s.projectId || '')
+                      const reviewer = s?.reviewedBy?.name || (s.reviewedBy || '')
+                      return (
+                        <TableRow key={s._id} hover>
+                          <TableCell>{workerName}</TableCell>
+                          <TableCell>{projectName}</TableCell>
+                          <TableCell><Chip size="small" color={statusColor(s.status)} label={s.status} /></TableCell>
+                          <TableCell>{new Date(s.createdAt).toLocaleString()}</TableCell>
+                          <TableCell>{reviewer ? String(reviewer) : '-'}</TableCell>
+                          <TableCell align="right">
+                            <Button size="small" variant="outlined" onClick={()=> openView('Worker Submission', s)}>View</Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+                {!filtered.length && <Alert severity="info" sx={{ m: 2 }}>No submissions found.</Alert>}
+              </Paper>
+            </Stack>
+          )
+        })()}
       </Box>
 
       {/* View Dialog */}
@@ -247,3 +308,4 @@ export default function ReviewQueue() {
     </Stack>
   )
 }
+

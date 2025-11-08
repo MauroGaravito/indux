@@ -31,9 +31,17 @@ router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
 });
 
 // Manager list pending submissions
-router.get('/', requireAuth, requireRole('manager', 'admin'), async (_req, res) => {
-  const list = await Submission.find({ status: 'pending' }).sort({ createdAt: -1 }).limit(100);
-  res.json(list);
+router.get('/', requireAuth, requireRole('manager', 'admin'), async (req, res) => {
+  const raw = (req.query?.status as string | undefined) || 'pending'
+  const status = ['pending','approved','declined','all'].includes(raw) ? raw : 'pending'
+  const filter = status === 'all' ? {} : { status }
+  const list = await Submission
+    .find(filter)
+    .populate('userId', 'name email')
+    .populate('projectId', 'name')
+    .populate('reviewedBy', 'name')
+    .sort({ createdAt: -1 })
+  res.json(list)
 });
 
 router.post('/:id/approve', requireAuth, requireRole('manager', 'admin'), async (req, res) => {
