@@ -50,11 +50,16 @@ function CameraCapture({ label, value, onChange }) {
   const videoRef = useRef(null)
   const [streaming, setStreaming] = useState(false)
   const [progress, setProgress] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [previewBlob, setPreviewBlob] = useState(null)
+
   const start = async () => {
     const s = await navigator.mediaDevices.getUserMedia({ video: true })
     videoRef.current.srcObject = s
     await videoRef.current.play()
     setStreaming(true)
+    setPreviewUrl('')
+    setPreviewBlob(null)
   }
   const capture = async () => {
     const video = videoRef.current
@@ -62,22 +67,55 @@ function CameraCapture({ label, value, onChange }) {
     canvas.width = video.videoWidth; canvas.height = video.videoHeight
     const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0)
     const blob = await new Promise(res=> canvas.toBlob(res, 'image/png'))
-    const { key } = await uploadFile('worker-uploads/', blob, { onProgress: setProgress })
-    onChange(key)
-    setProgress(null)
+    const url = canvas.toDataURL('image/png')
+    setPreviewBlob(blob)
+    setPreviewUrl(url)
   }
   const stop = () => {
     const s = videoRef.current?.srcObject; if (s) s.getTracks().forEach(t=> t.stop()); setStreaming(false)
   }
+  const retake = () => {
+    setPreviewBlob(null)
+    setPreviewUrl('')
+  }
+  const cancel = () => {
+    // Do not change existing value; just close everything
+    setPreviewBlob(null)
+    setPreviewUrl('')
+    setProgress(null)
+    stop()
+  }
+  const accept = async () => {
+    if (!previewBlob) return
+    const { key } = await uploadFile('worker-uploads/', previewBlob, { onProgress: setProgress })
+    onChange(key)
+    setProgress(null)
+    setPreviewBlob(null)
+    setPreviewUrl('')
+    stop()
+  }
   return (
     <Stack spacing={1}>
       <Typography variant="body2">{label}</Typography>
-      {!streaming ? <Button variant="outlined" onClick={start}>Open Camera</Button> : (
+      {!streaming && (
+        <Button variant="outlined" onClick={start}>Open Camera</Button>
+      )}
+      {streaming && !previewUrl && (
         <Stack spacing={1}>
           <video ref={videoRef} style={{ maxWidth: '100%', borderRadius: 8 }} />
           <Stack direction="row" spacing={1}>
             <Button variant="outlined" onClick={capture}>Capture</Button>
-            <Button onClick={stop}>Close</Button>
+            <Button onClick={cancel}>Close</Button>
+          </Stack>
+        </Stack>
+      )}
+      {streaming && !!previewUrl && (
+        <Stack spacing={1}>
+          <Box component="img" src={previewUrl} alt="Preview" sx={{ maxWidth: '100%', borderRadius: 1, border: '1px solid', borderColor: 'divider' }} />
+          <Stack direction="row" spacing={1}>
+            <Button onClick={retake}>Retake</Button>
+            <Button onClick={cancel}>Cancel</Button>
+            <Button variant="contained" onClick={accept} disabled={progress!=null}>Accept</Button>
           </Stack>
           {progress!=null && <LinearProgress variant="determinate" value={progress} />}
         </Stack>
