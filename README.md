@@ -19,6 +19,8 @@ Incluye:
 - Wizard (Worker)
   - El formulario de "Personal Details" se alimenta de la configuración de Admin (`project.config.personalDetails.fields`). Si no hay configuración guardada, se muestran campos por defecto (Name, DOB, Address, Phone, etc.). Los selects usan `native: true` para compatibilidad.
   - Cámara integrada: bloque visual con video en vivo (`autoPlay`, `playsInline`, `muted`), captura a `canvas`, vista previa, y botones Capture / Retake / Accept / Cancel. No se sube nada hasta "Accept". Manejo de limpieza del stream y fix del error `srcObject` nulo.
+  - Slides: visor embebido centrado y escalado automáticamente (PDF directo; PPT/PPTX vía Office Online). Temporizador de 5 segundos por slide que bloquea “Next/Continue” hasta cumplirse. El botón “Open Original” permanece disponible.
+  - Submit: diálogo de confirmación (Cancel/Confirm) para evitar doble clic, indicador de carga en “Confirm”, mensaje de éxito y redirección automática al dashboard del worker.
 - Backend
   - `GET /submissions` acepta `?status=pending|approved|declined|all` (default `pending`) y devuelve `userId.name`, `projectId.name` y `reviewedBy.name` (populate).
   - `Submission.quiz` soporta `answers` (índices seleccionados) y el wizard las envía.
