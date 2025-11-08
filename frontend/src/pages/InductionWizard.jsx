@@ -616,9 +616,10 @@ function SlidesStep({ project, onBack, onNext }) {
                 <Box component="iframe" src={viewerUrl} title="PDF Viewer" sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }} />
               </Box>
             ) : (
-              <Box sx={{ position: 'relative', pt: '56.25%' }}>
-                <Box component="iframe" src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(viewerUrl)}`} title="Office Viewer" sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }} />
-              </Box>
+              <Stack spacing={1}>
+                <Typography variant="body2">This file will open best in a new tab.</Typography>
+                <Button variant="outlined" onClick={() => window.open(viewerUrl, '_blank', 'noopener,noreferrer')}>Open Original</Button>
+              </Stack>
             )
           ) : (
             <Typography variant="body2">Loading...</Typography>
