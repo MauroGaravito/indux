@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Box, Button, Card, CardContent, Chip, Grid, LinearProgress, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography, FormControl, FormLabel, RadioGroup, Radio, FormControlLabel, Select, MenuItem, Collapse } from '@mui/material'
+import { Alert, Box, Button, Card, CardContent, Chip, Grid, LinearProgress, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography, FormControl, FormLabel, RadioGroup, Radio, FormControlLabel, Select, MenuItem, Collapse, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
 import SignaturePad from '../components/SignaturePad.jsx'
 import { useWizardStore } from '../store/wizard.js'
 import { useAuthStore } from '../store/auth.js'
