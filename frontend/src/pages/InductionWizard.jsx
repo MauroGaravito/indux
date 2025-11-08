@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Box, Button, Card, CardContent, Chip, Grid, LinearProgress, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography, FormControl, FormLabel, RadioGroup, Radio, FormControlLabel } from '@mui/material'
+import { Alert, Box, Button, Card, CardContent, Chip, Grid, LinearProgress, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography, FormControl, FormLabel, RadioGroup, Radio, FormControlLabel, Select, MenuItem, Collapse } from '@mui/material'
 import SignaturePad from '../components/SignaturePad.jsx'
 import { useWizardStore } from '../store/wizard.js'
 import { useAuthStore } from '../store/auth.js'
@@ -10,6 +10,9 @@ import AsyncButton from '../components/AsyncButton.jsx'
 
 function DynamicField({ field, value, onChange }) {
   const [progress, setProgress] = React.useState(null)
+  if (field.key === 'medicalIssues') {
+    return <MedicalField label={field.label || 'Medical Condition'} value={value} onChange={onChange} />
+  }
   if (field.type === 'textarea') {
     return <TextField fullWidth multiline minRows={3} label={field.label} value={value||''} onChange={e=> onChange(e.target.value)} />
   }
@@ -44,6 +47,35 @@ function DynamicField({ field, value, onChange }) {
     return <CameraCapture label={field.label} value={value} onChange={onChange} />
   }
   return <TextField fullWidth label={field.label} value={value||''} onChange={e=> onChange(e.target.value)} />
+}
+
+function MedicalField({ label, value, onChange }) {
+  const v = value || { hasCondition: false, description: '' }
+  const has = !!v.hasCondition
+  const handleSelect = (evt) => {
+    const next = evt.target.value === 'yes'
+    onChange({ hasCondition: next, description: next ? (v.description || '') : '' })
+  }
+  return (
+    <FormControl fullWidth>
+      <FormLabel sx={{ mb: 1 }}>{label || 'Has any medical condition?'}</FormLabel>
+      <Select value={has ? 'yes' : 'no'} onChange={handleSelect} size="small">
+        <MenuItem value="no">No</MenuItem>
+        <MenuItem value="yes">Yes</MenuItem>
+      </Select>
+      <Collapse in={has} timeout="auto" unmountOnExit>
+        <TextField
+          sx={{ mt: 1 }}
+          fullWidth
+          multiline
+          minRows={2}
+          label="Describe the condition"
+          value={v.description || ''}
+          onChange={(e)=> onChange({ hasCondition: true, description: e.target.value })}
+        />
+      </Collapse>
+    </FormControl>
+  )
 }
 
 function CameraCapture({ label, value, onChange }) {
@@ -220,7 +252,17 @@ export default function InductionWizard() {
   const answeredCount = React.useMemo(() => answers.filter(a => a !== undefined && a !== null).length, [answers])
   const canFinish = totalQ > 0 && answeredCount === totalQ
 
-  const validatePersonal = () => personalFields.every(f => !f.required || (personalValues[f.key] != null && personalValues[f.key] !== ''))
+  const validatePersonal = () => personalFields.every(f => {
+    if (!f.required) return true
+    if (f.key === 'medicalIssues') {
+      const m = personalValues.medical
+      if (!m) return false
+      if (m.hasCondition === false) return true
+      return typeof m.description === 'string' && m.description.trim().length > 0
+    }
+    const val = personalValues[f.key]
+    return val != null && val !== ''
+  })
   const nextStep = () => setStep(s => s + 1)
   const prevStep = () => setStep(s => Math.max(0, s - 1))
   // Only select project here; advance with an explicit Continue
@@ -293,7 +335,11 @@ export default function InductionWizard() {
           <Grid container spacing={2}>
             {personalFields.map((f)=> (
               <Grid item xs={12} sm={f.type==='textarea'?12:6} key={f.key}>
-                <DynamicField field={f} value={personalValues[f.key]} onChange={(val)=> setPersonalValues({ ...personalValues, [f.key]: val })} />
+                <DynamicField
+                  field={f}
+                  value={f.key==='medicalIssues' ? personalValues.medical : personalValues[f.key]}
+                  onChange={(val)=> setPersonalValues({ ...personalValues, ...(f.key==='medicalIssues' ? { medical: val } : { [f.key]: val }) })}
+                />
               </Grid>
             ))}
           </Grid>

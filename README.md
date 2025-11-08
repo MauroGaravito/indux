@@ -18,6 +18,7 @@ Incluye:
   - "Overview" ahora usa datos en vivo: Projects, Inductions Completed, Pending Reviews (submissions + project reviews), Users.
 - Wizard (Worker)
   - El formulario de "Personal Details" se alimenta de la configuración de Admin (`project.config.personalDetails.fields`). Si no hay configuración guardada, se muestran campos por defecto (Name, DOB, Address, Phone, etc.). Los selects usan `native: true` para compatibilidad.
+  - Cámara integrada: bloque visual con video en vivo (`autoPlay`, `playsInline`, `muted`), captura a `canvas`, vista previa, y botones Capture / Retake / Accept / Cancel. No se sube nada hasta "Accept". Manejo de limpieza del stream y fix del error `srcObject` nulo.
 - Backend
   - `GET /submissions` acepta `?status=pending|approved|declined|all` (default `pending`) y devuelve `userId.name`, `projectId.name` y `reviewedBy.name` (populate).
   - `Submission.quiz` soporta `answers` (índices seleccionados) y el wizard las envía.
@@ -234,16 +235,20 @@ Entrar por primera vez:
 
 ## Subidas a MinIO (presign)
 
-- El backend asegura el bucket y firma URLs con MinIO SDK. Las claves no empiezan con `/` y los prefijos terminan en `/`.
+- El backend asegura el bucket y firma URLs con MinIO SDK. Las claves no empiezan con / y los prefijos terminan en /.
 - Para que el navegador pueda usar la URL presignada:
-  - Define `PUBLIC_S3_ENDPOINT` con el host publico que usara el cliente.
-  - No fuerces `Content-Type` manualmente en el `PUT` del cliente.
+  - Define PUBLIC_S3_ENDPOINT con el host publico que usara el cliente.
+  - No fuerces Content-Type manualmente en el PUT del cliente.
+
+Prefijos y ubicaciones:
+- Capturas de cámara y subidas de imágenes de campos personales se guardan con prefijo worker-uploads/ dentro del bucket S3_BUCKET (por defecto indux).
+- Para descargar/mostrar, usa /uploads/presign-get con la key devuelta por la subida.
 
 Local:
-- Usa `PUBLIC_S3_ENDPOINT=http://localhost:9000` (el compose publica 9000 y 9001 por defecto).
+- Usa PUBLIC_S3_ENDPOINT=http://localhost:9000 (el compose publica 9000 y 9001 por defecto).
 
 Produccion:
-- Usa un dominio publico (p. ej. `https://s3.downundersolutions.com`) y configura Caddy para no strippear el prefijo del bucket.
+- Usa un dominio publico (p. ej. https://s3.downundersolutions.com) y configura Caddy para no strippear el prefijo del bucket.
 
 ---
 

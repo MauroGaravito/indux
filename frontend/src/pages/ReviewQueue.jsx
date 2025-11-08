@@ -190,13 +190,14 @@ export default function ReviewQueue() {
               {/* Personal Details */}
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Personal Details</Typography>
               <Grid container spacing={2}>
-                {Object.entries(viewJson.personal || {}).map(([key, val]) => {
+                {Object.entries(viewJson.personal || {})
+                  .filter(([key]) => key !== 'medical' && key !== 'medicalIssues')
+                  .map(([key, val]) => {
                   const labelMap = {
                     name: 'Name',
                     dob: 'Date of Birth',
                     phone: 'Phone',
                     address: 'Address',
-                    medicalIssues: 'Medical Issues',
                     nextOfKin: 'Next of Kin',
                     nextOfKinPhone: 'Next of Kin Phone',
                     isIndigenous: 'Is Indigenous',
@@ -215,6 +216,22 @@ export default function ReviewQueue() {
                   )
                 })}
               </Grid>
+
+              {/* Medical alert block */}
+              {(() => {
+                const p = viewJson.personal || {}
+                const medical = p.medical || (p.medicalIssues ? { hasCondition: true, description: p.medicalIssues } : null)
+                if (!medical) return null
+                if (!medical.hasCondition) return null
+                return (
+                  <Box sx={{ mt: 2 }}>
+                    <Chip color="error" label="Medical Alert" sx={{ mb: 1 }} />
+                    {medical.description && (
+                      <Typography variant="body2">Condition: {String(medical.description)}</Typography>
+                    )}
+                  </Box>
+                )
+              })()}
 
               {/* Signature */}
               {viewJson.signatureDataUrl && (
