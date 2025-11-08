@@ -48,6 +48,7 @@ function DynamicField({ field, value, onChange }) {
 
 function CameraCapture({ label, value, onChange }) {
   const videoRef = useRef(null)
+  const streamRef = useRef(null)
   const [streaming, setStreaming] = useState(false)
   const [progress, setProgress] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
@@ -56,20 +57,45 @@ function CameraCapture({ label, value, onChange }) {
   // Cleanup media stream on unmount
   useEffect(() => {
     return () => {
-      const s = videoRef.current?.srcObject
-      if (s) {
-        try { s.getTracks().forEach(t => t.stop()) } catch {}
-      }
+      try {
+        const v = videoRef.current
+        if (v && v.srcObject) {
+          const s = v.srcObject
+          // @ts-ignore
+          s && s.getTracks && s.getTracks().forEach(t => t.stop())
+          // @ts-ignore
+          v.srcObject = null
+        }
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(t => t.stop())
+          streamRef.current = null
+        }
+      } catch {}
     }
   }, [])
 
+  // When streaming state turns true and we have a stream, attach it to the video element
+  useEffect(() => {
+    if (!streaming) return
+    const v = videoRef.current
+    const s = streamRef.current
+    if (v && s) {
+      // @ts-ignore
+      v.srcObject = s
+      v.play().catch(() => {})
+    }
+  }, [streaming])
+
   const start = async () => {
-    const s = await navigator.mediaDevices.getUserMedia({ video: true })
-    videoRef.current.srcObject = s
-    await videoRef.current.play()
-    setStreaming(true)
-    setPreviewUrl('')
-    setPreviewBlob(null)
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: true })
+      streamRef.current = s
+      setStreaming(true)
+      setPreviewUrl('')
+      setPreviewBlob(null)
+    } catch (e) {
+      setStreaming(false)
+    }
   }
   const capture = async () => {
     const video = videoRef.current
@@ -82,7 +108,22 @@ function CameraCapture({ label, value, onChange }) {
     setPreviewUrl(url)
   }
   const stop = () => {
-    const s = videoRef.current?.srcObject; if (s) s.getTracks().forEach(t=> t.stop()); setStreaming(false)
+    try {
+      const v = videoRef.current
+      // @ts-ignore
+      const current = v?.srcObject
+      if (current && current.getTracks) current.getTracks().forEach(t => t.stop())
+      if (v) {
+        // @ts-ignore
+        v.srcObject = null
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+      }
+    } finally {
+      setStreaming(false)
+    }
   }
   const retake = () => {
     setPreviewBlob(null)
