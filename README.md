@@ -15,7 +15,9 @@ Incluye:
   - Modal “View” de submissions ahora renderiza datos con MUI: datos personales en grid, resumen del quiz, firma (imagen) y lista de uploads. También muestra el cuestionario con la respuesta seleccionada y la correcta.
   - Nueva pestaña “All Submissions” con tabla (Worker, Project, Status, Submitted At, Reviewed By) y acción “View”, filtros por estado y recuentos.
 - Dashboard (Admin)
-  - “Overview” ahora usa datos en vivo: Projects, Inductions Completed, Pending Reviews (submissions + project reviews), Users.
+  - "Overview" ahora usa datos en vivo: Projects, Inductions Completed, Pending Reviews (submissions + project reviews), Users.
+- Wizard (Worker)
+  - El formulario de "Personal Details" se alimenta de la configuración de Admin (`project.config.personalDetails.fields`). Si no hay configuración guardada, se muestran campos por defecto (Name, DOB, Address, Phone, etc.). Los selects usan `native: true` para compatibilidad.
 - Backend
   - `GET /submissions` acepta `?status=pending|approved|declined|all` (default `pending`) y devuelve `userId.name`, `projectId.name` y `reviewedBy.name` (populate).
   - `Submission.quiz` soporta `answers` (índices seleccionados) y el wizard las envía.

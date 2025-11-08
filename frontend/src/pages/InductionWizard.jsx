@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Box, Button, Card, CardContent, Chip, Grid, LinearProgress, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography, FormControl, FormLabel, RadioGroup, Radio, FormControlLabel } from '@mui/material'
 import SignaturePad from '../components/SignaturePad.jsx'
 import { useWizardStore } from '../store/wizard.js'
@@ -18,7 +18,7 @@ function DynamicField({ field, value, onChange }) {
   }
   if (field.type === 'select' && Array.isArray(field.options)) {
     return (
-      <TextField fullWidth select label={field.label} value={value||''} onChange={e=> onChange(e.target.value)}>
+      <TextField fullWidth select label={field.label} value={value||''} onChange={e=> onChange(e.target.value)} SelectProps={{ native: true }}>
         {field.options.map((opt,i)=> <option key={i} value={opt}>{opt}</option>)}
       </TextField>
     )
@@ -101,7 +101,21 @@ export default function InductionWizard() {
 
   useEffect(() => { api.get('/projects').then(r => setProjects(r.data || [])) }, [])
 
-  const personalFields = useMemo(() => project?.config?.personalDetails?.fields || [], [project])
+  const defaultPersonalFields = useMemo(() => ([
+    { key: 'name', label: 'Name', type: 'text', required: false, builtin: true },
+    { key: 'dob', label: 'Date of Birth', type: 'date', required: false, builtin: true },
+    { key: 'address', label: 'Address', type: 'text', required: false, builtin: true },
+    { key: 'phone', label: 'Phone', type: 'text', required: false, builtin: true },
+    { key: 'medicalIssues', label: 'Medical Issues', type: 'textarea', required: false, builtin: true },
+    { key: 'nextOfKin', label: 'Next of Kin', type: 'text', required: false, builtin: true },
+    { key: 'nextOfKinPhone', label: 'Next of Kin Phone', type: 'text', required: false, builtin: true },
+    { key: 'isIndigenous', label: 'Is Indigenous', type: 'select', options: ['Yes','No','Prefer not to say'], required: false, builtin: true },
+    { key: 'isApprentice', label: 'Is Apprentice', type: 'select', options: ['Yes','No'], required: false, builtin: true }
+  ]), [])
+  const personalFields = useMemo(() => {
+    const cfg = project?.config?.personalDetails?.fields
+    return Array.isArray(cfg) && cfg.length ? cfg : defaultPersonalFields
+  }, [project, defaultPersonalFields])
   const questions = useMemo(() => project?.config?.questions || [], [project])
   const totalQ = questions.length
   const answeredCount = React.useMemo(() => answers.filter(a => a !== undefined && a !== null).length, [answers])
