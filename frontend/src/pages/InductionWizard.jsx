@@ -465,7 +465,8 @@ function SlidesStep({ project, onBack, onNext }) {
     if (!pptKey) return
     try {
       const { url } = await presignGet(pptKey)
-      setViewerUrl(url)
+      const streamUrl = `${api.defaults.baseURL}/uploads/stream?key=${encodeURIComponent(pptKey)}`
+      setViewerUrl(streamUrl || url)
       const ext = (pptKey.split('.').pop() || 'pptx').toLowerCase()
       setViewerExt(ext)
     } catch {}

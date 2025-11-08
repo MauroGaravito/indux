@@ -36,3 +36,28 @@ router.post('/presign-get', requireAuth, async (req, res) => {
     res.status(400).json({ error: 'Could not presign get URL' });
   }
 });
+
+// Stream object via API (same-origin fallback to avoid PUBLIC_S3_ENDPOINT/CORS issues)
+router.get('/stream', requireAuth, async (req, res) => {
+  try {
+    const key = String((req.query as any)?.key || '')
+    if (!key) return res.status(400).json({ error: 'Missing key' })
+    const ext = (key.split('.').pop() || '').toLowerCase()
+    const ct = ext === 'pdf'
+      ? 'application/pdf'
+      : ext === 'ppt'
+        ? 'application/vnd.ms-powerpoint'
+        : ext === 'pptx'
+          ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+          : 'application/octet-stream'
+    res.setHeader('Content-Type', ct)
+    res.setHeader('Content-Disposition', 'inline')
+    await ensureBucket()
+    const { minio, bucket } = await import('../services/minio.js')
+    const obj = await minio.getObject(bucket, key)
+    obj.on('error', () => { try { res.status(404).end('Not found') } catch {} })
+    obj.pipe(res)
+  } catch {
+    res.status(400).json({ error: 'Stream failed' })
+  }
+})
