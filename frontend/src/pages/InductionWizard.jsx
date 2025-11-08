@@ -443,6 +443,8 @@ function SlidesStep({ project, onBack, onNext }) {
   const [totalSlides, setTotalSlides] = React.useState(1)
   const [slideIndex, setSlideIndex] = React.useState(1) // 1-based
   const [viewerOpen, setViewerOpen] = React.useState(false)
+  const [viewerUrl, setViewerUrl] = React.useState('')
+  const [viewerExt, setViewerExt] = React.useState('')
   const [blocked, setBlocked] = React.useState(true)
   const [countdown, setCountdown] = React.useState(5)
   const [viewedMap, setViewedMap] = React.useState({}) // { [index:number]: true }
@@ -459,8 +461,14 @@ function SlidesStep({ project, onBack, onNext }) {
     return () => { cancelled = true }
   }, [thumbKey])
 
-  const openViewer = () => {
+  const openViewer = async () => {
     if (!pptKey) return
+    try {
+      const { url } = await presignGet(pptKey)
+      setViewerUrl(url)
+      const ext = (pptKey.split('.').pop() || 'pptx').toLowerCase()
+      setViewerExt(ext)
+    } catch {}
     setViewerOpen(true)
     // Start timer if this slide is not yet viewed
     if (!viewedMap[slideIndex]) {
@@ -473,6 +481,7 @@ function SlidesStep({ project, onBack, onNext }) {
 
   const closeViewer = () => {
     setViewerOpen(false)
+    setViewerUrl('')
     // If timer is running and slide not marked as viewed, keep blocked state
     clearTimer()
     if (!viewedMap[slideIndex]) {
@@ -601,16 +610,18 @@ function SlidesStep({ project, onBack, onNext }) {
       <Dialog open={viewerOpen} onClose={closeViewer} maxWidth="lg" fullWidth>
         <DialogTitle>{name} — Slide {slideIndex}/{totalSlides}</DialogTitle>
         <DialogContent dividers>
-          {pptKey ? (
-            <Box sx={{ position: 'relative', pt: '56.25%' }}>
-              <Box component="iframe"
-                   src={`/slides-viewer?${new URLSearchParams({ key: pptKey, name, ext: (pptKey.split('.').pop()||'pptx').toLowerCase() }).toString()}`}
-                   title="Slides Viewer"
-                   sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
-              />
-            </Box>
+          {viewerUrl ? (
+            viewerExt === 'pdf' ? (
+              <Box sx={{ position: 'relative', pt: '56.25%' }}>
+                <Box component="iframe" src={viewerUrl} title="PDF Viewer" sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }} />
+              </Box>
+            ) : (
+              <Box sx={{ position: 'relative', pt: '56.25%' }}>
+                <Box component="iframe" src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(viewerUrl)}`} title="Office Viewer" sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }} />
+              </Box>
+            )
           ) : (
-            <Typography variant="body2">No slides available.</Typography>
+            <Typography variant="body2">Loading...</Typography>
           )}
         </DialogContent>
         <DialogActions>
