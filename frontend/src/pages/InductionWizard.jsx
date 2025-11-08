@@ -1,4 +1,17 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
+  )
+    </Paper>
+
+  // After successful submission, show success then redirect
+  useEffect(() => {
+    if (status === 'done') {
+      const t = setTimeout(() => navigate('/wizard'), 2000)
+      return () => clearTimeout(t)
+    }
+  }, [status, navigate])
+  )
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Alert, Box, Button, Card, CardContent, Chip, Grid, LinearProgress, Paper, Stack, Step, StepLabel, Stepper, TextField, Typography, FormControl, FormLabel, RadioGroup, Radio, FormControlLabel, Select, MenuItem, Collapse, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
 import SignaturePad from '../components/SignaturePad.jsx'
 import { useWizardStore } from '../store/wizard.js'
@@ -7,7 +20,6 @@ import api from '../utils/api.js'
 import { uploadFile, presignGet } from '../utils/upload.js'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import AsyncButton from '../components/AsyncButton.jsx'
-
 function DynamicField({ field, value, onChange }) {
   const [progress, setProgress] = React.useState(null)
   if (field.key === 'medicalIssues') {
@@ -47,7 +59,6 @@ function DynamicField({ field, value, onChange }) {
     return <CameraCapture label={field.label} value={value} onChange={onChange} />
   }
   return <TextField fullWidth label={field.label} value={value||''} onChange={e=> onChange(e.target.value)} />
-}
 
 function MedicalField({ label, value, onChange }) {
   const v = value || { hasCondition: false, description: '' }
@@ -76,7 +87,6 @@ function MedicalField({ label, value, onChange }) {
       </Collapse>
     </FormControl>
   )
-}
 
 function CameraCapture({ label, value, onChange }) {
   const videoRef = useRef(null)
@@ -216,9 +226,9 @@ function CameraCapture({ label, value, onChange }) {
       {value && <Chip label={`Captured: ${value}`} size="small" />}
     </Stack>
   )
-}
 
 export default function InductionWizard() {
+  const navigate = useNavigate()
   const { user } = useAuthStore()
   const [projects, setProjects] = useState([])
   const [project, setProject] = useState(null)
@@ -229,6 +239,7 @@ export default function InductionWizard() {
   const [passed, setPassed] = useState(null)
   const [signature, setSignature] = useState(null)
   const [status, setStatus] = useState('idle')
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   useEffect(() => { api.get('/projects').then(r => setProjects(r.data || [])) }, [])
 
@@ -305,6 +316,15 @@ export default function InductionWizard() {
       setStatus('error')
     }
   }
+
+
+  // After successful submission, show success then redirect
+  useEffect(() => {
+    if (status === 'done') {
+      const t = setTimeout(() => navigate('/wizard'), 2000)
+      return () => clearTimeout(t)
+    }
+  }, [status, navigate])
 
   if (!user) return <Alert severity="info">Please log in as a worker to complete induction.</Alert>
   if (user.role !== 'worker') return <Alert severity="warning">Switch to a worker account to submit an induction.</Alert>
@@ -425,15 +445,26 @@ export default function InductionWizard() {
           {status==='submitting' && <LinearProgress sx={{ my: 1 }} />}
           <Stack direction="row" spacing={1}>
             <Button onClick={prevStep}>Back</Button>
-            <AsyncButton variant="contained" onClick={submit} disabled={status==='submitting'}>Submit</AsyncButton>
+            <Button variant="contained" onClick={()=> setConfirmOpen(true)} disabled={status==='submitting'}>Submit</Button>
           </Stack>
-          {status==='done' && <Alert severity="success" sx={{ mt: 2 }}>Submission sent! A manager will review it.</Alert>}
+          {status==='done' && <Alert severity="success" sx={{ mt: 2 }}>Submission sent successfully! A manager will review it.</Alert>}
           {status==='error' && <Alert severity="error" sx={{ mt: 2 }}>Error submitting. Try again.</Alert>}
+          <Dialog open={confirmOpen} onClose={() => { if (status !== 'submitting') setConfirmOpen(false) }} maxWidth="xs" fullWidth>
+            <DialogTitle>Confirm Submission</DialogTitle>
+            <DialogContent>
+              <Typography variant="body2">Are you sure you want to submit your induction?</Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setConfirmOpen(false)} disabled={status==='submitting'}>Cancel</Button>
+              <AsyncButton variant="contained" onClick={async ()=> { await submit(); setConfirmOpen(false) }} disabled={status==='submitting'}>
+                Confirm
+              </AsyncButton>
+            </DialogActions>
+          </Dialog>
         </Paper>
       )}
     </Stack>
   )
-}
 
 function SlidesStep({ project, onBack, onNext }) {
   const slides = project?.config?.slides || {}
@@ -637,4 +668,3 @@ function SlidesStep({ project, onBack, onNext }) {
       </Dialog>
     </Paper>
   )
-}
