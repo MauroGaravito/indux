@@ -465,10 +465,11 @@ function SlidesStep({ project, onBack, onNext }) {
     if (!pptKey) return
     try {
       const { url } = await presignGet(pptKey)
-      const streamUrl = `${api.defaults.baseURL}/uploads/stream?key=${encodeURIComponent(pptKey)}`
-      setViewerUrl(streamUrl || url)
       const ext = (pptKey.split('.').pop() || 'pptx').toLowerCase()
       setViewerExt(ext)
+      // For Office embed to work, pass the public presigned URL
+      // PDFs also use the direct presigned URL for iframe rendering
+      setViewerUrl(url)
     } catch {}
     setViewerOpen(true)
     // Start timer if this slide is not yet viewed
@@ -613,22 +614,14 @@ function SlidesStep({ project, onBack, onNext }) {
         <DialogContent dividers>
           {viewerUrl ? (
             viewerExt === 'pdf' ? (
-              <Box sx={{ position: 'relative', pt: '56.25%' }}>
-                <Box component="iframe" src={viewerUrl} title="PDF Viewer" sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }} />
-              </Box>
+              <iframe src={viewerUrl} title="PDF Viewer" width="100%" height="70vh" style={{ border: 0 }} />
             ) : (
-              <Stack spacing={1}>
-                <Typography variant="body2">This file will open best in a new tab.</Typography>
-                <Button
-                  variant="outlined"
-                  component="a"
-                  href={viewerUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Open Original
-                </Button>
-              </Stack>
+              <>
+                <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(viewerUrl)}`} title="Office Viewer" width="100%" height="70vh" style={{ border: 0 }} />
+                <Box sx={{ mt: 1 }}>
+                  <Button variant="outlined" component="a" href={viewerUrl} target="_blank" rel="noopener noreferrer">Open Original</Button>
+                </Box>
+              </>
             )
           ) : (
             <Typography variant="body2">Loading...</Typography>
