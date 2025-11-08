@@ -618,7 +618,15 @@ function SlidesStep({ project, onBack, onNext }) {
             ) : (
               <Stack spacing={1}>
                 <Typography variant="body2">This file will open best in a new tab.</Typography>
-                <Button variant="outlined" onClick={() => window.open(viewerUrl, '_blank', 'noopener,noreferrer')}>Open Original</Button>
+                <Button
+                  variant="outlined"
+                  component="a"
+                  href={viewerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open Original
+                </Button>
               </Stack>
             )
           ) : (
