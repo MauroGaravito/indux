@@ -9,6 +9,21 @@ Incluye:
 
 ---
 
+## Actualizaciones recientes (2025-11-08)
+
+- Review (Manager/Admin)
+  - Modal “View” de submissions ahora renderiza datos con MUI: datos personales en grid, resumen del quiz, firma (imagen) y lista de uploads. También muestra el cuestionario con la respuesta seleccionada y la correcta.
+  - Nueva pestaña “All Submissions” con tabla (Worker, Project, Status, Submitted At, Reviewed By) y acción “View”, filtros por estado y recuentos.
+- Dashboard (Admin)
+  - “Overview” ahora usa datos en vivo: Projects, Inductions Completed, Pending Reviews (submissions + project reviews), Users.
+- Backend
+  - `GET /submissions` acepta `?status=pending|approved|declined|all` (default `pending`) y devuelve `userId.name`, `projectId.name` y `reviewedBy.name` (populate).
+  - `Submission.quiz` soporta `answers` (índices seleccionados) y el wizard las envía.
+- Compatibilidad
+  - Submissions antiguas sin `quiz.answers` siguen funcionando; el UI muestra “No stored answer” si falta.
+- Compose
+  - Docker Compose v2 ignora `version:`; puedes removerlo del `docker-compose.yml` para evitar warnings.
+
 ## Produccion
 
 - App: https://indux.downundersolutions.com/
@@ -206,7 +221,8 @@ Entrar por primera vez:
 - `DELETE /projects/:id` (admin)
 - `POST /uploads/presign` (auth) -> `{ key, url }`
 - `POST /submissions` (worker)
-- `GET /submissions` (manager/admin)
+- `GET /submissions[?status=pending|approved|declined|all]` (manager/admin)
+  - Devuelve `userId` y `projectId` con `name` (populate) y `reviewedBy.name` si existe.
 - `POST /submissions/:id/approve|decline` (manager/admin)
 - `POST /reviews/projects` (admin)
 - `GET /reviews/projects` (manager/admin)
