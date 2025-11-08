@@ -614,11 +614,15 @@ function SlidesStep({ project, onBack, onNext }) {
         <DialogContent dividers>
           {viewerUrl ? (
             viewerExt === 'pdf' ? (
-              <iframe src={viewerUrl} title="PDF Viewer" width="100%" height="70vh" style={{ border: 0 }} />
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', maxWidth: '90vw', overflow: 'hidden', bgcolor: '#f5f5f5' }}>
+                <Box component="iframe" src={viewerUrl} title="PDF Viewer" sx={{ width: '100%', height: '80vh', border: 0, bgcolor: '#f5f5f5' }} />
+              </Box>
             ) : (
               <>
-                <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(viewerUrl)}`} title="Office Viewer" width="100%" height="70vh" style={{ border: 0 }} />
-                <Box sx={{ mt: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', maxWidth: '90vw', overflow: 'hidden', bgcolor: '#f5f5f5' }}>
+                  <Box component="iframe" src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(viewerUrl)}`} title="Office Viewer" sx={{ width: '100%', height: '80vh', border: 0, bgcolor: '#f5f5f5' }} />
+                </Box>
+                <Box sx={{ mt: 2 }}>
                   <Button variant="outlined" component="a" href={viewerUrl} target="_blank" rel="noopener noreferrer">Open Original</Button>
                 </Box>
               </>
