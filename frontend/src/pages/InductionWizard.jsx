@@ -441,18 +441,14 @@ export default function InductionWizard() {
 
       await api.post('/submissions', body)
       setStatus('done')
+
+      // ✅ redirigir inmediatamente al dashboard del worker
+      navigate('/wizard')
     } catch (e) {
       setStatus('error')
     }
   }
 
-  // Redirección tras enviar
-  useEffect(() => {
-    if (status === 'done') {
-      const t = setTimeout(() => navigate('/wizard'), 2000)
-      return () => clearTimeout(t)
-    }
-  }, [status, navigate])
 
   if (!user) return <Alert severity="info">Please log in as a worker to complete induction.</Alert>
   if (user.role !== 'worker') return <Alert severity="warning">Switch to a worker account to submit an induction.</Alert>
