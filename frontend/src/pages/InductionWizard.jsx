@@ -441,9 +441,12 @@ function SlidesStep({ project, onBack, onNext }) {
   const thumbKey = slides.thumbKey
   const [thumbUrl, setThumbUrl] = React.useState('')
   const [totalSlides, setTotalSlides] = React.useState(1)
-  const [slideIndex, setSlideIndex] = React.useState(1)
+  const [slideIndex, setSlideIndex] = React.useState(1) // 1-based
+  const [viewerOpen, setViewerOpen] = React.useState(false)
   const [blocked, setBlocked] = React.useState(true)
   const [countdown, setCountdown] = React.useState(5)
+  const [viewedMap, setViewedMap] = React.useState({}) // { [index:number]: true }
+  const timerRef = React.useRef(null)
   const name = `${project?.name || 'Slides'}`
 
   React.useEffect(() => {
@@ -458,9 +461,43 @@ function SlidesStep({ project, onBack, onNext }) {
 
   const openViewer = () => {
     if (!pptKey) return
-    const ext = (pptKey.split('.').pop() || 'pptx').toLowerCase()
-    const params = new URLSearchParams({ key: pptKey, name, ext })
-    window.open(`/slides-viewer?${params.toString()}`, '_blank', 'noopener,noreferrer')
+    setViewerOpen(true)
+    // Start timer if this slide is not yet viewed
+    if (!viewedMap[slideIndex]) {
+      startTimer()
+    } else {
+      setBlocked(false)
+      setCountdown(0)
+    }
+  }
+
+  const closeViewer = () => {
+    setViewerOpen(false)
+    // If timer is running and slide not marked as viewed, keep blocked state
+    clearTimer()
+    if (!viewedMap[slideIndex]) {
+      setBlocked(true)
+    }
+  }
+
+  function clearTimer() {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+  }
+
+  function startTimer() {
+    clearTimer()
+    setBlocked(true)
+    setCountdown(5)
+    let secs = 5
+    timerRef.current = setInterval(() => {
+      secs -= 1
+      setCountdown(secs)
+      if (secs <= 0) {
+        clearTimer()
+        setBlocked(false)
+        setViewedMap((m) => ({ ...m, [slideIndex]: true }))
+      }
+    }, 1000)
   }
 
   // Try to detect slide count for PDFs; default to 1 otherwise
@@ -469,6 +506,8 @@ function SlidesStep({ project, onBack, onNext }) {
     async function detectSlides() {
       setTotalSlides(1)
       setSlideIndex(1)
+      setViewedMap({})
+      setViewerOpen(false)
       setBlocked(true)
       setCountdown(5)
       if (!pptKey) return
@@ -497,21 +536,21 @@ function SlidesStep({ project, onBack, onNext }) {
     return () => { cancelled = true }
   }, [pptKey])
 
-  // Block Next Slide for 5 seconds per slide
+  // On slide change, reset viewer state and blocking unless already viewed
   React.useEffect(() => {
-    setBlocked(true)
-    setCountdown(5)
-    let secs = 5
-    const tick = setInterval(() => {
-      secs -= 1
-      setCountdown(secs)
-      if (secs <= 0) {
-        clearInterval(tick)
-        setBlocked(false)
-      }
-    }, 1000)
-    return () => clearInterval(tick)
+    clearTimer()
+    setViewerOpen(false)
+    if (viewedMap[slideIndex]) {
+      setBlocked(false)
+      setCountdown(0)
+    } else {
+      setBlocked(true)
+      setCountdown(5)
+    }
   }, [slideIndex])
+
+  // Cleanup timers on unmount
+  React.useEffect(() => () => clearTimer(), [])
 
   const nextSlide = () => {
     if (slideIndex < totalSlides) setSlideIndex(slideIndex + 1)
@@ -531,19 +570,23 @@ function SlidesStep({ project, onBack, onNext }) {
             ) : (
               <Chip icon={<InsertDriveFileIcon />} label="Open Viewer" onClick={openViewer} variant="outlined" />
             )}
-            <Typography variant="body2" color="text.secondary">Manual slides navigation enabled below.</Typography>
+            <Typography variant="body2" color="text.secondary">Open the viewer to start the 5s review for each slide.</Typography>
           </Stack>
           <Stack direction="row" spacing={2} alignItems="center">
             <Chip label={`Slide ${slideIndex} of ${totalSlides}`} />
-            {blocked ? (
+            {!viewedMap[slideIndex] && viewerOpen && (
               <Typography variant="body2" color="warning.main">Please review this slide (Next available in {countdown}s)</Typography>
-            ) : (
+            )}
+            {!viewerOpen && !viewedMap[slideIndex] && (
+              <Typography variant="body2" color="text.secondary">Open the viewer to start the 5s review</Typography>
+            )}
+            {viewedMap[slideIndex] && (
               <Typography variant="body2" color="success.main">You can go next</Typography>
             )}
           </Stack>
           <Stack direction="row" spacing={1}>
             <Button onClick={prevSlide} disabled={slideIndex===1}>Previous</Button>
-            <Button variant="outlined" onClick={nextSlide} disabled={blocked || slideIndex===totalSlides}>Next Slide</Button>
+            <Button variant="outlined" onClick={nextSlide} disabled={!viewedMap[slideIndex] || slideIndex===totalSlides}>Next Slide</Button>
           </Stack>
         </Stack>
       ) : (
@@ -551,8 +594,29 @@ function SlidesStep({ project, onBack, onNext }) {
       )}
       <Stack direction="row" spacing={1}>
         <Button onClick={onBack}>Back</Button>
-        <Button variant="contained" onClick={onNext} disabled={!pptKey ? false : (slideIndex < totalSlides || blocked)}>Continue</Button>
+        <Button variant="contained" onClick={onNext} disabled={!pptKey ? false : !(slideIndex===totalSlides && viewedMap[slideIndex])}>Continue</Button>
       </Stack>
+
+      {/* Embedded Viewer Modal */}
+      <Dialog open={viewerOpen} onClose={closeViewer} maxWidth="lg" fullWidth>
+        <DialogTitle>{name} — Slide {slideIndex}/{totalSlides}</DialogTitle>
+        <DialogContent dividers>
+          {pptKey ? (
+            <Box sx={{ position: 'relative', pt: '56.25%' }}>
+              <Box component="iframe"
+                   src={`/slides-viewer?${new URLSearchParams({ key: pptKey, name, ext: (pptKey.split('.').pop()||'pptx').toLowerCase() }).toString()}`}
+                   title="Slides Viewer"
+                   sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
+              />
+            </Box>
+          ) : (
+            <Typography variant="body2">No slides available.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeViewer}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   )
 }
