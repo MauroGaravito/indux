@@ -9,13 +9,20 @@ export default function Users() {
   useEffect(()=> { load() }, [])
 
   const add = async () => {
-    if (!newUser.email || !newUser.name || !newUser.password) return
+    // Permitir creación sin password: el backend generará una temporal si falta
+    if (!newUser.email || !newUser.name) return
     await api.post('/users', newUser)
     setNewUser({ email: '', name: '', role: 'worker', password: '' })
     await load()
   }
   const toggle = async (u) => {
     await api.put(`/users/${u._id}`, { disabled: !u.disabled })
+    await load()
+  }
+  const removeUser = async (u) => {
+    const ok = window.confirm(`¿Eliminar usuario ${u.email}? Esta acción lo desactivará.`)
+    if (!ok) return
+    await api.delete(`/users/${u._id}`)
     await load()
   }
 
@@ -41,7 +48,10 @@ export default function Users() {
                 <TableCell sx={{ textTransform: 'capitalize' }}>{r.role}</TableCell>
                 <TableCell>{r.disabled ? <Chip size="small" color="warning" label="Disabled"/> : <Chip size="small" color="success" label="Active"/>}</TableCell>
                 <TableCell align="right">
-                  <Button size="small" variant="outlined" onClick={()=> toggle(r)}>{r.disabled ? 'Enable' : 'Disable'}</Button>
+                  <Stack direction="row" spacing={1} justifyContent="flex-end">
+                    <Button size="small" variant="outlined" onClick={()=> toggle(r)}>{r.disabled ? 'Enable' : 'Disable'}</Button>
+                    <Button size="small" color="error" variant="outlined" onClick={()=> removeUser(r)}>Delete</Button>
+                  </Stack>
                 </TableCell>
               </TableRow>
             ))}

@@ -61,6 +61,7 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
       patch.password = await bcrypt.hash(patch.password, 10);
     }
     const updated = await User.findByIdAndUpdate(req.params.id, patch, { new: true }).select('-password');
+    if (!updated) return res.status(404).json({ error: 'User not found' });
     res.json(updated);
   } catch (e: any) {
     return res.status(500).json({ error: e?.message || 'Error al actualizar usuario' });
