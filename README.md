@@ -232,6 +232,10 @@ Entrar por primera vez:
 - `POST /reviews/projects` (admin)
 - `GET /reviews/projects` (manager/admin)
 - `POST /reviews/projects/:id/approve|decline` (manager/admin)
+\- `GET /users` (admin)
+\- `POST /users` (admin) — si falta `password`, se genera automáticamente una temporal (8 chars) y se guarda hasheada.
+\- `PUT /users/:id` (admin) — permite actualizar `name`, `role`, `disabled` y `password` (el backend almacena el hash en `password`).
+\- `DELETE /users/:id` (admin) — soft delete: marca `disabled: true`.
 
 ---
 
@@ -341,3 +345,11 @@ Recomendaciones futuras:
 - Enviar la contraseña temporal por correo al usuario (usando `api/src/services/mailer.ts`) o forzar un flujo de “establecer contraseña” mediante enlace de un solo uso.
 - Registrar en auditoría que se generó una contraseña automática para trazabilidad.
 - Permitir a los administradores copiar/mostrar la contraseña generada una sola vez en el panel, con advertencia de seguridad.
+
+---
+
+## Gestión de usuarios (Admin)
+
+- Toggle Activar/Desactivar: desde el panel, el botón cambia el estado `disabled` del usuario mediante `PUT /users/:id { disabled: true|false }`.
+- Eliminar (Delete): el botón realiza un soft delete (`DELETE /users/:id`) que marca `disabled: true` en la cuenta. Los datos no se borran físicamente.
+- Seguridad: las respuestas de `GET/PUT` excluyen el campo `password` para evitar exponer hashes.
