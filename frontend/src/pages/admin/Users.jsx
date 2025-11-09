@@ -20,7 +20,7 @@ export default function Users() {
     await load()
   }
   const removeUser = async (u) => {
-    const ok = window.confirm(`¿Eliminar usuario ${u.email}? Esta acción lo desactivará.`)
+    const ok = window.confirm(`Delete user ${u.email}? This action cannot be undone.`)
     if (!ok) return
     await api.delete(`/users/${u._id}`)
     await load()

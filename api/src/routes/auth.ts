@@ -13,6 +13,7 @@ router.post('/login', async (req, res) => {
   const { email, password } = parsed.data;
   const user = await User.findOne({ email });
   if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+  if (user.disabled) return res.status(403).json({ error: 'Account disabled' });
   const ok = await bcrypt.compare(password, user.password);
   if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
 
