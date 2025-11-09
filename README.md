@@ -311,3 +311,33 @@ BASE_URL=http://localhost:8080 node check-health.js
 - Rebuild limpio: `docker compose build --no-cache api frontend && docker compose up -d`.
 - Login redirige al refrescar: el frontend hidrata el estado de autenticación desde `localStorage` al iniciar. Si se borra el storage o el navegador lo bloquea, volverás a `/login`. Asegúrate de no estar en modo privado restrictivo y de que tu dominio esté en `FRONTEND_URL`.
 edicion
+
+---
+
+## Creación automática de contraseñas
+
+Cuando un administrador crea un usuario desde `/admin/users` y no proporciona el campo `password`, el backend genera automáticamente una contraseña temporal alfanumérica de 8 caracteres. Esta contraseña se encripta con `bcrypt` y se almacena en el campo `password` del documento (que contiene el hash). La creación del usuario continúa normalmente y la respuesta incluye un mensaje informativo.
+
+Detalles:
+- Si `password` no está presente en la petición, se genera internamente antes de validar los datos.
+- La validación (`zod`) sigue exigiendo que exista una contraseña válida (la generada cumple la longitud mínima).
+- Para consultas/listados, el backend excluye el campo `password` para no exponer el hash.
+- En caso de error inesperado, el servidor responde con JSON legible y no se cae.
+
+Ejemplo de respuesta al crear un usuario sin `password`:
+```
+HTTP/1.1 201 Created
+{
+  "id": "<mongo_id>",
+  "email": "nuevo@indux.local",
+  "name": "Nuevo Usuario",
+  "role": "worker",
+  "disabled": false,
+  "info": "El campo password era requerido y se generó automáticamente."
+}
+```
+
+Recomendaciones futuras:
+- Enviar la contraseña temporal por correo al usuario (usando `api/src/services/mailer.ts`) o forzar un flujo de “establecer contraseña” mediante enlace de un solo uso.
+- Registrar en auditoría que se generó una contraseña automática para trazabilidad.
+- Permitir a los administradores copiar/mostrar la contraseña generada una sola vez en el panel, con advertencia de seguridad.
