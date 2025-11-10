@@ -1,7 +1,9 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
-import { CssBaseline, AppBar, Toolbar, Typography, Container, Button } from '@mui/material'
+import { CssBaseline, AppBar, Toolbar, Typography, Container, Button, Box } from '@mui/material'
+import { ThemeProvider, createTheme, responsiveFontSizes } from '@mui/material/styles'
+import useBrandConfig from './hooks/useBrandConfig.js'
 import Login from './pages/Login.jsx'
 import './setupAxiosNotifications'
 import Landing from './pages/Landing.jsx'
@@ -16,13 +18,20 @@ import AdminUsers from './pages/admin/Users.jsx'
 import AdminSettings from './pages/admin/Settings.jsx'
 import { useAuthStore } from './store/auth.js'
 
-function Nav() {
+function Nav({ brand }) {
   const { user, logout } = useAuthStore()
   const dashboardPath = user?.role === 'admin' ? '/admin' : user?.role === 'manager' ? '/review' : user ? '/wizard' : '/login'
+  const brandName = brand?.companyName || 'Indux'
+  const logoUrl = brand?.logoUrl || ''
   return (
     <AppBar position="static">
       <Toolbar>
-        <Typography variant="h6" sx={{ flexGrow: 1 }}>Indux</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1 }}>
+          {logoUrl ? (
+            <Box component="img" src={logoUrl} alt={brandName} sx={{ height: 28, width: 'auto', borderRadius: 0.5, bgcolor: 'rgba(255,255,255,0.12)' }} />
+          ) : null}
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>{brandName}</Typography>
+        </Box>
         <Button color="inherit" component={Link} to="/">Home</Button>
         <Button color="inherit" component={Link} to={dashboardPath}>Dashboard</Button>
         {user?.role !== 'worker' && (
@@ -41,11 +50,11 @@ function Nav() {
   )
 }
 
-function App() {
+function App({ brand }) {
   return (
     <BrowserRouter>
       <CssBaseline />
-      <Nav />
+      <Nav brand={brand} />
       <Container maxWidth={false} disableGutters sx={{ mt: 2, px: { xs: 2, md: 3 } }}>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -74,4 +83,19 @@ function AdminGuard({ children }) {
   return children
 }
 
-createRoot(document.getElementById('root')).render(<App />)
+function ThemedRoot() {
+  const { brandConfig } = useBrandConfig()
+  const primary = brandConfig?.primaryColor || '#1976d2'
+  const secondary = brandConfig?.secondaryColor || '#6b7280'
+  const theme = React.useMemo(() => responsiveFontSizes(createTheme({
+    palette: { primary: { main: primary }, secondary: { main: secondary } }
+  })), [primary, secondary])
+
+  return (
+    <ThemeProvider theme={theme}>
+      <App brand={brandConfig} />
+    </ThemeProvider>
+  )
+}
+
+createRoot(document.getElementById('root')).render(<ThemedRoot />)
