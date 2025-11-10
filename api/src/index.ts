@@ -10,6 +10,7 @@ import uploadRoutes from './routes/uploads.js';
 import reviewRoutes from './routes/reviews.js';
 import userRoutes from './routes/users.js';
 import assignmentsRoutes from './routes/assignments.js';
+import brandConfigRoutes from './routes/brandConfigRoutes.js';
 import { seedAll } from './seed.js';
 import { ensureBucket } from './services/minio.js';
 
@@ -79,6 +80,7 @@ app.use('/uploads', uploadRoutes);
 app.use('/reviews', reviewRoutes);
 app.use('/users', userRoutes);
 app.use('/assignments', assignmentsRoutes);
+app.use('/brand-config', brandConfigRoutes);
 
 // --- Start Server ---
 async function start() {
