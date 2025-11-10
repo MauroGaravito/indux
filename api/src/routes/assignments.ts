@@ -103,3 +103,37 @@ router.delete('/:id', requireAuth, requireRole('admin', 'manager'), async (req, 
 
 export default router;
 
+// --- Manager Team View ---
+// GET /assignments/manager/:id/team
+// Returns workers assigned to any project managed by :id
+router.get('/manager/:id/team', requireAuth, requireRole('admin', 'manager'), async (req, res) => {
+  const managerId = req.params.id;
+  try {
+    if (!Types.ObjectId.isValid(managerId)) return res.status(400).json({ error: 'Invalid manager id' });
+    // Only the manager themself or an admin can view
+    if (!(req.user!.role === 'admin' || req.user!.sub === managerId)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // Find projects where this user is manager
+    const managed = await Assignment.find({ user: managerId, role: 'manager' }).lean();
+    if (!managed.length) return res.status(404).json({ error: 'No managed projects found' });
+    const projectIds = managed.map(a => a.project);
+
+    // Find workers assigned to those projects
+    const workers = await Assignment.find({ project: { $in: projectIds }, role: 'worker' })
+      .populate([{ path: 'user', select: 'name email' }, { path: 'project', select: 'name' }])
+      .lean();
+
+    const out = workers.map(w => ({
+      userId: String((w as any).user?._id || w.user),
+      name: String((w as any).user?.name || ''),
+      email: String((w as any).user?.email || ''),
+      projectName: String((w as any).project?.name || ''),
+      projectId: String((w as any).project?._id || w.project),
+    }));
+    return res.json(out);
+  } catch (e: any) {
+    return res.status(500).json({ error: e?.message || 'Failed to fetch team' });
+  }
+});

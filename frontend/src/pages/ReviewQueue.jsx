@@ -4,6 +4,7 @@ import {
   DialogContent, DialogActions, TextField, Grid, Box, Divider, List, ListItem, ListItemText,
   Table, TableBody, TableCell, TableHead, TableRow
 } from '@mui/material'
+import GroupIcon from '@mui/icons-material/Group'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import api from '../utils/api.js'
 import { presignGet } from '../utils/upload.js'
@@ -24,6 +25,7 @@ export default function ReviewQueue() {
   const [historyFilter, setHistoryFilter] = useState('all') // all | pending | approved | declined
   const [projReviews, setProjReviews] = useState([])
   const [projects, setProjects] = useState([])
+  const [team, setTeam] = useState([])
   const [viewOpen, setViewOpen] = useState(false)
   const [viewTitle, setViewTitle] = useState('')
   const [viewJson, setViewJson] = useState(null)
@@ -39,6 +41,7 @@ export default function ReviewQueue() {
     api.get('/reviews/projects').then(r => setProjReviews(r.data || []))
   ])
   useEffect(()=> { if (user) load() }, [user])
+  useEffect(()=> { if (user && user.id) api.get(`/assignments/manager/${user.id}/team`).then(r => setTeam(r.data || [])).catch(()=> setTeam([])) }, [user])
   useEffect(()=> { api.get('/projects').then(r => setProjects(r.data || [])) }, [])
 
   if (!user) return <Alert severity="info">Please log in as manager/admin.</Alert>
@@ -87,6 +90,7 @@ export default function ReviewQueue() {
         <Tab label="Project Reviews" />
         <Tab label="Worker Submissions" />
         <Tab label="All Submissions" />
+        <Tab icon={<GroupIcon />} iconPosition="start" label="My Team" />
       </Tabs>
 
       {/* Project Reviews */}
@@ -207,6 +211,33 @@ export default function ReviewQueue() {
             </Stack>
           )
         })()}
+      </Box>
+
+      {/* My Team */}
+      <Box hidden={tab!==3}>
+        <Paper sx={{ width: '100%', overflowX: 'auto', mt: 2 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Project</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {team.map((m) => (
+                <TableRow key={`${m.userId}-${m.projectId}`} hover>
+                  <TableCell>{m.name}</TableCell>
+                  <TableCell>{m.email}</TableCell>
+                  <TableCell>{m.projectName}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Paper>
+        {!team.length && (
+          <Alert severity="info" sx={{ mt: 2 }}>No team members assigned yet.</Alert>
+        )}
       </Box>
 
       {/* View Dialog */}
