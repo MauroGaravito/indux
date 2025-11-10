@@ -26,6 +26,8 @@ export default function ReviewQueue() {
   const [projReviews, setProjReviews] = useState([])
   const [projects, setProjects] = useState([])
   const [team, setTeam] = useState([])
+  const [teamLoading, setTeamLoading] = useState(false)
+  const [teamQueried, setTeamQueried] = useState(false)
   const [viewOpen, setViewOpen] = useState(false)
   const [viewTitle, setViewTitle] = useState('')
   const [viewJson, setViewJson] = useState(null)
@@ -41,8 +43,21 @@ export default function ReviewQueue() {
     api.get('/reviews/projects').then(r => setProjReviews(r.data || []))
   ])
   useEffect(()=> { if (user) load() }, [user])
-  useEffect(()=> { if (user && user.id) api.get(`/assignments/manager/${user.id}/team`).then(r => setTeam(r.data || [])).catch(()=> setTeam([])) }, [user])
   useEffect(()=> { api.get('/projects').then(r => setProjects(r.data || [])) }, [])
+
+  const loadTeam = async () => {
+    if (!user || !user.id) return
+    setTeamLoading(true)
+    try {
+      const r = await api.get(`/assignments/manager/${user.id}/team`)
+      setTeam(r.data || [])
+    } catch (e) {
+      setTeam([])
+    } finally {
+      setTeamLoading(false)
+      setTeamQueried(true)
+    }
+  }
 
   if (!user) return <Alert severity="info">Please log in as manager/admin.</Alert>
   if (user.role === 'worker') return <Alert severity="warning">Managers/Admins only.</Alert>
@@ -86,7 +101,12 @@ export default function ReviewQueue() {
   return (
     <Stack spacing={2}>
       <Typography variant="h5">Manager Review</Typography>
-      <Tabs value={tab} onChange={(_,v)=> setTab(v)} sx={{ borderBottom: '1px solid #eee' }}>
+      const handleTabChange = (_evt, v) => {
+        setTab(v)
+        if (v === 3 && !teamQueried) loadTeam()
+      }
+
+      <Tabs value={tab} onChange={handleTabChange} sx={{ borderBottom: '1px solid #eee' }}>
         <Tab label="Project Reviews" />
         <Tab label="Worker Submissions" />
         <Tab label="All Submissions" />
@@ -215,28 +235,34 @@ export default function ReviewQueue() {
 
       {/* My Team */}
       <Box hidden={tab!==3}>
-        <Paper sx={{ width: '100%', overflowX: 'auto', mt: 2 }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Project</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {team.map((m) => (
-                <TableRow key={`${m.userId}-${m.projectId}`} hover>
-                  <TableCell>{m.name}</TableCell>
-                  <TableCell>{m.email}</TableCell>
-                  <TableCell>{m.projectName}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Paper>
-        {!team.length && (
-          <Alert severity="info" sx={{ mt: 2 }}>No team members assigned yet.</Alert>
+        {teamLoading ? (
+          <Alert severity="info" sx={{ mt: 2 }}>Loading team...</Alert>
+        ) : (
+          <>
+            <Paper sx={{ width: '100%', overflowX: 'auto', mt: 2 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Email</TableCell>
+                    <TableCell>Project</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {team.map((m) => (
+                    <TableRow key={`${m.userId}-${m.projectId}`} hover>
+                      <TableCell>{m.name}</TableCell>
+                      <TableCell>{m.email}</TableCell>
+                      <TableCell>{m.projectName}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Paper>
+            {!team.length && teamQueried && (
+              <Alert severity="info" sx={{ mt: 2 }}>No team members assigned yet.</Alert>
+            )}
+          </>
         )}
       </Box>
 

@@ -360,6 +360,8 @@ Recomendaciones futuras:
 
 Managers can now view their assigned team under the "My Team" tab in the Review panel. The API endpoint `GET /assignments/manager/:id/team` returns all workers linked to the manager’s projects, including their name, email, and project references.
 
+> The team list is now loaded lazily when the manager opens the "My Team" tab, improving performance.
+
 ---
 
 ## Project Assignments (User ↔ Project)
