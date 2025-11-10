@@ -353,3 +353,53 @@ Recomendaciones futuras:
 - Toggle Activar/Desactivar: desde el panel, el botón cambia el estado `disabled` del usuario mediante `PUT /users/:id { disabled: true|false }`.
 - Eliminar (Delete): el botón realiza un borrado real (`DELETE /users/:id`).
 - Seguridad: las respuestas de `GET/PUT` excluyen el campo `password` para evitar exponer hashes.
+
+---
+
+## Project Assignments (User ↔ Project)
+
+Conecta usuarios con proyectos mediante una relación controlada.
+
+- Admins y managers pueden asignar usuarios (workers o managers) a proyectos.
+- Workers solo pueden ver y participar en sus proyectos asignados.
+- Managers solo pueden ver los proyectos y equipos bajo su responsabilidad.
+
+### Modelo
+
+`Assignment`:
+- `user`: ObjectId, ref `User`, required
+- `project`: ObjectId, ref `Project`, required
+- `role`: enum `['manager','worker']`
+- `assignedBy`: ObjectId, ref `User`
+- `timestamps`: `true`
+- Índice único `{ user, project }`
+
+### Endpoints
+
+- `POST /assignments` (admin, manager)
+  - Body: `{ user, project, role: 'manager'|'worker' }`
+  - Managers solo pueden asignar dentro de proyectos donde son `manager`.
+
+- `GET /assignments/user/:id` (admin, manager, worker)
+  - Lista los proyectos asignados a un usuario.
+  - Admin: completo. Manager: solo en proyectos que gestiona. Worker: solo si solicita su propio ID.
+
+- `GET /assignments/project/:id` (admin, manager)
+  - Lista los usuarios asignados al proyecto.
+  - Manager debe estar asignado como `manager` al proyecto.
+
+- `DELETE /assignments/:id` (admin, manager)
+  - Elimina la asignación. Manager solo dentro de proyectos que gestiona.
+
+### `GET /projects` (filtrado por rol)
+
+- Ahora requiere autenticación.
+- Admin: devuelve todos los proyectos.
+- Manager/Worker: devuelve solo proyectos asignados (existe un `Assignment` para el usuario).
+
+### UI (Admin → Projects → “Assigned Users”)
+
+- Nueva pestaña “Assigned Users” al editar un proyecto.
+- Lista de asignaciones con nombre y rol.
+- Botón “Assign User” abre modal con selector de usuario y rol.
+- Cada fila incluye “Remove” para quitar la asignación.

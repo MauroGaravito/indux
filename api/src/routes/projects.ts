@@ -1,13 +1,23 @@
 import { Router } from 'express';
 import { Project } from '../models/Project.js';
+import { Assignment } from '../models/Assignment.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { ProjectSchema } from '../utils/validators.js';
 
 const router = Router();
 
-router.get('/', async (_req, res) => {
-  const projects = await Project.find().sort({ createdAt: -1 });
-  res.json(projects);
+// List projects
+router.get('/', requireAuth, async (req, res) => {
+  const role = req.user!.role;
+  if (role === 'admin') {
+    const projects = await Project.find().sort({ createdAt: -1 });
+    return res.json(projects);
+  }
+  // manager/worker: only assigned projects
+  const assignments = await Assignment.find({ user: req.user!.sub }).lean();
+  const ids = assignments.map((a) => a.project);
+  const projects = await Project.find({ _id: { $in: ids } }).sort({ createdAt: -1 });
+  return res.json(projects);
 });
 
 router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
@@ -30,4 +40,3 @@ router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
 });
 
 export default router;
-

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Box, Grid, Card, CardContent, Typography, Button, Stack, TextField, MenuItem, Divider, Tabs, Tab, List, ListItemButton, ListItemIcon, ListItemText, CardHeader } from '@mui/material'
+import { Box, Grid, Card, CardContent, Typography, Button, Stack, TextField, MenuItem, Divider, Tabs, Tab, List, ListItemButton, ListItemIcon, ListItemText, CardHeader, Dialog } from '@mui/material'
 import api from '../../utils/api.js'
 import AsyncButton from '../../components/AsyncButton.jsx'
 import ProjectInfoSection from '../../components/admin/ProjectInfoSection.jsx'
@@ -7,6 +7,7 @@ import PersonalDetailsSection from '../../components/admin/PersonalDetailsSectio
 import SlidesSection from '../../components/admin/SlidesSection.jsx'
 import QuestionsSection from '../../components/admin/QuestionsSection.jsx'
 import FolderIcon from '@mui/icons-material/Folder'
+import GroupIcon from '@mui/icons-material/Group'
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
 import SaveIcon from '@mui/icons-material/Save'
 import SendIcon from '@mui/icons-material/Send'
@@ -22,6 +23,11 @@ export default function Projects() {
   const [desc, setDesc] = useState('')
   const [config, setConfig] = useState({ projectInfo: {}, personalDetails: {}, slides: {}, questions: [] })
   const [tab, setTab] = useState(0)
+  const [assignments, setAssignments] = useState([])
+  const [users, setUsers] = useState([])
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [assignUserId, setAssignUserId] = useState('')
+  const [assignRole, setAssignRole] = useState('worker')
 
   const load = async () => {
     const r = await api.get('/projects')
@@ -39,6 +45,12 @@ export default function Projects() {
     setSelectedId(id)
     const p = projects.find(x => x._id === id)
     setConfig(p?.config || { projectInfo: {}, personalDetails: {}, slides: {}, questions: [] })
+    // load assignments for this project
+    if (id) {
+      api.get(`/assignments/project/${id}`).then(r => setAssignments(r.data || [])).catch(()=> setAssignments([]))
+    } else {
+      setAssignments([])
+    }
   }
 
   const saveConfig = async () => {
@@ -49,6 +61,25 @@ export default function Projects() {
   const sendForReview = async () => {
     if (!selectedId) return
     await api.post('/reviews/projects', { projectId: selectedId, data: config })
+  }
+
+  const openAssign = async () => {
+    setAssignOpen(true)
+    // Fetch users on demand (admin only route)
+    try { const r = await api.get('/users'); setUsers(r.data || []) } catch { setUsers([]) }
+  }
+  const closeAssign = () => setAssignOpen(false)
+  const doAssign = async () => {
+    if (!selectedId || !assignUserId) return
+    await api.post('/assignments', { user: assignUserId, project: selectedId, role: assignRole })
+    setAssignUserId(''); setAssignRole('worker'); setAssignOpen(false)
+    const r = await api.get(`/assignments/project/${selectedId}`)
+    setAssignments(r.data || [])
+  }
+  const removeAssignment = async (id) => {
+    await api.delete(`/assignments/${id}`)
+    const r = await api.get(`/assignments/project/${selectedId}`)
+    setAssignments(r.data || [])
   }
 
   const accent = '#1976d2'
@@ -100,6 +131,7 @@ export default function Projects() {
                   <Tab icon={<PersonIcon />} iconPosition="start" label="Personal Details" sx={{ '&.Mui-selected': { color: accent } }} />
                   <Tab icon={<SlideshowIcon />} iconPosition="start" label="Slides" sx={{ '&.Mui-selected': { color: accent } }} />
                   <Tab icon={<QuizIcon />} iconPosition="start" label="Questions" sx={{ '&.Mui-selected': { color: accent } }} />
+                  <Tab icon={<GroupIcon />} iconPosition="start" label="Assigned Users" sx={{ '&.Mui-selected': { color: accent } }} />
                 </Tabs>
                 <Box sx={{ mt: 2 }} hidden={tab!==0}>
                   <ProjectInfoSection value={config.projectInfo} onChange={(val)=> setConfig({ ...config, projectInfo: val })} />
@@ -113,6 +145,26 @@ export default function Projects() {
                 <Box sx={{ mt: 2 }} hidden={tab!==3}>
                   <QuestionsSection value={config.questions} onChange={(val)=> setConfig({ ...config, questions: val })} />
                 </Box>
+                <Box sx={{ mt: 2 }} hidden={tab!==4}>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                    <GroupIcon color="action" />
+                    <Typography variant="subtitle2">Assigned Users</Typography>
+                    <Box sx={{ flex: 1 }} />
+                    <Button variant="contained" onClick={openAssign} sx={{ textTransform: 'none' }}>Assign User</Button>
+                  </Stack>
+                  <List>
+                    {assignments.map((a) => (
+                      <ListItemButton key={a._id} sx={{ borderRadius: 1 }}>
+                        <ListItemIcon sx={{ minWidth: 36 }}><PersonIcon /></ListItemIcon>
+                        <ListItemText primary={`${a?.user?.name || a?.user} — ${a.role}`} secondary={a?.user?.email || ''} />
+                        <Button color="error" onClick={()=> removeAssignment(a._id)}>Remove</Button>
+                      </ListItemButton>
+                    ))}
+                  </List>
+                  {!assignments.length && (
+                    <Typography variant="body2" sx={{ opacity: 0.7 }}>No users assigned to this project.</Typography>
+                  )}
+                </Box>
               </Box>
             ) : (
               <Typography variant="body2" sx={{ mt: 2, opacity: 0.7 }}>Select a project to edit.</Typography>
@@ -121,5 +173,38 @@ export default function Projects() {
         </Card>
       </Grid>
     </Grid>
+
+    {/* Assign User Modal */}
+    <Dialog open={assignOpen} onClose={closeAssign} maxWidth="sm" fullWidth>
+      <CardHeader title={<Typography variant="subtitle1">Assign User to Project</Typography>} />
+      <CardContent>
+        <Stack spacing={2}>
+          <TextField
+            select
+            label="User"
+            value={assignUserId}
+            onChange={(e)=> setAssignUserId(e.target.value)}
+            helperText="Select a user to assign"
+          >
+            {users.map(u => (
+              <MenuItem key={u._id} value={u._id}>{u.name} ({u.email})</MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            label="Role"
+            value={assignRole}
+            onChange={(e)=> setAssignRole(e.target.value)}
+          >
+            <MenuItem value="worker">Worker</MenuItem>
+            <MenuItem value="manager">Manager</MenuItem>
+          </TextField>
+        </Stack>
+      </CardContent>
+      <Stack direction="row" spacing={1} sx={{ px: 2, pb: 2, justifyContent: 'flex-end' }}>
+        <Button onClick={closeAssign}>Cancel</Button>
+        <AsyncButton variant="contained" disabled={!assignUserId} onClick={doAssign}>Assign</AsyncButton>
+      </Stack>
+    </Dialog>
   )
 }
