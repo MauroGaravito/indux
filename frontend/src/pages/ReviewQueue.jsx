@@ -101,12 +101,7 @@ export default function ReviewQueue() {
   return (
     <Stack spacing={2}>
       <Typography variant="h5">Manager Review</Typography>
-      const handleTabChange = (_evt, v) => {
-        setTab(v)
-        if (v === 3 && !teamQueried) loadTeam()
-      }
-
-      <Tabs value={tab} onChange={handleTabChange} sx={{ borderBottom: '1px solid #eee' }}>
+      <Tabs value={tab} onChange={(_,v)=> { setTab(v); if (v === 3 && !teamQueried) loadTeam() }} sx={{ borderBottom: '1px solid #eee' }}>
         <Tab label="Project Reviews" />
         <Tab label="Worker Submissions" />
         <Tab label="All Submissions" />
