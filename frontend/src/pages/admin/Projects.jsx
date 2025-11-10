@@ -85,6 +85,7 @@ export default function Projects() {
   const accent = '#1976d2'
 
   return (
+    <>
     <Grid container spacing={2}>
       <Grid item xs={12} md={4}>
         <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -156,7 +157,7 @@ export default function Projects() {
                     {assignments.map((a) => (
                       <ListItemButton key={a._id} sx={{ borderRadius: 1 }}>
                         <ListItemIcon sx={{ minWidth: 36 }}><PersonIcon /></ListItemIcon>
-                        <ListItemText primary={`${a?.user?.name || a?.user} — ${a.role}`} secondary={a?.user?.email || ''} />
+                        <ListItemText primary={`${a?.user?.name || a?.user} - ${a.role}`} secondary={a?.user?.email || ''} />
                         <Button color="error" onClick={()=> removeAssignment(a._id)}>Remove</Button>
                       </ListItemButton>
                     ))}
@@ -206,5 +207,6 @@ export default function Projects() {
         <AsyncButton variant="contained" disabled={!assignUserId} onClick={doAssign}>Assign</AsyncButton>
       </Stack>
     </Dialog>
+    </>
   )
 }
