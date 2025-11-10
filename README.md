@@ -29,6 +29,11 @@ Incluye:
 - Compose
   - Docker Compose v2 ignora `version:`; puedes removerlo del `docker-compose.yml` para evitar warnings.
 
+- Branding
+  - Nuevo módulo BrandConfig (API + UI) para definir nombre de empresa, logo y colores.
+  - Página Admin → Settings permite editar y guardar el branding.
+  - El frontend aplica los colores al tema de MUI (ThemeProvider) y muestra el logo/nombre en la barra superior.
+
 ## Produccion
 
 - App: https://indux.downundersolutions.com/
@@ -236,6 +241,11 @@ Entrar por primera vez:
 \- `POST /users` (admin) - si falta `password`, se genera automáticamente una temporal (8 chars) y se guarda hasheada.
 \- `PUT /users/:id` (admin) - permite actualizar `name`, `role`, `disabled` y `password` (el backend almacena el hash en `password`).
 \- `DELETE /users/:id` (admin) - borrado real del usuario (hard delete).
+
+Branding:
+- `GET /brand-config` (public)
+- `POST /brand-config` (admin)
+- `PUT /brand-config/:id` (admin)
 
 ---
 
