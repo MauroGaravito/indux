@@ -13,8 +13,9 @@ import assignmentsRoutes from './routes/assignments.js';
 import brandConfigRoutes from './routes/brandConfigRoutes.js';
 import { seedAll } from './seed.js';
 import { ensureBucket } from './services/minio.js';
-// NOTE: All API routes are mounted under the '/api' base path for consistency
-// and to align with reverse proxy configurations (e.g., Caddy handling '/api/*').
+// NOTE: Reverse proxy (e.g., Caddy) handles the '/api' prefix externally using
+// 'handle_path /api/*' which strips the prefix before forwarding. Therefore,
+// routes here are mounted WITHOUT the '/api' prefix.
 
 const app = express();
 
@@ -70,19 +71,19 @@ const limiter = rateLimit({ windowMs: 60_000, max: 300 });
 app.use(limiter);
 
 // --- Health check ---
-app.get('/api/health', (_req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'indux-api' });
 });
 
 // --- Routes ---
-app.use('/api/auth', authRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/submissions', submissionRoutes);
-app.use('/api/uploads', uploadRoutes);
-app.use('/api/reviews', reviewRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/assignments', assignmentsRoutes);
-app.use('/api/brand-config', brandConfigRoutes);
+app.use('/auth', authRoutes);
+app.use('/projects', projectRoutes);
+app.use('/submissions', submissionRoutes);
+app.use('/uploads', uploadRoutes);
+app.use('/reviews', reviewRoutes);
+app.use('/users', userRoutes);
+app.use('/assignments', assignmentsRoutes);
+app.use('/brand-config', brandConfigRoutes);
 
 // --- Start Server ---
 async function start() {
