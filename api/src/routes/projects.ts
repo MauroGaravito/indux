@@ -35,8 +35,16 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
 });
 
 router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
-  await Project.findByIdAndDelete(req.params.id);
-  res.json({ ok: true });
+  const { id } = req.params;
+  const existing = await Project.findById(id);
+  if (!existing) return res.status(404).json({ ok: false, message: 'Project not found' });
+
+  // Delete the project
+  await Project.findByIdAndDelete(id);
+  // Cascade: remove related assignments (keep submissions intact)
+  await Assignment.deleteMany({ project: id });
+
+  return res.json({ ok: true, message: 'Project deleted successfully' });
 });
 
 export default router;

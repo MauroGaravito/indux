@@ -15,6 +15,9 @@ import InfoIcon from '@mui/icons-material/Info'
 import PersonIcon from '@mui/icons-material/Person'
 import SlideshowIcon from '@mui/icons-material/Slideshow'
 import QuizIcon from '@mui/icons-material/Quiz'
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
+import { useAuthStore } from '../../store/auth.js'
+import { notifyError, notifySuccess } from '../../notifications/store.js'
 
 export default function Projects() {
   const [projects, setProjects] = useState([])
@@ -28,6 +31,9 @@ export default function Projects() {
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignUserId, setAssignUserId] = useState('')
   const [assignRole, setAssignRole] = useState('worker')
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const { user } = useAuthStore()
+  const isAdmin = user?.role === 'admin'
 
   const load = async () => {
     const r = await api.get('/projects')
@@ -61,6 +67,25 @@ export default function Projects() {
   const sendForReview = async () => {
     if (!selectedId) return
     await api.post('/reviews/projects', { projectId: selectedId, data: config })
+  }
+
+  const confirmDelete = () => setDeleteOpen(true)
+  const closeDelete = () => setDeleteOpen(false)
+  const doDelete = async () => {
+    if (!selectedId) return
+    try {
+      const r = await api.delete(`/projects/${selectedId}`)
+      notifySuccess(r?.data?.message || 'Project deleted successfully')
+      setProjects(prev => prev.filter(p => p._id !== selectedId))
+      setSelectedId('')
+      setConfig({ projectInfo: {}, personalDetails: {}, slides: {}, questions: [] })
+      setAssignments([])
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.response?.data?.error || 'Failed to delete project'
+      notifyError(msg)
+    } finally {
+      setDeleteOpen(false)
+    }
   }
 
   const openAssign = async () => {
@@ -123,6 +148,11 @@ export default function Projects() {
               <Stack direction="row" spacing={1}>
                 <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveConfig} disabled={!selectedId} sx={{ textTransform: 'none' }}>Save</AsyncButton>
                 <AsyncButton startIcon={<SendIcon />} variant="contained" onClick={sendForReview} disabled={!selectedId} sx={{ textTransform: 'none', bgcolor: accent }}>Send For Review</AsyncButton>
+                {isAdmin && !!selectedId && (
+                  <Button startIcon={<DeleteForeverIcon />} color="error" variant="outlined" onClick={confirmDelete} sx={{ textTransform: 'none' }}>
+                    Delete Project
+                  </Button>
+                )}
               </Stack>
             </Stack>
             {selectedId ? (
@@ -205,6 +235,18 @@ export default function Projects() {
       <Stack direction="row" spacing={1} sx={{ px: 2, pb: 2, justifyContent: 'flex-end' }}>
         <Button onClick={closeAssign}>Cancel</Button>
         <AsyncButton variant="contained" disabled={!assignUserId} onClick={doAssign}>Assign</AsyncButton>
+      </Stack>
+    </Dialog>
+
+    {/* Delete Project Confirmation */}
+    <Dialog open={deleteOpen} onClose={closeDelete} maxWidth="xs" fullWidth>
+      <CardHeader title={<Typography variant="subtitle1">Delete Project</Typography>} />
+      <CardContent>
+        <Typography variant="body2">Are you sure? This action cannot be undone.</Typography>
+      </CardContent>
+      <Stack direction="row" spacing={1} sx={{ px: 2, pb: 2, justifyContent: 'flex-end' }}>
+        <Button onClick={closeDelete}>Cancel</Button>
+        <AsyncButton color="error" variant="contained" onClick={doDelete}>Delete</AsyncButton>
       </Stack>
     </Dialog>
     </>
