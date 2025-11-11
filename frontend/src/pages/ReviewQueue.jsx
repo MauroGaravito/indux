@@ -6,6 +6,7 @@ import {
 } from '@mui/material'
 import GroupIcon from '@mui/icons-material/Group'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
+import DownloadIcon from '@mui/icons-material/Download'
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
 import api from '../utils/api.js'
 import { presignGet } from '../utils/upload.js'
@@ -17,6 +18,158 @@ function StatusChip({ status }) {
   const color = status === 'approved' ? 'success' : status === 'declined' ? 'error' : 'default'
   const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Pending'
   return <Chip size="small" color={color} label={label} />
+}
+
+// Project Configuration viewer with tabs
+function ProjectConfigViewer({ config }) {
+  const [tab, setTab] = React.useState(0)
+  const cfg = config || {}
+  const hasProjectInfo = !!cfg.projectInfo && Object.keys(cfg.projectInfo || {}).length > 0
+  const hasPersonal = !!cfg.personalDetails && Array.isArray(cfg.personalDetails?.fields) && cfg.personalDetails.fields.length > 0
+  const slides = cfg.slides || cfg.materials
+  const hasSlides = !!slides && ((Array.isArray(slides) && slides.length > 0) || (!!slides && Object.keys(slides).length > 0))
+  const hasQuestions = Array.isArray(cfg.questions) && cfg.questions.length > 0
+  const tabs = [
+    hasProjectInfo && { key: 'info', label: 'Project Info' },
+    hasPersonal && { key: 'personal', label: 'Personal Details' },
+    hasSlides && { key: 'slides', label: 'Slides' },
+    hasQuestions && { key: 'questions', label: 'Questions' }
+  ].filter(Boolean)
+  const effectiveIndex = Math.min(tab, Math.max(0, tabs.length - 1))
+
+  const doExport = () => {
+    try {
+      const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'project-config.json'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (_) {}
+  }
+
+  return (
+    <Box sx={{ py: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, flex: 1 }}>Project Configuration</Typography>
+        <Button size="small" startIcon={<DownloadIcon />} onClick={doExport}>Export JSON</Button>
+      </Box>
+
+      <Tabs value={effectiveIndex} onChange={(_,v)=> setTab(v)} sx={{ borderBottom: '1px solid #eee' }} variant="scrollable" scrollButtons allowScrollButtonsMobile>
+        {tabs.map((t, idx) => (<Tab key={t.key} label={t.label} value={idx} />))}
+      </Tabs>
+
+      <Box sx={{ mt: 2 }}>
+        {tabs[effectiveIndex]?.key === 'info' && (
+          <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
+            {Object.keys(cfg.projectInfo || {}).length ? (
+              <Table size="small">
+                <TableBody>
+                  {Object.entries(cfg.projectInfo).map(([k, v]) => (
+                    <TableRow key={k}>
+                      <TableCell sx={{ width: '35%' }}><Typography variant="subtitle2">{String(k)}</Typography></TableCell>
+                      <TableCell>{typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <Typography color="text.secondary">No data available</Typography>
+            )}
+          </Paper>
+        )}
+
+        {tabs[effectiveIndex]?.key === 'personal' && (
+          <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
+            {Array.isArray(cfg.personalDetails?.fields) && cfg.personalDetails.fields.length ? (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Label</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell>Required</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {cfg.personalDetails.fields.map((f, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>{f.label || f.name || '-'}</TableCell>
+                      <TableCell>{f.type || '-'}</TableCell>
+                      <TableCell>{f.required ? <Chip size="small" color="success" label="Required" /> : <Chip size="small" label="Optional" />}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <Typography color="text.secondary">No data available</Typography>
+            )}
+          </Paper>
+        )}
+
+        {tabs[effectiveIndex]?.key === 'slides' && (
+          <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
+            {(() => {
+              const items = Array.isArray(slides) ? slides : (slides?.items || slides?.list || [])
+              if (!Array.isArray(items) || !items.length) return <Typography color="text.secondary">No data available</Typography>
+              return (
+                <List>
+                  {items.map((it, idx) => {
+                    const title = it?.name || it?.title || `Item ${idx+1}`
+                    const type = it?.type || it?.mime || '-'
+                    const url = it?.url || it?.href || ''
+                    return (
+                      <ListItem key={idx} secondaryAction={url ? <Button size="small" onClick={()=> window.open(url, '_blank')}>Open</Button> : null}>
+                        <ListItemText primary={`${title}`} secondary={`Type: ${type}${url ? ' • link' : ''}`} />
+                      </ListItem>
+                    )
+                  })}
+                </List>
+              )
+            })()}
+          </Paper>
+        )}
+
+        {tabs[effectiveIndex]?.key === 'questions' && (
+          <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
+            {Array.isArray(cfg.questions) && cfg.questions.length ? (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Question</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell>Correct Answer</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {cfg.questions.map((q, idx) => {
+                    const qText = q?.text || q?.question || `Q${idx+1}`
+                    const qType = q?.type || (Array.isArray(q?.options) ? 'multiple-choice' : '-')
+                    const correct = q?.correct ?? q?.answer ?? q?.answers
+                    let correctText = '-'
+                    if (Array.isArray(correct)) correctText = correct.join(', ')
+                    else if (typeof correct === 'object' && correct != null) correctText = JSON.stringify(correct)
+                    else if (correct != null) correctText = String(correct)
+                    return (
+                      <TableRow key={idx}>
+                        <TableCell>{qText}</TableCell>
+                        <TableCell>{qType}</TableCell>
+                        <TableCell>{correctText}</TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <Typography color="text.secondary">No data available</Typography>
+            )}
+          </Paper>
+        )}
+      </Box>
+    </Box>
+  )
 }
 
 export default function ReviewQueue() {
@@ -429,7 +582,9 @@ export default function ReviewQueue() {
               )}
             </Box>
           ) : (
-            <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{viewJson ? JSON.stringify(viewJson, null, 2) : ''}</pre>
+            viewTitle === 'Project Configuration' && viewJson
+              ? <ProjectConfigViewer config={viewJson} />
+              : <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{viewJson ? JSON.stringify(viewJson, null, 2) : ''}</pre>
           )}
         </DialogContent>
         <DialogActions>
