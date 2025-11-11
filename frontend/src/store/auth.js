@@ -35,9 +35,10 @@ export const useAuthStore = create((set, get) => {
         set({ user, accessToken, refreshToken })
         api.setToken(accessToken)
         saveAuthToStorage(user, accessToken, refreshToken)
-        return true
+        return { ok: true }
       } catch (e) {
-        return false
+        const reason = e?.response?.data?.error || 'Invalid credentials'
+        return { ok: false, reason }
       }
     },
     logout() {

@@ -14,7 +14,7 @@ router.get('/', requireAuth, async (req, res) => {
     return res.json(projects);
   }
   // manager/worker: only assigned projects
-  const assignments = await Assignment.find({ user: req.user!.sub }).lean();
+  const assignments = await Assignment.find({ user: req.user!.sub, $or: [{ endedAt: { $exists: false } }, { endedAt: null }] }).lean();
   const ids = assignments.map((a) => a.project);
   const projects = await Project.find({ _id: { $in: ids } }).sort({ createdAt: -1 });
   return res.json(projects);

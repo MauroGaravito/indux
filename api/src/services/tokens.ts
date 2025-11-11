@@ -19,3 +19,14 @@ export function verifyRefreshToken(token: string) {
   const secret = (process.env.JWT_REFRESH_SECRET || 'devrefreshsecretchangeme');
   return jwt.verify(token, secret) as JwtPayload & { sub: string; role: Role };
 }
+
+export function signEmailToken(userId: string) {
+  const expiresIn = (process.env.EMAIL_TOKEN_TTL || '1d') as SignOptions['expiresIn'];
+  const secret = (process.env.JWT_EMAIL_SECRET || 'devemailsecretchangeme');
+  return jwt.sign({ sub: userId }, secret, { expiresIn });
+}
+
+export function verifyEmailToken(token: string) {
+  const secret = (process.env.JWT_EMAIL_SECRET || 'devemailsecretchangeme');
+  return jwt.verify(token, secret) as JwtPayload & { sub: string };
+}

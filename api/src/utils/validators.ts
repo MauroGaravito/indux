@@ -5,6 +5,12 @@ export const LoginSchema = z.object({
   password: z.string().min(6)
 });
 
+export const RegisterSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1),
+  password: z.string().min(6),
+});
+
 export const ProjectSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
@@ -56,4 +62,8 @@ export const UserUpdateSchema = z.object({
   role: z.enum(['admin','manager','worker']).optional(),
   password: z.string().min(6).optional(),
   disabled: z.boolean().optional()
+});
+
+export const UserStatusPatchSchema = z.object({
+  status: z.enum(['pending','approved','disabled'])
 });

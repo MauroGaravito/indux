@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Submission } from '../models/Submission.js';
+import { Assignment } from '../models/Assignment.js';
 import { User } from '../models/User.js';
 import { Project } from '../models/Project.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
@@ -22,6 +23,9 @@ router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
     const userId = req.user!.sub;
     const body = parsed.data;
+    // Ensure the worker is assigned to the project
+    const assigned = await Assignment.findOne({ user: userId, project: body.projectId }).lean();
+    if (!assigned) return res.status(403).json({ error: 'Not assigned to this project' });
     const sub = await Submission.create({ ...body, userId, status: 'pending' });
     res.status(201).json(sub);
   } catch (e: any) {

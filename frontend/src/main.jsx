@@ -5,6 +5,8 @@ import { CssBaseline, AppBar, Toolbar, Typography, Container, Button, Box } from
 import { ThemeProvider, createTheme, responsiveFontSizes } from '@mui/material/styles'
 import useBrandConfig from './hooks/useBrandConfig.js'
 import Login from './pages/Login.jsx'
+import Register from './pages/Register.jsx'
+import Pending from './pages/Pending.jsx'
 import './setupAxiosNotifications'
 import Landing from './pages/Landing.jsx'
 import InductionWizard from './pages/InductionWizard.jsx'
@@ -40,6 +42,9 @@ function Nav({ brand }) {
         {user?.role === 'admin' && (
           <Button color="inherit" component={Link} to="/admin">Admin</Button>
         )}
+        {!user && (
+          <Button color="inherit" component={Link} to="/register">Register</Button>
+        )}
         {user ? (
           <Button color="inherit" onClick={logout}>Logout</Button>
         ) : (
@@ -60,6 +65,8 @@ function App({ brand }) {
           <Route path="/" element={<Landing />} />
           <Route path="/wizard" element={<InductionWizard />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/pending" element={<Pending />} />
           <Route path="/review" element={<ReviewQueue />} />
           <Route path="/slides-viewer" element={<SlidesViewer />} />
           <Route path="/admin" element={<AdminGuard><AdminLayout /></AdminGuard>}>

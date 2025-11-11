@@ -14,7 +14,7 @@ export async function seedAll() {
     const exists = await User.findOne({ email: u.email });
     if (!exists) {
       const passwordHash = await bcrypt.hash(u.password, 10);
-      await User.create({ email: u.email, name: u.name, role: u.role, password: passwordHash });
+      await User.create({ email: u.email, name: u.name, role: u.role, password: passwordHash, status: 'approved', emailVerified: true, emailVerifiedAt: new Date() });
       console.log('Seeded user', u.email);
     }
   }
@@ -50,4 +50,3 @@ export async function seedAll() {
     console.log('Seeded questions');
   }
 }
-
