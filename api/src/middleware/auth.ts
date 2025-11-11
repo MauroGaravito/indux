@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
+import { Project } from '../models/Project.js';
 
 export interface AuthPayload {
   sub: string;
@@ -40,4 +41,23 @@ export function requireRole(...roles: Array<'admin'|'manager'|'worker'>) {
     if (!roles.includes(req.user.role)) return res.status(403).json({ error: 'Forbidden' });
     next();
   };
+}
+
+// Allow access if user is admin, or is listed as a manager for the project in :id
+export async function requireProjectManagerOrAdmin(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    if (req.user.role === 'admin') return next();
+
+    const projectId = req.params?.id;
+    if (!projectId) return res.status(400).json({ error: 'Project id is required' });
+    const project = await Project.findById(projectId).select('_id managers').lean();
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const isManager = Array.isArray((project as any).managers) && (project as any).managers.some((m: any) => String(m) === req.user!.sub);
+    if (!isManager) return res.status(403).json({ error: 'Forbidden' });
+    return next();
+  } catch (e: any) {
+    return res.status(500).json({ error: e?.message || 'Authorization failed' });
+  }
 }

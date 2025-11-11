@@ -34,6 +34,7 @@ export default function Projects() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
+  const [managers, setManagers] = useState([])
 
   const load = async () => {
     const r = await api.get('/projects')
@@ -54,8 +55,11 @@ export default function Projects() {
     // load assignments for this project
     if (id) {
       api.get(`/assignments/project/${id}`).then(r => setAssignments(r.data || [])).catch(()=> setAssignments([]))
+      // also fetch managers via project detail endpoint
+      api.get(`/projects/${id}`).then(r => setManagers(r.data?.managers || [])).catch(()=> setManagers([]))
     } else {
       setAssignments([])
+      setManagers([])
     }
   }
 
@@ -100,11 +104,15 @@ export default function Projects() {
     setAssignUserId(''); setAssignRole('worker'); setAssignOpen(false)
     const r = await api.get(`/assignments/project/${selectedId}`)
     setAssignments(r.data || [])
+    // refresh managers list in case a manager was assigned
+    try { const pr = await api.get(`/projects/${selectedId}`); setManagers(pr.data?.managers || []) } catch { setManagers([]) }
   }
   const removeAssignment = async (id) => {
     await api.delete(`/assignments/${id}`)
     const r = await api.get(`/assignments/project/${selectedId}`)
     setAssignments(r.data || [])
+    // refresh managers if a manager assignment was removed
+    try { const pr = await api.get(`/projects/${selectedId}`); setManagers(pr.data?.managers || []) } catch { setManagers([]) }
   }
 
   const accent = '#1976d2'
@@ -166,6 +174,22 @@ export default function Projects() {
                 </Tabs>
                 <Box sx={{ mt: 2 }} hidden={tab!==0}>
                   <ProjectInfoSection value={config.projectInfo} onChange={(val)=> setConfig({ ...config, projectInfo: val })} />
+                  {/* Managers List */}
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Managers</Typography>
+                    {managers && managers.length ? (
+                      <List dense>
+                        {managers.map((m) => (
+                          <ListItemButton key={m._id} sx={{ cursor: 'default' }}>
+                            <ListItemIcon sx={{ minWidth: 36 }}><PersonIcon /></ListItemIcon>
+                            <ListItemText primary={m.name || m.email || m._id} secondary={m.email || ''} />
+                          </ListItemButton>
+                        ))}
+                      </List>
+                    ) : (
+                      <Typography variant="body2" sx={{ opacity: 0.7 }}>No managers assigned.</Typography>
+                    )}
+                  </Box>
                 </Box>
                 <Box sx={{ mt: 2 }} hidden={tab!==1}>
                   <PersonalDetailsSection value={config.personalDetails} onChange={(val)=> setConfig({ ...config, personalDetails: val })} />

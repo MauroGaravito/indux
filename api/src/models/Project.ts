@@ -14,6 +14,7 @@ export interface IProject extends Document {
   description?: string;
   steps: IStepConfig[];
   config?: Record<string, any>;
+  managers?: mongoose.Types.ObjectId[];
 }
 
 const StepSchema = new Schema<IStepConfig>({
@@ -29,7 +30,8 @@ const ProjectSchema = new Schema<IProject>({
   name: { type: String, required: true },
   description: { type: String },
   steps: { type: [StepSchema], default: [] },
-  config: { type: Schema.Types.Mixed, default: {} }
+  config: { type: Schema.Types.Mixed, default: {} },
+  managers: { type: [Schema.Types.ObjectId], ref: 'User', default: [] }
 }, { timestamps: true });
 
 export const Project = mongoose.model<IProject>('Project', ProjectSchema);

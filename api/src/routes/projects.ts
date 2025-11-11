@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Project } from '../models/Project.js';
 import { Assignment } from '../models/Assignment.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireProjectManagerOrAdmin } from '../middleware/auth.js';
 import { ProjectSchema } from '../utils/validators.js';
 
 const router = Router();
@@ -27,7 +27,14 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
   res.status(201).json(proj);
 });
 
-router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
+// Get single project (with managers populated)
+router.get('/:id', requireAuth, async (req, res) => {
+  const p = await Project.findById(req.params.id).populate('managers', 'name email role');
+  if (!p) return res.status(404).json({ error: 'Project not found' });
+  res.json(p);
+});
+
+router.put('/:id', requireAuth, requireProjectManagerOrAdmin, async (req, res) => {
   const parsed = ProjectSchema.partial().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const proj = await Project.findByIdAndUpdate(req.params.id, parsed.data, { new: true });

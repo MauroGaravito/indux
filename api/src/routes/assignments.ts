@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Types } from 'mongoose';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { Assignment } from '../models/Assignment.js';
+import { Project } from '../models/Project.js';
 
 const router = Router();
 
@@ -29,6 +30,12 @@ router.post('/', requireAuth, requireRole('admin', 'manager'), async (req, res) 
     }
 
     const doc = await Assignment.create({ user, project, role, assignedBy: req.user!.sub });
+    // If a manager is assigned, reflect in Project.managers
+    try {
+      if (role === 'manager') {
+        await Project.findByIdAndUpdate(project, { $addToSet: { managers: user } });
+      }
+    } catch (_) {}
     const populated = await doc.populate([{ path: 'user', select: '-password' }, { path: 'project' }]);
     return res.status(201).json(populated);
   } catch (e: any) {
@@ -95,6 +102,12 @@ router.delete('/:id', requireAuth, requireRole('admin', 'manager'), async (req, 
       if (!allowed) return res.status(403).json({ error: 'Forbidden' });
     }
     await Assignment.findByIdAndDelete(id);
+    // If the removed assignment was a manager, remove from Project.managers as well
+    try {
+      if (doc.role === 'manager') {
+        await Project.findByIdAndUpdate(doc.project, { $pull: { managers: doc.user } });
+      }
+    } catch (_) {}
     return res.json({ ok: true });
   } catch (e: any) {
     return res.status(500).json({ error: e?.message || 'Failed to delete assignment' });
