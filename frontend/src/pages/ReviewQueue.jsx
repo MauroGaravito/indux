@@ -27,12 +27,14 @@ function ProjectConfigViewer({ config }) {
   const hasProjectInfo = !!cfg.projectInfo && Object.keys(cfg.projectInfo || {}).length > 0
   const hasPersonal = !!cfg.personalDetails && Array.isArray(cfg.personalDetails?.fields) && cfg.personalDetails.fields.length > 0
   const slides = cfg.slides || cfg.materials
+  const uploads = cfg?.uploads || cfg?.files
   const hasSlides = !!slides && ((Array.isArray(slides) && slides.length > 0) || (!!slides && Object.keys(slides).length > 0))
+    || (Array.isArray(uploads) && uploads.length > 0)
   const hasQuestions = Array.isArray(cfg.questions) && cfg.questions.length > 0
   const tabs = [
     hasProjectInfo && { key: 'info', label: 'Project Info' },
     hasPersonal && { key: 'personal', label: 'Personal Details' },
-    hasSlides && { key: 'slides', label: 'Slides' },
+    hasSlides && { key: 'slides', label: 'Slides & Files' },
     hasQuestions && { key: 'questions', label: 'Questions' }
   ].filter(Boolean)
   const effectiveIndex = Math.min(tab, Math.max(0, tabs.length - 1))
@@ -112,14 +114,16 @@ function ProjectConfigViewer({ config }) {
         {tabs[effectiveIndex]?.key === 'slides' && (
           <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
             {(() => {
-              const items = Array.isArray(slides) ? slides : (slides?.items || slides?.list || [])
+              const itemsBase = Array.isArray(slides) ? slides : (slides?.items || slides?.list || [])
+              const extra = Array.isArray(uploads) ? uploads : []
+              const items = [...itemsBase, ...extra]
               if (!Array.isArray(items) || !items.length) return <Typography color="text.secondary">No data available</Typography>
               return (
                 <List>
                   {items.map((it, idx) => {
                     const title = it?.name || it?.title || `Item ${idx+1}`
                     const type = it?.type || it?.mime || '-'
-                    const url = it?.url || it?.href || ''
+                    const url = it?.url || it?.href || it?.link || ''
                     return (
                       <ListItem key={idx} secondaryAction={url ? <Button size="small" onClick={()=> window.open(url, '_blank')}>Open</Button> : null}>
                         <ListItemText primary={`${title}`} secondary={`Type: ${type}${url ? ' • link' : ''}`} />
@@ -289,7 +293,7 @@ export default function ReviewQueue() {
               <Paper sx={{ p:2 }}>
                 <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={1}>
                   <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{pr.projectId}</Typography>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{pr?.projectId?.name || pr.projectId}</Typography>
                     <Stack direction="row" spacing={1}>
                       <StatusChip status={pr.status || 'pending'} />
                       <Typography variant="caption" sx={{ opacity: 0.7 }}>Requested: {new Date(pr.createdAt).toLocaleString()}</Typography>

@@ -10,6 +10,9 @@ router.post('/projects', requireAuth, requireRole('admin'), async (req, res) => 
   const schema = z.object({ projectId: z.string().min(1), data: z.record(z.any()) });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  // Prevent duplicate pending reviews for the same project
+  const existing = await ProjectReview.findOne({ projectId: parsed.data.projectId, status: 'pending' }).lean();
+  if (existing) return res.status(400).json({ error: 'This project is already under review.' });
   const review = await ProjectReview.create({
     projectId: parsed.data.projectId,
     requestedBy: req.user!.sub as any,
@@ -21,7 +24,9 @@ router.post('/projects', requireAuth, requireRole('admin'), async (req, res) => 
 
 // Manager/Admin list project reviews pending
 router.get('/projects', requireAuth, requireRole('manager','admin'), async (_req, res) => {
-  const list = await ProjectReview.find({ status: 'pending' }).sort({ createdAt: -1 });
+  const list = await ProjectReview.find({ status: 'pending' })
+    .populate('projectId', 'name')
+    .sort({ createdAt: -1 });
   res.json(list);
 });
 
@@ -45,4 +50,3 @@ router.post('/projects/:id/decline', requireAuth, requireRole('manager','admin')
 });
 
 export default router;
-

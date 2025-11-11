@@ -35,6 +35,7 @@ export default function Projects() {
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
   const [managers, setManagers] = useState([])
+  const [hasPendingReview, setHasPendingReview] = useState(false)
 
   const load = async () => {
     const r = await api.get('/projects')
@@ -57,9 +58,16 @@ export default function Projects() {
       api.get(`/assignments/project/${id}`).then(r => setAssignments(r.data || [])).catch(()=> setAssignments([]))
       // also fetch managers via project detail endpoint
       api.get(`/projects/${id}`).then(r => setManagers(r.data?.managers || [])).catch(()=> setManagers([]))
+      // check pending reviews for this project
+      api.get('/reviews/projects').then(r => {
+        const list = r.data || []
+        const pending = list.some((rev) => String(rev?.projectId?._id || rev.projectId) === String(id))
+        setHasPendingReview(pending)
+      }).catch(()=> setHasPendingReview(false))
     } else {
       setAssignments([])
       setManagers([])
+      setHasPendingReview(false)
     }
   }
 
@@ -70,7 +78,9 @@ export default function Projects() {
 
   const sendForReview = async () => {
     if (!selectedId) return
+    if (hasPendingReview) return
     await api.post('/reviews/projects', { projectId: selectedId, data: config })
+    setHasPendingReview(true)
   }
 
   const confirmDelete = () => setDeleteOpen(true)
@@ -155,7 +165,7 @@ export default function Projects() {
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Edit Project</Typography>
               <Stack direction="row" spacing={1}>
                 <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveConfig} disabled={!selectedId} sx={{ textTransform: 'none' }}>Save</AsyncButton>
-                <AsyncButton startIcon={<SendIcon />} variant="contained" onClick={sendForReview} disabled={!selectedId} sx={{ textTransform: 'none', bgcolor: accent }}>Send For Review</AsyncButton>
+                <AsyncButton startIcon={<SendIcon />} variant="contained" onClick={sendForReview} disabled={!selectedId || hasPendingReview} sx={{ textTransform: 'none', bgcolor: accent }} title={hasPendingReview ? 'This project is already pending review.' : ''}>Send For Review</AsyncButton>
                 {isAdmin && !!selectedId && (
                   <Button startIcon={<DeleteForeverIcon />} color="error" variant="outlined" onClick={confirmDelete} sx={{ textTransform: 'none' }}>
                     Delete Project
