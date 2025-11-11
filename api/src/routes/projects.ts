@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Project } from '../models/Project.js';
 import { Assignment } from '../models/Assignment.js';
+import { ProjectReview } from '../models/ProjectReview.js';
 import { requireAuth, requireRole, requireProjectManagerOrAdmin } from '../middleware/auth.js';
 import { ProjectSchema } from '../utils/validators.js';
 
@@ -50,6 +51,13 @@ router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   await Project.findByIdAndDelete(id);
   // Cascade: remove related assignments (keep submissions intact)
   await Assignment.deleteMany({ project: id });
+  // Mark pending reviews as cancelled to keep queues clean
+  try {
+    await ProjectReview.updateMany(
+      { projectId: id, status: 'pending' },
+      { $set: { status: 'cancelled', message: 'Project deleted by admin' } }
+    );
+  } catch (_) {}
 
   return res.json({ ok: true, message: 'Project deleted successfully' });
 });

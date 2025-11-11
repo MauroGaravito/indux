@@ -23,11 +23,28 @@ router.post('/projects', requireAuth, requireRole('admin'), async (req, res) => 
 });
 
 // Manager/Admin list project reviews pending
-router.get('/projects', requireAuth, requireRole('manager','admin'), async (_req, res) => {
-  const list = await ProjectReview.find({ status: 'pending' })
+router.get('/projects', requireAuth, requireRole('manager','admin'), async (req, res) => {
+  const raw = (req.query?.status as string | undefined) || 'pending';
+  const allowed = new Set(['pending','approved','declined','cancelled','all']);
+  const eff = allowed.has(raw) ? raw : 'pending';
+  const filter = eff === 'all' ? {} : { status: eff };
+  const list = await ProjectReview.find(filter)
     .populate('projectId', 'name')
     .sort({ createdAt: -1 });
   res.json(list);
+});
+
+// Admin-only: delete a review document
+router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
+  try {
+    const review = await ProjectReview.findById(req.params.id);
+    if (!review) return res.status(404).json({ error: 'Review not found' });
+    await review.deleteOne();
+    return res.json({ ok: true, message: 'Review deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting review:', err);
+    return res.status(500).json({ error: 'Failed to delete review' });
+  }
 });
 
 router.post('/projects/:id/approve', requireAuth, requireRole('manager','admin'), async (req, res) => {

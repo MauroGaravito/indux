@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import {
   Alert, Button, Paper, Stack, Typography, Tabs, Tab, Chip, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Grid, Box, Divider, List, ListItem, ListItemText,
-  Table, TableBody, TableCell, TableHead, TableRow
+  Table, TableBody, TableCell, TableHead, TableRow, Tooltip
 } from '@mui/material'
 import GroupIcon from '@mui/icons-material/Group'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
@@ -15,8 +15,8 @@ import { useAuthStore } from '../store/auth.js'
 import { notifyError, notifySuccess } from '../notifications/store.js'
 
 function StatusChip({ status }) {
-  const color = status === 'approved' ? 'success' : status === 'declined' ? 'error' : 'default'
-  const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Pending'
+  const color = status === 'approved' ? 'success' : status === 'declined' ? 'error' : status === 'cancelled' ? 'default' : 'warning'
+  const label = status ? (status === 'cancelled' ? 'Cancelled' : status.charAt(0).toUpperCase() + status.slice(1)) : 'Pending'
   return <Chip size="small" color={color} label={label} />
 }
 
@@ -197,11 +197,13 @@ export default function ReviewQueue() {
   const [viewUploadUrls, setViewUploadUrls] = useState({}) // { [key:string]: url }
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteId, setDeleteId] = useState(null)
+  const [deleteReviewOpen, setDeleteReviewOpen] = useState(false)
+  const [deleteReviewId, setDeleteReviewId] = useState(null)
 
   const load = () => Promise.all([
     api.get('/submissions').then(r => setSubs(r.data || [])), // pending only (default)
     api.get('/submissions?status=all').then(r => setAllSubs(r.data || [])),
-    api.get('/reviews/projects').then(r => setProjReviews(r.data || []))
+    api.get('/reviews/projects?status=all').then(r => setProjReviews(r.data || []))
   ])
   useEffect(()=> { if (user) load() }, [user])
   useEffect(()=> { api.get('/projects').then(r => setProjects(r.data || [])) }, [])
@@ -229,11 +231,27 @@ export default function ReviewQueue() {
   const closeDecline = () => setDeclineOpen(false)
   const openDelete = (id) => { setDeleteId(id); setDeleteOpen(true) }
   const closeDelete = () => setDeleteOpen(false)
+  const openDeleteReview = (id) => { setDeleteReviewId(id); setDeleteReviewOpen(true) }
+  const closeDeleteReview = () => setDeleteReviewOpen(false)
 
   const approveSubmission = async (id) => { await api.post(`/submissions/${id}/approve`); await load() }
   const declineSubmission = async () => { if(!declineId) return; await api.post(`/submissions/${declineId}/decline`, { reason: declineReason }); closeDecline(); await load() }
   const approveProject = async (id) => { await api.post(`/reviews/projects/${id}/approve`); await load() }
   const declineProject = async () => { if(!declineId) return; await api.post(`/reviews/projects/${declineId}/decline`, { reason: declineReason }); closeDecline(); await load() }
+  const deleteReview = async () => {
+    if (!deleteReviewId) return
+    try {
+      const r = await api.delete(`/reviews/${deleteReviewId}`)
+      notifySuccess(r?.data?.message || 'Review deleted successfully')
+      await load()
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.response?.data?.error || 'Failed to delete review'
+      notifyError(msg)
+    } finally {
+      setDeleteReviewOpen(false)
+      setDeleteReviewId(null)
+    }
+  }
   const deleteSubmission = async () => {
     if (!deleteId) return
     try {
@@ -294,15 +312,31 @@ export default function ReviewQueue() {
                 <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={1}>
                   <Box>
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{pr?.projectId?.name || pr.projectId}</Typography>
-                    <Stack direction="row" spacing={1}>
+                    <Stack direction="row" spacing={1} alignItems="center">
                       <StatusChip status={pr.status || 'pending'} />
                       <Typography variant="caption" sx={{ opacity: 0.7 }}>Requested: {new Date(pr.createdAt).toLocaleString()}</Typography>
+                      {pr.status === 'cancelled' && (
+                        pr.message ? (
+                          <Tooltip title={pr.message} placement="top-start">
+                            <Chip label="Reason" size="small" />
+                          </Tooltip>
+                        ) : (
+                          <Typography variant="caption" sx={{ opacity: 0.6 }}>—</Typography>
+                        )
+                      )}
                     </Stack>
                   </Box>
                   <Stack direction="row" spacing={1}>
                     <Button variant="outlined" onClick={()=> openView('Project Configuration', pr.data)}>View</Button>
-                    <Button color="error" variant="outlined" onClick={()=> openDecline('project', pr._id)}>Decline</Button>
-                    <AsyncButton color="success" variant="contained" onClick={()=> approveProject(pr._id)}>Approve</AsyncButton>
+                    {pr.status !== 'cancelled' && (
+                      <>
+                        <Button color="error" variant="outlined" onClick={()=> openDecline('project', pr._id)}>Decline</Button>
+                        <AsyncButton color="success" variant="contained" onClick={()=> approveProject(pr._id)}>Approve</AsyncButton>
+                      </>
+                    )}
+                    {user?.role === 'admin' && (
+                      <Button color="error" variant="outlined" onClick={()=> openDeleteReview(pr._id)}>Delete</Button>
+                    )}
                   </Stack>
                 </Stack>
               </Paper>
@@ -617,6 +651,18 @@ export default function ReviewQueue() {
         <DialogActions>
           <Button onClick={closeDelete}>Cancel</Button>
           <AsyncButton color="error" variant="contained" onClick={deleteSubmission}>Delete</AsyncButton>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Review Dialog (admin only) */}
+      <Dialog open={deleteReviewOpen} onClose={closeDeleteReview} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete Review</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this review? This action cannot be undone.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDeleteReview}>Cancel</Button>
+          <AsyncButton color="error" variant="contained" onClick={deleteReview}>Delete</AsyncButton>
         </DialogActions>
       </Dialog>
     </Stack>
