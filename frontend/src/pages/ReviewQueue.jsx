@@ -6,10 +6,12 @@ import {
 } from '@mui/material'
 import GroupIcon from '@mui/icons-material/Group'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
 import api from '../utils/api.js'
 import { presignGet } from '../utils/upload.js'
 import AsyncButton from '../components/AsyncButton.jsx'
 import { useAuthStore } from '../store/auth.js'
+import { notifyError, notifySuccess } from '../notifications/store.js'
 
 function StatusChip({ status }) {
   const color = status === 'approved' ? 'success' : status === 'declined' ? 'error' : 'default'
@@ -36,6 +38,8 @@ export default function ReviewQueue() {
   const [declineKind, setDeclineKind] = useState('submission')
   const [declineReason, setDeclineReason] = useState('Not adequate')
   const [viewUploadUrls, setViewUploadUrls] = useState({}) // { [key:string]: url }
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteId, setDeleteId] = useState(null)
 
   const load = () => Promise.all([
     api.get('/submissions').then(r => setSubs(r.data || [])), // pending only (default)
@@ -66,11 +70,27 @@ export default function ReviewQueue() {
   const closeView = () => setViewOpen(false)
   const openDecline = (kind, id) => { setDeclineKind(kind); setDeclineId(id); setDeclineOpen(true) }
   const closeDecline = () => setDeclineOpen(false)
+  const openDelete = (id) => { setDeleteId(id); setDeleteOpen(true) }
+  const closeDelete = () => setDeleteOpen(false)
 
   const approveSubmission = async (id) => { await api.post(`/submissions/${id}/approve`); await load() }
   const declineSubmission = async () => { if(!declineId) return; await api.post(`/submissions/${declineId}/decline`, { reason: declineReason }); closeDecline(); await load() }
   const approveProject = async (id) => { await api.post(`/reviews/projects/${id}/approve`); await load() }
   const declineProject = async () => { if(!declineId) return; await api.post(`/reviews/projects/${declineId}/decline`, { reason: declineReason }); closeDecline(); await load() }
+  const deleteSubmission = async () => {
+    if (!deleteId) return
+    try {
+      const r = await api.delete(`/submissions/${deleteId}`)
+      notifySuccess(r?.data?.message || 'Submission deleted successfully')
+      await load()
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.response?.data?.error || 'Failed to delete submission'
+      notifyError(msg)
+    } finally {
+      setDeleteOpen(false)
+      setDeleteId(null)
+    }
+  }
 
   // When viewing a worker submission, pre-sign image uploads so we can preview them
   useEffect(() => {
@@ -162,6 +182,11 @@ export default function ReviewQueue() {
                     <Button variant="outlined" onClick={()=> openView('Worker Submission', s)}>View</Button>
                     <Button color="error" variant="outlined" onClick={()=> openDecline('submission', s._id)}>Decline</Button>
                     <AsyncButton color="success" variant="contained" onClick={()=> approveSubmission(s._id)}>Approve</AsyncButton>
+                    {user?.role === 'admin' && (
+                      <Button startIcon={<DeleteForeverIcon />} color="error" variant="outlined" onClick={()=> openDelete(s._id)}>
+                        Delete
+                      </Button>
+                    )}
                   </Stack>
                 </Stack>
               </Paper>
@@ -214,7 +239,12 @@ export default function ReviewQueue() {
                           <TableCell>{new Date(s.createdAt).toLocaleString()}</TableCell>
                           <TableCell>{reviewer ? String(reviewer) : '-'}</TableCell>
                           <TableCell align="right">
-                            <Button size="small" variant="outlined" onClick={()=> openView('Worker Submission', s)}>View</Button>
+                            <Stack direction="row" spacing={1} justifyContent="flex-end">
+                              <Button size="small" variant="outlined" onClick={()=> openView('Worker Submission', s)}>View</Button>
+                              {user?.role === 'admin' && (
+                                <Button size="small" startIcon={<DeleteForeverIcon />} color="error" variant="outlined" onClick={()=> openDelete(s._id)}>Delete</Button>
+                              )}
+                            </Stack>
                           </TableCell>
                         </TableRow>
                       )
@@ -416,6 +446,18 @@ export default function ReviewQueue() {
         <DialogActions>
           <Button onClick={closeDecline}>Cancel</Button>
           <AsyncButton color="error" variant="contained" onClick={declineKind==='project' ? declineProject : declineSubmission}>Decline</AsyncButton>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Submission Dialog */}
+      <Dialog open={deleteOpen} onClose={closeDelete} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete Submission</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure? This action cannot be undone.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDelete}>Cancel</Button>
+          <AsyncButton color="error" variant="contained" onClick={deleteSubmission}>Delete</AsyncButton>
         </DialogActions>
       </Dialog>
     </Stack>

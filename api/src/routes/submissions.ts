@@ -81,4 +81,13 @@ router.post('/:id/decline', requireAuth, requireRole('manager', 'admin'), async 
   res.json({ ok: true });
 });
 
+// Admin-only: delete a submission by ID
+router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
+  const { id } = req.params;
+  const existing = await Submission.findById(id);
+  if (!existing) return res.status(404).json({ error: 'Submission not found' });
+  await Submission.findByIdAndDelete(id);
+  return res.json({ ok: true, message: 'Submission deleted successfully' });
+});
+
 export default router;
