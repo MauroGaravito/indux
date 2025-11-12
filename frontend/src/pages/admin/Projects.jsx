@@ -211,43 +211,48 @@ export default function Projects() {
             </List>
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2" sx={{ mb: 1 }}>Create Project</Typography>
-            <Stack direction={{ xs:'column', sm:'row' }} spacing={1}>
-              <TextField
-                size="small"
-                label="Name"
-                placeholder="Project name"
-                fullWidth
-                value={name}
-                onChange={e=> setName(e.target.value)}
-                sx={{ minWidth: 200 }}
-              />
-              <TextField
-                size="small"
-                label="Description"
-                placeholder="Short description"
-                fullWidth
-                value={desc}
-                onChange={e=> setDesc(e.target.value)}
-                sx={{ minWidth: 240 }}
-              />
-              {isAdmin && (
+            <Grid container spacing={1}>
+              <Grid item xs={12} sm={6}>
                 <TextField
                   size="small"
-                  select
-                  label="Project Manager"
-                  placeholder="Select manager"
                   fullWidth
-                  value={createManagerId}
-                  onChange={(e)=> setCreateManagerId(e.target.value)}
-                  sx={{ minWidth: 220 }}
-                >
-                  {(users.filter(u => u.role === 'manager') || []).map(u => (
-                    <MenuItem key={u._id} value={u._id}>{u.name} ({u.email})</MenuItem>
-                  ))}
-                </TextField>
+                  label="Name"
+                  placeholder="Project name"
+                  value={name}
+                  onChange={e=> setName(e.target.value)}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  label="Description"
+                  placeholder="Short description"
+                  value={desc}
+                  onChange={e=> setDesc(e.target.value)}
+                />
+              </Grid>
+              {isAdmin && (
+                <Grid item xs={12}>
+                  <TextField
+                    size="small"
+                    select
+                    fullWidth
+                    label="Project Manager"
+                    placeholder="Select manager"
+                    value={createManagerId}
+                    onChange={(e)=> setCreateManagerId(e.target.value)}
+                  >
+                    {(users.filter(u => u.role === 'manager') || []).map(u => (
+                      <MenuItem key={u._id} value={u._id}>{u.name} ({u.email})</MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
               )}
-            </Stack>
-            <AsyncButton startIcon={<AddCircleOutlineIcon />} sx={{ mt: 1, textTransform: 'none' }} variant="contained" onClick={createProject} disabled={!name}>Create</AsyncButton>
+              <Grid item xs={12}>
+                <AsyncButton startIcon={<AddCircleOutlineIcon />} sx={{ mt: 0.5, textTransform: 'none' }} variant="contained" onClick={createProject} disabled={!name}>Create</AsyncButton>
+              </Grid>
+            </Grid>
           </CardContent>
         </Card>
       </Grid>
