@@ -3,6 +3,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { z } from 'zod';
 import { ProjectReview } from '../models/ProjectReview.js';
 import { Project } from '../models/Project.js';
+import { Assignment } from '../models/Assignment.js';
 
 const router = Router();
 
@@ -29,6 +30,12 @@ router.post('/projects', requireAuth, requireRole('admin'), async (req, res) => 
     return res.status(200).json({ ok: true, message: 'Existing review updated with latest project data.' });
   }
 
+  // Prevent duplicates when there is an approved review already
+  const approved = await ProjectReview.findOne({ projectId, status: 'approved' }).lean();
+  if (approved) {
+    return res.status(409).json({ error: 'Project already approved. Delete or cancel the previous review to request a new one.' });
+  }
+
   // Otherwise, create a new review with current project data
   const review = await ProjectReview.create({
     projectId,
@@ -44,7 +51,15 @@ router.get('/projects', requireAuth, requireRole('manager','admin'), async (req,
   const raw = (req.query?.status as string | undefined) || 'pending';
   const allowed = new Set(['pending','approved','declined','cancelled','all']);
   const eff = allowed.has(raw) ? raw : 'pending';
-  const filter = eff === 'all' ? {} : { status: eff };
+  const filter: any = eff === 'all' ? {} : { status: eff };
+
+  // Restrict managers to reviews of projects they manage
+  if (req.user!.role === 'manager') {
+    const managed = await Assignment.find({ user: req.user!.sub, role: 'manager' }).lean();
+    const ids = managed.map(a => a.project);
+    filter.projectId = { $in: ids };
+  }
+
   const list = await ProjectReview.find(filter)
     .populate('projectId', 'name')
     .sort({ createdAt: -1 });

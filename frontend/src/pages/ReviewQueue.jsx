@@ -431,7 +431,7 @@ export default function ReviewQueue() {
                   </Box>
                   <Stack direction="row" spacing={1}>
                     <Button variant="outlined" onClick={()=> viewProjectReview(pr)}>View</Button>
-                    {pr.status !== 'cancelled' && (
+                    {pr.status === 'pending' && (
                       <>
                         <Button color="error" variant="outlined" onClick={()=> declineProject(pr._id)}>Decline</Button>
                         <AsyncButton color="success" variant="contained" onClick={()=> approveProject(pr._id)}>Approve</AsyncButton>
