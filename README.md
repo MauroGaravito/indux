@@ -421,3 +421,4 @@ Conecta usuarios con proyectos mediante una relación controlada.
 - Lista de asignaciones con nombre y rol.
 - Botón “Assign User” abre modal con selector de usuario y rol.
 - Cada fila incluye “Remove” para quitar la asignación.
+test
