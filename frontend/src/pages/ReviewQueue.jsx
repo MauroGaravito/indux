@@ -185,13 +185,13 @@ function ProjectConfigViewer({ config }) {
                 return <InsertDriveFileIcon sx={{ fontSize: 42, color: 'text.secondary' }} />
               }
 
-              const isSlidesDocKey = (k) => /^slides\//.test(String(k || '')) && ['pdf','ppt','pptx'].includes(ext(k))
-              const displayName = (f) => f?.name || f?.title || (isSlidesDocKey(f?.key) ? 'Slides' : ((f?.key || '').split('/').pop() || 'file'))
+              const isSlidesKey = (k) => /^slides\//.test(String(k || ''))
+              const displayName = (f) => f?.name || f?.title || (isSlidesKey(f?.key) ? 'Slides' : ((f?.key || '').split('/').pop() || 'file'))
               const openItem = async (f) => {
                 try {
-                  if (f?.key && isSlidesDocKey(f.key)) {
-                    const e = ext(f.key)
-                    const n = displayName(f)
+                  if (f?.key && isSlidesKey(f.key)) {
+                    const e = ext(f?.name) || ext(f?.title) || ext(f?.url) || 'pptx'
+                    const n = displayName(f) || 'Slides'
                     const params = new URLSearchParams({ key: f.key, name: n, ext: e })
                     window.open(`/slides-viewer?${params.toString()}`, '_blank', 'noopener,noreferrer')
                     return
@@ -232,7 +232,7 @@ function ProjectConfigViewer({ config }) {
                 <List>
                   {norm.map((f, idx) => {
                     const url = f?.url || ''
-                    const type = f?.type || ext(url) || (f?.key ? ext(f.key) : '-')
+                    const type = f?.type || ext(f?.name) || ext(url) || (f?.key ? ext(f.key) : '-')
                     const title = displayName(f)
                     return (
                       <ListItem key={idx} secondaryAction={<Button size="small" onClick={()=> openItem(f)}>Open</Button>}>
