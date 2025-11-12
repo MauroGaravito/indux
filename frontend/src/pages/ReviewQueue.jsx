@@ -7,6 +7,10 @@ import {
 import GroupIcon from '@mui/icons-material/Group'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import DownloadIcon from '@mui/icons-material/Download'
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
+import DescriptionIcon from '@mui/icons-material/Description'
+import SlideshowIcon from '@mui/icons-material/Slideshow'
+import ImageIcon from '@mui/icons-material/Image'
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
 import api from '../utils/api.js'
 import { presignGet } from '../utils/upload.js'
@@ -67,20 +71,34 @@ function ProjectConfigViewer({ config }) {
       <Box sx={{ mt: 2 }}>
         {tabs[effectiveIndex]?.key === 'info' && (
           <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
-            {Object.keys(cfg.projectInfo || {}).length ? (
-              <Table size="small">
-                <TableBody>
-                  {Object.entries(cfg.projectInfo).map(([k, v]) => (
-                    <TableRow key={k}>
-                      <TableCell sx={{ width: '35%' }}><Typography variant="subtitle2">{String(k)}</Typography></TableCell>
-                      <TableCell>{typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <Typography color="text.secondary">No data available</Typography>
-            )}
+            {(() => {
+              const pinfo = cfg.projectInfo || {}
+              const mapKey = pinfo?.projectMapKey || pinfo?.mapKey
+              return (
+                <>
+                  {mapKey ? (
+                    <Box sx={{ mb: 2 }}>
+                      <Box component="img" src={`/${mapKey}`} alt="Project Map" sx={{ width: '100%', maxWidth: 300, borderRadius: 1 }} />
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Map key: {String(mapKey)}</Typography>
+                    </Box>
+                  ) : null}
+                  {Object.keys(pinfo).length ? (
+                    <Table size="small">
+                      <TableBody>
+                        {Object.entries(pinfo).map(([k, v]) => (
+                          <TableRow key={k}>
+                            <TableCell sx={{ width: '35%' }}><Typography variant="subtitle2">{String(k)}</Typography></TableCell>
+                            <TableCell>{typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <Typography color="text.secondary">No data available</Typography>
+                  )}
+                </>
+              )
+            })()}
           </Paper>
         )}
 
@@ -114,11 +132,67 @@ function ProjectConfigViewer({ config }) {
         {tabs[effectiveIndex]?.key === 'slides' && (
           <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
             {(() => {
-              const itemsBase = Array.isArray(slides) ? slides : (slides?.items || slides?.list || [])
-              const extra = Array.isArray(uploads) ? uploads : []
-              const items = [...itemsBase, ...extra]
-              if (!Array.isArray(items) || !items.length) return <Typography color="text.secondary">No data available</Typography>
+              const toArray = (v) => Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : [])
+              const raw = [
+                ...toArray(cfg.slides || cfg.materials),
+                ...toArray(cfg.uploads),
+                ...toArray(cfg.files)
+              ]
+              const norm = raw.map((item) => {
+                if (typeof item === 'string') {
+                  const key = item
+                  const name = key.split('/').pop() || key
+                  const url = `/${key}`
+                  return { key, name, url }
+                }
+                const key = item?.key || item?.path || item?.url || ''
+                const name = item?.name || item?.title || (typeof key === 'string' ? (key.split('/').pop() || key) : 'file')
+                const url = item?.url || (item?.key ? `/${item.key}` : (typeof key === 'string' ? `/${key}` : ''))
+                const type = item?.type || item?.mime
+                return { key, name, url, type }
+              }).filter((f) => f && (f.url || f.key))
+
+              if (!norm.length) return <Typography color="text.secondary">No files uploaded</Typography>
+
+              const ext = (s) => {
+                try { return String(s || '').split('?')[0].split('#')[0].split('.').pop().toLowerCase() } catch { return '' }
+              }
+              const isImage = (s, t) => ['png','jpg','jpeg','webp','gif','bmp'].includes(ext(s)) || (typeof t === 'string' && t.startsWith('image'))
+
+              const iconFor = (s) => {
+                const e = ext(s)
+                if (['pdf'].includes(e)) return <PictureAsPdfIcon sx={{ fontSize: 48, color: 'error.main' }} />
+                if (['ppt','pptx','key'].includes(e)) return <SlideshowIcon sx={{ fontSize: 48, color: 'warning.main' }} />
+                if (['doc','docx','txt','rtf','csv','xls','xlsx'].includes(e)) return <DescriptionIcon sx={{ fontSize: 48, color: 'info.main' }} />
+                return <InsertDriveFileIcon sx={{ fontSize: 42, color: 'text.secondary' }} />
+              }
+
               return (
+                <Grid container spacing={2}>
+                  {norm.map((f, idx) => (
+                    <Grid key={`${f.key || f.url || idx}-${idx}`} item xs={12} sm={6} md={4} lg={3}>
+                      <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, height: '100%' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box sx={{ width: 72, height: 72, borderRadius: 1, border: '1px solid', borderColor: 'divider', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', mr: 1.5 }}>
+                            {isImage(f.url || f.key, f.type) ? (
+                              <Box component="img" src={f.url} alt={f.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              iconFor(f.url || f.key)
+                            )}
+                          </Box>
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography variant="subtitle2" noWrap title={f.name}>{f.name}</Typography>
+                            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                              {f.url && (
+                                <Button size="small" variant="outlined" component="a" href={f.url} target="_blank" rel="noopener">Open</Button>
+                              )}
+                            </Stack>
+                          </Box>
+                        </Box>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
                 <List>
                   {items.map((it, idx) => {
                     const title = it?.name || it?.title || `Item ${idx+1}`
@@ -144,7 +218,7 @@ function ProjectConfigViewer({ config }) {
                   <TableRow>
                     <TableCell>Question</TableCell>
                     <TableCell>Type</TableCell>
-                    <TableCell>Correct Answer</TableCell>
+                    <TableCell>Correct Answer(s)</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -153,14 +227,18 @@ function ProjectConfigViewer({ config }) {
                     const qType = q?.type || (Array.isArray(q?.options) ? 'multiple-choice' : '-')
                     const correct = q?.correct ?? q?.answer ?? q?.answers
                     let correctText = '-'
-                    if (Array.isArray(correct)) correctText = correct.join(', ')
-                    else if (typeof correct === 'object' && correct != null) correctText = JSON.stringify(correct)
-                    else if (correct != null) correctText = String(correct)
+                    if (Array.isArray(correct)) correctText = correct
+                    else if (typeof correct === 'object' && correct != null) correctText = [JSON.stringify(correct)]
+                    else if (correct != null) correctText = [String(correct)]
                     return (
                       <TableRow key={idx}>
                         <TableCell>{qText}</TableCell>
                         <TableCell>{qType}</TableCell>
-                        <TableCell>{correctText}</TableCell>
+                        <TableCell>
+                          {Array.isArray(correctText)
+                            ? correctText.map((a, i) => (<Typography key={i} component="span" sx={{ fontWeight: 600, mr: 1 }}>{String(a)}</Typography>))
+                            : <Typography color="text.secondary">-</Typography>}
+                        </TableCell>
                       </TableRow>
                     )
                   })}
