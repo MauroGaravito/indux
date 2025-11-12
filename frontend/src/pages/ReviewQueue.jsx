@@ -213,13 +213,13 @@ function ProjectConfigViewer({ config }) {
                   ))}
                 </Grid>
                 <List>
-                  {norm.map() => {
-                    const title = it?.name || it?.title || `Item ${idx+1}`
-                    const type = it?.type || it?.mime || '-'
-                    const url = it?.url || it?.href || it?.link || ''
+                  {norm.map((f, idx) => {
+                    const title = f?.name || `Item ${idx+1}`
+                    const url = f?.url || (f?.key ? `/${f.key}` : '')
+                    const type = f?.type || ext(url) || '-'
                     return (
                       <ListItem key={idx} secondaryAction={url ? <Button size="small" onClick={()=> window.open(url, '_blank')}>Open</Button> : null}>
-                        <ListItemText primary={`${title}`} secondary={`Type: ${type}${url ? ' • link' : ''}`} />
+                        <ListItemText primary={title} secondary={`Type: ${type}${url ? ' • link' : ''}`} />
                       </ListItem>
                     )
                   })}
