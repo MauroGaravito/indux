@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { Assignment } from '../models/Assignment.js';
 import { Project } from '../models/Project.js';
+import { User } from '../models/User.js';
 
 const router = Router();
 
@@ -24,9 +25,29 @@ router.post('/', requireAuth, requireRole('admin', 'manager'), async (req, res) 
       return res.status(400).json({ error: 'Invalid role' });
     }
 
-    if (req.user!.role === 'manager') {
+    // Enforce hierarchy:
+    // - Only admin can assign a project manager
+    // - Only managers can assign workers, and only to their managed projects
+    if (role === 'manager') {
+      if (req.user!.role !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can assign project managers' });
+      }
+      // Target user must have manager role
+      const u = await User.findById(user).select('role');
+      if (!u || u.role !== 'manager') {
+        return res.status(400).json({ error: 'Assigned user must have role "manager"' });
+      }
+    } else if (role === 'worker') {
+      if (req.user!.role !== 'manager') {
+        return res.status(403).json({ error: 'Only managers can assign workers' });
+      }
       const allowed = await isManagerOfProject(req.user!.sub, project);
       if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+      // Target user must have worker role
+      const u = await User.findById(user).select('role');
+      if (!u || u.role !== 'worker') {
+        return res.status(400).json({ error: 'Assigned user must have role "worker"' });
+      }
     }
 
     const doc = await Assignment.create({ user, project, role, assignedBy: req.user!.sub });

@@ -24,6 +24,7 @@ export default function Projects() {
   const [selectedId, setSelectedId] = useState('')
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
+  const [createManagerId, setCreateManagerId] = useState('')
   const [config, setConfig] = useState({ projectInfo: {}, personalDetails: {}, slides: {}, questions: [] })
   const [tab, setTab] = useState(0)
   const [assignments, setAssignments] = useState([])
@@ -44,10 +45,25 @@ export default function Projects() {
     setProjects(r.data)
   }
   useEffect(()=> { load() }, [])
+  // Preload users for manager select in create section (admins only)
+  useEffect(() => {
+    if (!isAdmin) return
+    api.get('/users').then(r => {
+      const list = Array.isArray(r.data) ? r.data : []
+      setUsers(list.filter(u => u.role === 'manager'))
+    }).catch(() => setUsers([]))
+  }, [isAdmin])
 
   const createProject = async () => {
-    await api.post('/projects', { name, description: desc, steps: [] })
-    setName(''); setDesc('');
+    const r = await api.post('/projects', { name, description: desc, steps: [] })
+    try {
+      const newId = r?.data?._id
+      if (newId && createManagerId) {
+        await api.post('/assignments', { user: createManagerId, project: newId, role: 'manager' })
+      }
+      notifySuccess('Project created successfully')
+    } catch (_) {}
+    setName(''); setDesc(''); setCreateManagerId('');
     await load()
   }
 
@@ -132,12 +148,18 @@ export default function Projects() {
   const openAssign = async () => {
     setAssignOpen(true)
     // Fetch users on demand (admin only route)
-    try { const r = await api.get('/users'); setUsers(r.data || []) } catch { setUsers([]) }
+    try {
+      const r = await api.get('/users')
+      const list = Array.isArray(r.data) ? r.data : []
+      const filtered = isAdmin ? list.filter(u => u.role === 'manager') : list.filter(u => u.role === 'worker')
+      setUsers(filtered)
+    } catch { setUsers([]) }
   }
   const closeAssign = () => setAssignOpen(false)
   const doAssign = async () => {
     if (!selectedId || !assignUserId) return
-    await api.post('/assignments', { user: assignUserId, project: selectedId, role: assignRole })
+    const role = isAdmin ? 'manager' : 'worker'
+    await api.post('/assignments', { user: assignUserId, project: selectedId, role })
     setAssignUserId(''); setAssignRole('worker'); setAssignOpen(false)
     const r = await api.get(`/assignments/project/${selectedId}`)
     setAssignments(r.data || [])
@@ -192,6 +214,13 @@ export default function Projects() {
             <Stack direction="row" spacing={1}>
               <TextField size="small" label="Name" value={name} onChange={e=> setName(e.target.value)} />
               <TextField size="small" label="Description" value={desc} onChange={e=> setDesc(e.target.value)} />
+              {isAdmin && (
+                <TextField size="small" select label="Project Manager" value={createManagerId} onChange={(e)=> setCreateManagerId(e.target.value)} sx={{ minWidth: 220 }}>
+                  {(users.filter(u => u.role === 'manager') || []).map(u => (
+                    <MenuItem key={u._id} value={u._id}>{u.name} ({u.email})</MenuItem>
+                  ))}
+                </TextField>
+              )}
             </Stack>
             <AsyncButton startIcon={<AddCircleOutlineIcon />} sx={{ mt: 1, textTransform: 'none' }} variant="contained" onClick={createProject} disabled={!name}>Create</AsyncButton>
           </CardContent>
@@ -256,7 +285,7 @@ export default function Projects() {
                     <GroupIcon color="action" />
                     <Typography variant="subtitle2">Assigned Users</Typography>
                     <Box sx={{ flex: 1 }} />
-                    <Button variant="contained" onClick={openAssign} sx={{ textTransform: 'none' }}>Assign User</Button>
+                    <Button variant="contained" onClick={openAssign} sx={{ textTransform: 'none' }}>{isAdmin ? 'Assign Manager' : 'Assign Worker'}</Button>
                   </Stack>
                   <List>
                     {assignments.map((a) => (
@@ -280,9 +309,9 @@ export default function Projects() {
       </Grid>
     </Grid>
 
-    {/* Assign User Modal */}
+    {/* Assign Modal */}
     <Dialog open={assignOpen} onClose={closeAssign} maxWidth="sm" fullWidth>
-      <CardHeader title={<Typography variant="subtitle1">Assign User to Project</Typography>} />
+      <CardHeader title={<Typography variant="subtitle1">{isAdmin ? 'Assign Project Manager' : 'Assign Worker to Project'}</Typography>} />
       <CardContent>
         <Stack spacing={2}>
           <TextField
@@ -290,21 +319,22 @@ export default function Projects() {
             label="User"
             value={assignUserId}
             onChange={(e)=> setAssignUserId(e.target.value)}
-            helperText="Select a user to assign"
+            helperText={isAdmin ? 'Select a manager to assign' : 'Select a worker to assign'}
           >
             {users.map(u => (
               <MenuItem key={u._id} value={u._id}>{u.name} ({u.email})</MenuItem>
             ))}
           </TextField>
-          <TextField
-            select
-            label="Role"
-            value={assignRole}
-            onChange={(e)=> setAssignRole(e.target.value)}
-          >
-            <MenuItem value="worker">Worker</MenuItem>
-            <MenuItem value="manager">Manager</MenuItem>
-          </TextField>
+          {!isAdmin && (
+            <TextField
+              select
+              label="Role"
+              value={assignRole}
+              onChange={(e)=> setAssignRole(e.target.value)}
+            >
+              <MenuItem value="worker">Worker</MenuItem>
+            </TextField>
+          )}
         </Stack>
       </CardContent>
       <Stack direction="row" spacing={1} sx={{ px: 2, pb: 2, justifyContent: 'flex-end' }}>
