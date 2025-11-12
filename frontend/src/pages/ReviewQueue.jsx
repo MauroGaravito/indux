@@ -168,6 +168,7 @@ function ProjectConfigViewer({ config }) {
               }
 
               return (
+                <Box>
                 <Grid container spacing={2}>
                   {norm.map((f, idx) => (
                     <Grid key={`${f.key || f.url || idx}-${idx}`} item xs={12} sm={6} md={4} lg={3}>
@@ -205,6 +206,7 @@ function ProjectConfigViewer({ config }) {
                     )
                   })}
                 </List>
+                </Box>
               )
             })()}
           </Paper>
