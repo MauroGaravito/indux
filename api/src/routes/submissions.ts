@@ -36,21 +36,34 @@ router.post('/', requireAuth, requireRole('worker'), async (req, res) => {
 
 // Manager list pending submissions
 router.get('/', requireAuth, requireRole('manager', 'admin'), async (req, res) => {
-  const raw = (req.query?.status as string | undefined) || 'pending'
-  const status = ['pending','approved','declined','all'].includes(raw) ? raw : 'pending'
-  const filter = status === 'all' ? {} : { status }
+  const raw = (req.query?.status as string | undefined) || 'pending';
+  const status = ['pending','approved','declined','all'].includes(raw) ? raw : 'pending';
+  const filter: any = status === 'all' ? {} : { status };
+
+  // If caller is a manager, restrict to projects they manage
+  if (req.user!.role === 'manager') {
+    const managed = await Assignment.find({ user: req.user!.sub, role: 'manager' }).lean();
+    const ids = managed.map(a => a.project);
+    filter.projectId = { $in: ids };
+  }
+
   const list = await Submission
     .find(filter)
     .populate('userId', 'name email')
     .populate('projectId', 'name')
     .populate('reviewedBy', 'name')
-    .sort({ createdAt: -1 })
-  res.json(list)
+    .sort({ createdAt: -1 });
+  res.json(list);
 });
 
 router.post('/:id/approve', requireAuth, requireRole('manager', 'admin'), async (req, res) => {
   const sub = await Submission.findById(req.params.id);
   if (!sub) return res.status(404).json({ error: 'Not found' });
+  // Managers can only act on submissions from projects they manage
+  if (req.user!.role === 'manager') {
+    const allowed = await Assignment.findOne({ user: req.user!.sub, project: sub.projectId, role: 'manager' }).lean();
+    if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+  }
   const user = await User.findById(sub.userId);
   const project = await Project.findById(sub.projectId);
   if (!user || !project) return res.status(400).json({ error: 'Invalid submission context' });
@@ -74,6 +87,10 @@ router.post('/:id/approve', requireAuth, requireRole('manager', 'admin'), async 
 router.post('/:id/decline', requireAuth, requireRole('manager', 'admin'), async (req, res) => {
   const sub = await Submission.findById(req.params.id);
   if (!sub) return res.status(404).json({ error: 'Not found' });
+  if (req.user!.role === 'manager') {
+    const allowed = await Assignment.findOne({ user: req.user!.sub, project: sub.projectId, role: 'manager' }).lean();
+    if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+  }
   sub.status = 'declined';
   sub.reviewReason = (req.body && req.body.reason) || 'Not specified';
   sub.reviewedBy = req.user!.sub as any;

@@ -576,9 +576,15 @@ export default function ReviewQueue() {
       <Dialog open={viewOpen} onClose={closeView} maxWidth="md" fullWidth>
         <DialogTitle>{viewTitle}</DialogTitle>
         <DialogContent>
-          {viewTitle === 'Project Configuration' && viewJson
-            ? <ProjectConfigViewer config={viewJson} />
-            : <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{viewJson ? JSON.stringify(viewJson, null, 2) : ''}</pre>}
+          {viewTitle === 'Project Configuration' && viewJson && (
+            <ProjectConfigViewer config={viewJson} />
+          )}
+          {viewTitle === 'Submission' && viewJson && (
+            <SubmissionViewer submission={viewJson} />
+          )}
+          {!viewJson && (
+            <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{viewJson ? JSON.stringify(viewJson, null, 2) : ''}</pre>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={closeView}>Close</Button>
@@ -624,6 +630,112 @@ export default function ReviewQueue() {
           <AsyncButton variant="contained" onClick={addWorker} disabled={!addWorkerId || !teamProjectId}>Add</AsyncButton>
         </DialogActions>
       </Dialog>
+    </Stack>
+  )
+}
+
+// Submission viewer for managers/admins
+function SubmissionViewer({ submission }) {
+  const s = submission || {}
+  const worker = s?.userId || s?.user || {}
+  const project = s?.projectId || {}
+  const created = s?.createdAt ? new Date(s.createdAt).toLocaleString() : ''
+  const quiz = s?.quiz || {}
+  const pct = typeof quiz.total === 'number' && quiz.total > 0 ? Math.round((quiz.correct || 0) * 100 / quiz.total) : null
+  const personal = s?.personal && typeof s.personal === 'object' ? s.personal : {}
+  const uploads = Array.isArray(s?.uploads) ? s.uploads : []
+
+  const ext = (str) => { try { return String(str||'').split('?')[0].split('#')[0].split('.').pop().toLowerCase() } catch { return '' } }
+  const iconFor = (name) => {
+    const e = ext(name)
+    if (['pdf'].includes(e)) return <PictureAsPdfIcon sx={{ fontSize: 32, color: 'error.main' }} />
+    if (['png','jpg','jpeg','webp','gif','bmp'].includes(e)) return <ImageIcon sx={{ fontSize: 32, color: 'success.main' }} />
+    if (['ppt','pptx','key'].includes(e)) return <SlideshowIcon sx={{ fontSize: 32, color: 'warning.main' }} />
+    if (['doc','docx','txt','rtf','csv','xls','xlsx'].includes(e)) return <DescriptionIcon sx={{ fontSize: 32, color: 'info.main' }} />
+    return <InsertDriveFileIcon sx={{ fontSize: 28, color: 'text.secondary' }} />
+  }
+
+  const openFile = async (u) => {
+    try {
+      const key = typeof u === 'string' ? u : (u?.key || '')
+      if (!key) return
+      const { url } = await presignGet(key)
+      window.open(url || `/${key}`, '_blank', 'noopener,noreferrer')
+    } catch (_) {}
+  }
+
+  return (
+    <Stack spacing={2}>
+      <Box>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Summary</Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6} md={3}><Typography variant="body2"><b>Worker:</b> {worker?.name} ({worker?.email})</Typography></Grid>
+          <Grid item xs={12} sm={6} md={3}><Typography variant="body2"><b>Project:</b> {project?.name}</Typography></Grid>
+          <Grid item xs={12} sm={6} md={3}><Typography variant="body2"><b>Date:</b> {created}</Typography></Grid>
+          <Grid item xs={12} sm={6} md={3}><Typography variant="body2"><b>Status:</b> {s?.status}</Typography></Grid>
+        </Grid>
+      </Box>
+
+      <Divider />
+      <Box>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Quiz</Typography>
+        <Stack direction="row" spacing={1}>
+          <Chip size="small" label={`Total: ${quiz.total ?? '-'}`} />
+          <Chip size="small" color="success" label={`Correct: ${quiz.correct ?? '-'}`} />
+          {pct != null && <Chip size="small" color={pct >= 80 ? 'success' : pct >= 50 ? 'warning' : 'error'} label={`${pct}%`} />}
+        </Stack>
+      </Box>
+
+      {!!(personal && Object.keys(personal).length) && (
+        <>
+          <Divider />
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Personal Details</Typography>
+            <Grid container spacing={1}>
+              {Object.entries(personal).map(([k,v]) => (
+                <Grid key={k} item xs={12} sm={6} md={4}><Typography variant="body2"><b>{k}:</b> {String(v ?? '')}</Typography></Grid>
+              ))}
+            </Grid>
+          </Box>
+        </>
+      )}
+
+      {!!uploads.length && (
+        <>
+          <Divider />
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Uploads</Typography>
+            <Grid container spacing={2}>
+              {uploads.map((u, idx) => {
+                const name = typeof u === 'string' ? u.split('/').pop() : (u?.name || u?.key || `file-${idx+1}`)
+                return (
+                  <Grid key={idx} item xs={12} sm={6} md={4}>
+                    <Paper variant="outlined" sx={{ p:1 }}>
+                      <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          {iconFor(name)}
+                          <Typography variant="body2" sx={{ maxWidth: 240, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</Typography>
+                        </Stack>
+                        <Button size="small" startIcon={<DownloadIcon />} onClick={()=> openFile(u)}>Open</Button>
+                      </Stack>
+                    </Paper>
+                  </Grid>
+                )
+              })}
+            </Grid>
+          </Box>
+        </>
+      )}
+
+      {!!s?.signatureDataUrl && (
+        <>
+          <Divider />
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Signature</Typography>
+            <img src={s.signatureDataUrl} alt="signature" style={{ maxWidth: '100%', border: '1px solid #eee', borderRadius: 8 }} />
+          </Box>
+        </>
+      )}
     </Stack>
   )
 }
