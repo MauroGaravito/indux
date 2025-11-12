@@ -18,6 +18,21 @@ router.get('/', requireAuth, requireRole('admin'), async (req, res) => {
   res.json(users);
 });
 
+// List approved workers (admin or manager)
+// Managers are not allowed to list all users, but need a restricted
+// view to assign workers to their projects. This returns only users
+// with role "worker" and status "approved", and excludes passwords.
+router.get('/workers', requireAuth, requireRole('admin', 'manager'), async (_req, res) => {
+  try {
+    const workers = await User.find({ role: 'worker', status: 'approved', disabled: { $ne: true } })
+      .select('-password')
+      .sort({ createdAt: -1 });
+    res.json(workers);
+  } catch (e: any) {
+    return res.status(500).json({ error: e?.message || 'Failed to list workers' });
+  }
+});
+
 // Create user (admin)
 router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
   // Generate a temporary password if missing

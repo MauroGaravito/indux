@@ -371,7 +371,8 @@ export default function ReviewQueue() {
   const openAddWorker = async () => {
     setAddWorkerOpen(true)
     try {
-      const r = await api.get('/users')
+      // Admins can list all users; managers get a restricted list
+      const r = await api.get(user?.role === 'admin' ? '/users' : '/users/workers')
       const list = Array.isArray(r.data) ? r.data : []
       setWorkerOptions(list.filter(u => u.role === 'worker'))
     } catch { setWorkerOptions([]) }
