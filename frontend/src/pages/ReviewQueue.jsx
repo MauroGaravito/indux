@@ -1,803 +1,10886 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import {
-  Alert, Button, Paper, Stack, Typography, Tabs, Tab, Chip, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, Grid, Box, Divider, List, ListItem, ListItemText,
-  Table, TableBody, TableCell, TableHead, TableRow, Tooltip
-} from '@mui/material'
-import GroupIcon from '@mui/icons-material/Group'
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
-import DownloadIcon from '@mui/icons-material/Download'
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
-import DescriptionIcon from '@mui/icons-material/Description'
-import SlideshowIcon from '@mui/icons-material/Slideshow'
-import ImageIcon from '@mui/icons-material/Image'
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
-import api from '../utils/api.js'
-import { presignGet } from '../utils/upload.js'
-import AsyncButton from '../components/AsyncButton.jsx'
-import { useAuthStore } from '../store/auth.js'
-import { notifyError, notifySuccess } from '../notifications/store.js'
-
-function StatusChip({ status }) {
-  const color = status === 'approved' ? 'success' : status === 'declined' ? 'error' : status === 'cancelled' ? 'default' : 'warning'
-  const label = status ? (status === 'cancelled' ? 'Cancelled' : status.charAt(0).toUpperCase() + status.slice(1)) : 'Pending'
-  return <Chip size="small" color={color} label={label} />
-}
-
-// Project Configuration viewer with tabs
-function ProjectConfigViewer({ config }) {
-  const [tab, setTab] = React.useState(0)
-  const cfg = config || {}
-  const pinfoAll = cfg.projectInfo || {}
-  const mapKey = pinfoAll?.projectMapKey || pinfoAll?.mapKey || ''
-  const [projectMapUrl, setProjectMapUrl] = React.useState('')
-  React.useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
-        if (!mapKey) { setProjectMapUrl(''); return }
-        if (/^https?:/i.test(mapKey)) { setProjectMapUrl(mapKey); return }
-        const { url } = await presignGet(mapKey)
-        if (!cancelled) setProjectMapUrl(url || '')
-      } catch (_) {
-        if (!cancelled) setProjectMapUrl(mapKey ? `/${mapKey}` : '')
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [mapKey])
-  const hasProjectInfo = !!cfg.projectInfo && Object.keys(cfg.projectInfo || {}).length > 0
-  const hasPersonal = !!cfg.personalDetails && Array.isArray(cfg.personalDetails?.fields) && cfg.personalDetails.fields.length > 0
-  const slides = cfg.slides || cfg.materials
-  const uploads = cfg?.uploads || cfg?.files
-  const hasSlides = !!slides && ((Array.isArray(slides) && slides.length > 0) || (!!slides && Object.keys(slides).length > 0))
-    || (Array.isArray(uploads) && uploads.length > 0)
-  const hasQuestions = Array.isArray(cfg.questions) && cfg.questions.length > 0
-  const tabs = [
-    hasProjectInfo && { key: 'info', label: 'Project Info' },
-    hasPersonal && { key: 'personal', label: 'Personal Details' },
-    hasSlides && { key: 'slides', label: 'Slides & Files' },
-    hasQuestions && { key: 'questions', label: 'Questions' }
-  ].filter(Boolean)
-  const effectiveIndex = Math.min(tab, Math.max(0, tabs.length - 1))
-
-  const doExport = () => {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
     try {
-      const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'project-config.json'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    } catch (_) {}
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
   }
-
-  return (
-    <Box sx={{ py: 1 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-        <Typography variant="h6" sx={{ fontWeight: 600, flex: 1 }}>Project Configuration</Typography>
-        <Button size="small" startIcon={<DownloadIcon />} onClick={doExport}>Export JSON</Button>
-      </Box>
-
-      <Tabs value={effectiveIndex} onChange={(_,v)=> setTab(v)} sx={{ borderBottom: '1px solid #eee' }} variant="scrollable" scrollButtons allowScrollButtonsMobile>
-        {tabs.map((t, idx) => (<Tab key={t.key} label={t.label} value={idx} />))}
-      </Tabs>
-
-      <Box sx={{ mt: 2 }}>
-        {tabs[effectiveIndex]?.key === 'info' && (
-          <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
-            {(() => {
-              const pinfo = cfg.projectInfo || {}
-              const mapKey = pinfo?.projectMapKey || pinfo?.mapKey
-              return (
-                <>
-                  {mapKey ? (
-                    <Box sx={{ mb: 2 }}>
-                      <Box component="img" src={projectMapUrl || (mapKey ? `/${mapKey}` : '')} alt="Project Map" sx={{ width: '100%', maxWidth: 300, borderRadius: 1 }} />
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Map key: {String(mapKey)}</Typography>
-                    </Box>
-                  ) : null}
-                  {Object.keys(pinfo).length ? (
-                    <Table size="small">
-                      <TableBody>
-                        {Object.entries(pinfo).map(([k, v]) => (
-                          <TableRow key={k}>
-                            <TableCell sx={{ width: '35%' }}><Typography variant="subtitle2">{String(k)}</Typography></TableCell>
-                            <TableCell>{typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  ) : (
-                    <Typography color="text.secondary">No data available</Typography>
-                  )}
-                </>
-              )
-            })()}
-          </Paper>
-        )}
-
-        {tabs[effectiveIndex]?.key === 'personal' && (
-          <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
-            {Array.isArray(cfg.personalDetails?.fields) && cfg.personalDetails.fields.length ? (
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Label</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Required</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {cfg.personalDetails.fields.map((f, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell>{f.label || f.name || '-'}</TableCell>
-                      <TableCell>{f.type || '-'}</TableCell>
-                      <TableCell>{f.required ? <Chip size="small" color="success" label="Required" /> : <Chip size="small" label="Optional" />}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <Typography color="text.secondary">No data available</Typography>
-            )}
-          </Paper>
-        )}
-
-        {tabs[effectiveIndex]?.key === 'slides' && (
-          <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
-            {(() => {
-              const toArray = (v) => Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : [])
-              const raw = [
-                ...toArray(cfg.slides || cfg.materials),
-                ...toArray(cfg.uploads),
-                ...toArray(cfg.files)
-              ]
-              const norm = raw.map((item) => {
-                if (typeof item === 'string') {
-                  const key = item
-                  const name = key.split('/').pop() || key
-                  const url = `/${key}`
-                  return { key, name, url }
-                }
-                const key = item?.key || item?.path || item?.url || ''
-                const name = item?.name || item?.title || (typeof key === 'string' ? (key.split('/').pop() || key) : 'file')
-                const url = item?.url || (item?.key ? `/${item.key}` : (typeof key === 'string' ? `/${key}` : ''))
-                const type = item?.type || item?.mime
-                return { key, name, url, type }
-              }).filter((f) => f && (f.url || f.key))
-
-              if (!norm.length) return <Typography color="text.secondary">No files uploaded</Typography>
-
-              const ext = (s) => {
-                try { return String(s || '').split('?')[0].split('#')[0].split('.').pop().toLowerCase() } catch { return '' }
-              }
-              const isImage = (s, t) => ['png','jpg','jpeg','webp','gif','bmp'].includes(ext(s)) || (typeof t === 'string' && t.startsWith('image'))
-
-              const iconFor = (s) => {
-                const e = ext(s)
-                if (['pdf'].includes(e)) return <PictureAsPdfIcon sx={{ fontSize: 48, color: 'error.main' }} />
-                if (['ppt','pptx','key'].includes(e)) return <SlideshowIcon sx={{ fontSize: 48, color: 'warning.main' }} />
-                if (['doc','docx','txt','rtf','csv','xls','xlsx'].includes(e)) return <DescriptionIcon sx={{ fontSize: 48, color: 'info.main' }} />
-                return <InsertDriveFileIcon sx={{ fontSize: 42, color: 'text.secondary' }} />
-              }
-
-              const isSlidesKey = (k) => /^slides\//.test(String(k || ''))
-              const displayName = (f) => f?.name || f?.title || (isSlidesKey(f?.key) ? 'Slides' : ((f?.key || '').split('/').pop() || 'file'))
-              const openItem = async (f) => {
-                try {
-                  if (f?.key && isSlidesKey(f.key)) {
-                    const e = ext(f?.name) || ext(f?.title) || ext(f?.url) || 'pptx'
-                    const n = displayName(f) || 'Slides'
-                    const params = new URLSearchParams({ key: f.key, name: n, ext: e })
-                    window.open(`/slides-viewer?${params.toString()}`, '_blank', 'noopener,noreferrer')
-                    return
-                  }
-                  if (f?.url) { window.open(f.url, '_blank', 'noopener,noreferrer'); return }
-                  if (f?.key) {
-                    const { url } = await presignGet(f.key)
-                    if (url) window.open(url, '_blank', 'noopener,noreferrer')
-                  }
-                } catch (_) {}
-              }
-
-              return (
-                <Box>
-                <Grid container spacing={2}>
-                  {norm.map((f, idx) => (
-                    <Grid key={`${f.key || f.url || idx}-${idx}`} item xs={12} sm={6} md={4} lg={3}>
-                      <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, height: '100%' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Box sx={{ width: 72, height: 72, borderRadius: 1, border: '1px solid', borderColor: 'divider', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', mr: 1.5 }}>
-                            {isImage(f.url || f.key, f.type) ? (
-                              <Box component="img" src={f.url} alt={f.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              iconFor(f.url || f.key)
-                            )}
-                          </Box>
-                          <Box sx={{ minWidth: 0, flex: 1 }}>
-                            <Typography variant="subtitle2" noWrap title={displayName(f)}>{displayName(f)}</Typography>
-                            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                              <Button size="small" variant="outlined" onClick={()=> openItem(f)}>Open</Button>
-                            </Stack>
-                          </Box>
-                        </Box>
-                      </Paper>
-                    </Grid>
-                  ))}
-                </Grid>
-                <List>
-                  {norm.map((f, idx) => {
-                    const url = f?.url || ''
-                    const type = f?.type || ext(f?.name) || ext(url) || (f?.key ? ext(f.key) : '-')
-                    const title = displayName(f)
-                    return (
-                      <ListItem key={idx} secondaryAction={<Button size="small" onClick={()=> openItem(f)}>Open</Button>}>
-                        <ListItemText primary={title} secondary={`Type: ${type}${(url || f?.key) ? ' • link' : ''}`} />
-                      </ListItem>
-                    )
-                  })}
-                </List>
-                </Box>
-              )
-            })()}
-          </Paper>
-        )}
-
-        {tabs[effectiveIndex]?.key === 'questions' && (
-          <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
-            {Array.isArray(cfg.questions) && cfg.questions.length ? (
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Question</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Correct Answer(s)</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {cfg.questions.map((q, idx) => {
-                    const qText = q?.text || q?.question || `Q${idx+1}`
-                    const qType = q?.type || (Array.isArray(q?.options) ? 'multiple-choice' : '-')
-                    const correct = q?.correct ?? q?.answer ?? q?.answers
-                    let correctText = '-'
-                    if (Array.isArray(correct)) correctText = correct
-                    else if (typeof correct === 'object' && correct != null) correctText = [JSON.stringify(correct)]
-                    else if (correct != null) correctText = [String(correct)]
-                    return (
-                      <TableRow key={idx}>
-                        <TableCell>{qText}</TableCell>
-                        <TableCell>{qType}</TableCell>
-                        <TableCell>
-                          {Array.isArray(correctText)
-                            ? correctText.map((a, i) => (<Typography key={i} component="span" sx={{ fontWeight: 600, mr: 1 }}>{String(a)}</Typography>))
-                            : <Typography color="text.secondary">-</Typography>}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            ) : (
-              <Typography color="text.secondary">No data available</Typography>
-            )}
-          </Paper>
-        )}
-      </Box>
-    </Box>
-  )
-}
-
-export default function ReviewQueue() {
-  const { user } = useAuthStore()
-  const [tab, setTab] = useState(0)
-  const [subs, setSubs] = useState([])
-  const [allSubs, setAllSubs] = useState([])
-  const [historyFilter, setHistoryFilter] = useState('all') // all | pending | approved | declined
-  const [projReviews, setProjReviews] = useState([])
-  const [projects, setProjects] = useState([])
-  const [team, setTeam] = useState([])
-  const [teamLoading, setTeamLoading] = useState(false)
-  const [teamQueried, setTeamQueried] = useState(false)
-  const [viewOpen, setViewOpen] = useState(false)
-  const [viewTitle, setViewTitle] = useState('')
-  const [viewJson, setViewJson] = useState(null)
-  const [declineOpen, setDeclineOpen] = useState(false)
-  const [declineId, setDeclineId] = useState(null)
-  const [declineKind, setDeclineKind] = useState('submission')
-  const [declineReason, setDeclineReason] = useState('Not adequate')
-  const [viewUploadUrls, setViewUploadUrls] = useState({}) // { [key:string]: url }
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [deleteId, setDeleteId] = useState(null)
-  const [deleteReviewOpen, setDeleteReviewOpen] = useState(false)
-  const [deleteReviewId, setDeleteReviewId] = useState(null)
-
-  const load = () => Promise.all([
-    api.get('/submissions').then(r => setSubs(r.data || [])), // pending only (default)
-    api.get('/submissions?status=all').then(r => setAllSubs(r.data || [])),
-    api.get('/reviews/projects?status=all').then(r => setProjReviews(r.data || []))
-  ])
-  useEffect(()=> { if (user) load() }, [user])
-  useEffect(()=> { api.get('/projects').then(r => setProjects(r.data || [])) }, [])
-
-  const loadTeam = async () => {
-    if (!user || !user.id) return
-    setTeamLoading(true)
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
     try {
-      const r = await api.get(`/assignments/manager/${user.id}/team`)
-      setTeam(r.data || [])
-    } catch (e) {
-      setTeam([])
-    } finally {
-      setTeamLoading(false)
-      setTeamQueried(true)
-    }
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
   }
-
-  if (!user) return <Alert severity="info">Please log in as manager/admin.</Alert>
-  if (user.role === 'worker') return <Alert severity="warning">Managers/Admins only.</Alert>
-
-  const openView = (title, data) => { setViewTitle(title); setViewJson(data); setViewUploadUrls({}); setViewOpen(true) }
-  // When viewing a Project Review, fetch latest project config live from DB
-  const viewProjectReview = async (pr) => {
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]import {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
     try {
-      const projId = typeof pr?.projectId === 'string' ? pr.projectId : (pr?.projectId && pr.projectId._id)
-      setViewTitle('Project Configuration')
-      setViewUploadUrls({})
-      setViewOpen(true)
-      if (projId) {
-        const r = await api.get(`/projects/${projId}`)
-        const latest = r?.data?.config || {}
-        setViewJson(latest)
-        return
-      }
-    } catch (_) {}
-    // Fallback to snapshot stored on the review if live fetch fails
-    setViewJson(pr?.data || {})
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
   }
-  const closeView = () => setViewOpen(false)
-  const openDecline = (kind, id) => { setDeclineKind(kind); setDeclineId(id); setDeclineOpen(true) }
-  const closeDecline = () => setDeclineOpen(false)
-  const openDelete = (id) => { setDeleteId(id); setDeleteOpen(true) }
-  const closeDelete = () => setDeleteOpen(false)
-  const openDeleteReview = (id) => { setDeleteReviewId(id); setDeleteReviewOpen(true) }
-  const closeDeleteReview = () => setDeleteReviewOpen(false)
-
-  const approveSubmission = async (id) => { await api.post(`/submissions/${id}/approve`); await load() }
-  const declineSubmission = async () => { if(!declineId) return; await api.post(`/submissions/${declineId}/decline`, { reason: declineReason }); closeDecline(); await load() }
-  const approveProject = async (id) => { await api.post(`/reviews/projects/${id}/approve`); await load() }
-  const declineProject = async () => { if(!declineId) return; await api.post(`/reviews/projects/${declineId}/decline`, { reason: declineReason }); closeDecline(); await load() }
-  const deleteReview = async () => {
-    if (!deleteReviewId) return
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
     try {
-      const r = await api.delete(`/reviews/${deleteReviewId}`)
-      notifySuccess(r?.data?.message || 'Review deleted successfully')
-      await load()
-    } catch (e) {
-      const msg = e?.response?.data?.message || e?.response?.data?.error || 'Failed to delete review'
-      notifyError(msg)
-    } finally {
-      setDeleteReviewOpen(false)
-      setDeleteReviewId(null)
-    }
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
   }
-  const deleteSubmission = async () => {
-    if (!deleteId) return
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  Alert, Button, Paper, Stack, Typography, Tabs, Tab, Chip, Dialog, DialogTitle,
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
     try {
-      const r = await api.delete(`/submissions/${deleteId}`)
-      notifySuccess(r?.data?.message || 'Submission deleted successfully')
-      await load()
-    } catch (e) {
-      const msg = e?.response?.data?.message || e?.response?.data?.error || 'Failed to delete submission'
-      notifyError(msg)
-    } finally {
-      setDeleteOpen(false)
-      setDeleteId(null)
-    }
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
   }
-
-  // When viewing a worker submission, pre-sign image uploads so we can preview them
-  useEffect(() => {
-    let cancelled = false
-    async function hydrateUploadUrls() {
-      try {
-        if (!viewOpen || viewTitle !== 'Worker Submission' || !viewJson) return
-        const uploads = Array.isArray(viewJson.uploads) ? viewJson.uploads : []
-        const imageLike = uploads
-          .map((u) => (typeof u === 'string' ? { key: u, type: undefined } : u))
-          .filter((u) => u && typeof u.key === 'string' && u.key && (u.type === 'image' || u.type === 'camera'))
-        if (!imageLike.length) { setViewUploadUrls({}); return }
-        const entries = await Promise.all(imageLike.map(async (u) => {
-          try {
-            const { url } = await presignGet(u.key)
-            return [u.key, url]
-          } catch {
-            return [u.key, '']
-          }
-        }))
-        if (!cancelled) setViewUploadUrls(Object.fromEntries(entries))
-      } catch {}
-    }
-    hydrateUploadUrls()
-    return () => { cancelled = true }
-  }, [viewOpen, viewTitle, viewJson])
-
-  return (
-    <Stack spacing={2}>
-      <Typography variant="h5">Manager Review</Typography>
-      <Tabs value={tab} onChange={(_,v)=> { setTab(v); if (v === 3 && !teamQueried) loadTeam() }} sx={{ borderBottom: '1px solid #eee' }}>
-        <Tab label="Project Reviews" />
-        <Tab label="Worker Submissions" />
-        <Tab label="All Submissions" />
-        <Tab icon={<GroupIcon />} iconPosition="start" label="My Team" />
-      </Tabs>
-
-      {/* Project Reviews */}
-      <Box hidden={tab!==0}>
-        <Grid container spacing={2} sx={{ mt: 1 }}>
-          {projReviews.map(pr => (
-            <Grid key={pr._id} item xs={12}>
-              <Paper sx={{ p:2 }}>
-                <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={1}>
-                  <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{pr?.projectId?.name || pr.projectId}</Typography>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <StatusChip status={pr.status || 'pending'} />
-                      <Typography variant="caption" sx={{ opacity: 0.7 }}>Requested: {new Date(pr.createdAt).toLocaleString()}</Typography>
-                      {pr.status === 'cancelled' && (
-                        pr.message ? (
-                          <Tooltip title={pr.message} placement="top-start">
-                            <Chip label="Reason" size="small" />
-                          </Tooltip>
-                        ) : (
-                          <Typography variant="caption" sx={{ opacity: 0.6 }}>—</Typography>
-                        )
-                      )}
-                    </Stack>
-                  </Box>
-                  <Stack direction="row" spacing={1}>
-                    <Button variant="outlined" onClick={()=> viewProjectReview(pr)}>View</Button>
-                    {pr.status !== 'cancelled' && (
-                      <>
-                        <Button color="error" variant="outlined" onClick={()=> openDecline('project', pr._id)}>Decline</Button>
-                        <AsyncButton color="success" variant="contained" onClick={()=> approveProject(pr._id)}>Approve</AsyncButton>
-                      </>
-                    )}
-                    {user?.role === 'admin' && (
-                      <Button color="error" variant="outlined" onClick={()=> openDeleteReview(pr._id)}>Delete</Button>
-                    )}
-                  </Stack>
-                </Stack>
-              </Paper>
-            </Grid>
-          ))}
-        </Grid>
-        {!projReviews.length && <Alert severity="info" sx={{ mt: 2 }}>No pending project reviews.</Alert>}
-      </Box>
-
-      {/* Worker Submissions */}
-      <Box hidden={tab!==1}>
-        <Grid container spacing={2} sx={{ mt: 1 }}>
-          {subs.map(s => (
-            <Grid key={s._id} item xs={12}>
-              <Paper sx={{ p:2 }}>
-                <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={1}>
-                  <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Submission {s._id}</Typography>
-                    <Stack direction="row" spacing={1}>
-                      <StatusChip status={s.status || 'pending'} />
-                      <Typography variant="caption" sx={{ opacity: 0.7 }}>Date: {new Date(s.createdAt).toLocaleString()}</Typography>
-                    </Stack>
-                    {(() => {
-                      const workerName = s?.userId?.name || s?.user?.name || String(s.userId || '')
-                      const projectName = s?.projectId?.name || String(s.projectId || '')
-                      return (
-                        <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                          Project: {projectName} | User: {workerName}
-                        </Typography>
-                      )
-                    })()}
-                  </Box>
-                  <Stack direction="row" spacing={1}>
-                    <Button variant="outlined" onClick={()=> openView('Worker Submission', s)}>View</Button>
-                    <Button color="error" variant="outlined" onClick={()=> openDecline('submission', s._id)}>Decline</Button>
-                    <AsyncButton color="success" variant="contained" onClick={()=> approveSubmission(s._id)}>Approve</AsyncButton>
-                    {user?.role === 'admin' && (
-                      <Button startIcon={<DeleteForeverIcon />} color="error" variant="outlined" onClick={()=> openDelete(s._id)}>
-                        Delete
-                      </Button>
-                    )}
-                  </Stack>
-                </Stack>
-              </Paper>
-            </Grid>
-          ))}
-        </Grid>
-        {!subs.length && <Alert severity="info" sx={{ mt: 2 }}>No pending worker submissions.</Alert>}
-      </Box>
-
-      {/* All Submissions (History) */}
-      <Box hidden={tab!==2}>
-        {(() => {
-          const counts = allSubs.reduce((acc, s) => {
-            acc.all++
-            acc[s.status] = (acc[s.status] || 0) + 1
-            return acc
-          }, { all: 0, pending: 0, approved: 0, declined: 0 })
-          const filtered = allSubs.filter(s => historyFilter==='all' ? true : s.status===historyFilter)
-          const statusColor = (st) => st==='approved' ? 'success' : st==='declined' ? 'error' : 'warning'
-          return (
-            <Stack spacing={2} sx={{ mt: 2 }}>
-              <Tabs value={historyFilter} onChange={(_,v)=> setHistoryFilter(v)} variant="scrollable" scrollButtons allowScrollButtonsMobile>
-                <Tab value="all" label={`All (${counts.all})`} />
-                <Tab value="pending" label={`Pending (${counts.pending})`} />
-                <Tab value="approved" label={`Approved (${counts.approved})`} />
-                <Tab value="declined" label={`Declined (${counts.declined})`} />
-              </Tabs>
-              <Paper sx={{ width: '100%', overflowX: 'auto' }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Worker</TableCell>
-                      <TableCell>Project</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Submitted At</TableCell>
-                      <TableCell>Reviewed By</TableCell>
-                      <TableCell align="right">Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filtered.map((s) => {
-                      const workerName = s?.userId?.name || s?.user?.name || String(s.userId || '')
-                      const projectName = s?.projectId?.name || String(s.projectId || '')
-                      const reviewer = s?.reviewedBy?.name || (s.reviewedBy || '')
-                      return (
-                        <TableRow key={s._id} hover>
-                          <TableCell>{workerName}</TableCell>
-                          <TableCell>{projectName}</TableCell>
-                          <TableCell><Chip size="small" color={statusColor(s.status)} label={s.status} /></TableCell>
-                          <TableCell>{new Date(s.createdAt).toLocaleString()}</TableCell>
-                          <TableCell>{reviewer ? String(reviewer) : '-'}</TableCell>
-                          <TableCell align="right">
-                            <Stack direction="row" spacing={1} justifyContent="flex-end">
-                              <Button size="small" variant="outlined" onClick={()=> openView('Worker Submission', s)}>View</Button>
-                              {user?.role === 'admin' && (
-                                <Button size="small" startIcon={<DeleteForeverIcon />} color="error" variant="outlined" onClick={()=> openDelete(s._id)}>Delete</Button>
-                              )}
-                            </Stack>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-                {!filtered.length && <Alert severity="info" sx={{ m: 2 }}>No submissions found.</Alert>}
-              </Paper>
-            </Stack>
-          )
-        })()}
-      </Box>
-
-      {/* My Team */}
-      <Box hidden={tab!==3}>
-        {teamLoading ? (
-          <Alert severity="info" sx={{ mt: 2 }}>Loading team...</Alert>
-        ) : (
-          <>
-            <Paper sx={{ width: '100%', overflowX: 'auto', mt: 2 }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell>Project</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {team.map((m) => (
-                    <TableRow key={`${m.userId}-${m.projectId}`} hover>
-                      <TableCell>{m.name}</TableCell>
-                      <TableCell>{m.email}</TableCell>
-                      <TableCell>{m.projectName}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Paper>
-            {!team.length && teamQueried && (
-              <Alert severity="info" sx={{ mt: 2 }}>No team members assigned yet.</Alert>
-            )}
-          </>
-        )}
-      </Box>
-
-      {/* View Dialog */}
-      <Dialog open={viewOpen} onClose={closeView} maxWidth="md" fullWidth>
-        <DialogTitle>{viewTitle}</DialogTitle>
-        <DialogContent>
-          {viewTitle === 'Worker Submission' && viewJson ? (
-            <Box sx={{ py: 1 }}>
-              {/* Personal Details */}
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Personal Details</Typography>
-              <Grid container spacing={2}>
-                {Object.entries(viewJson.personal || {})
-                  .filter(([key]) => key !== 'medical' && key !== 'medicalIssues')
-                  .map(([key, val]) => {
-                  const labelMap = {
-                    name: 'Name',
-                    dob: 'Date of Birth',
-                    phone: 'Phone',
-                    address: 'Address',
-                    nextOfKin: 'Next of Kin',
-                    nextOfKinPhone: 'Next of Kin Phone',
-                    isIndigenous: 'Is Indigenous',
-                    isApprentice: 'Is Apprentice'
-                  }
-                  const prettify = (k) => labelMap[k] || String(k)
-                    .replace(/([a-z])([A-Z])/g, '$1 $2')
-                    .replace(/[-_]/g, ' ')
-                    .replace(/^\w/, (c) => c.toUpperCase())
-                  const display = typeof val === 'object' && val != null ? JSON.stringify(val) : String(val ?? '')
-                  return (
-                    <Grid key={key} item xs={12} sm={6}>
-                      <Typography variant="subtitle2" color="text.secondary">{prettify(key)}</Typography>
-                      <Typography variant="body1">{display}</Typography>
-                    </Grid>
-                  )
-                })}
-              </Grid>
-
-              {/* Medical alert block */}
-              {(() => {
-                const p = viewJson.personal || {}
-                const medical = p.medical || (p.medicalIssues ? { hasCondition: true, description: p.medicalIssues } : null)
-                if (!medical) return null
-                if (!medical.hasCondition) return null
-                return (
-                  <Box sx={{ mt: 2 }}>
-                    <Chip color="error" label="Medical Alert" sx={{ mb: 1 }} />
-                    {medical.description && (
-                      <Typography variant="body2">Condition: {String(medical.description)}</Typography>
-                    )}
-                  </Box>
-                )
-              })()}
-
-              {/* Signature */}
-              {viewJson.signatureDataUrl && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Signature</Typography>
-                  <Box component="img" src={viewJson.signatureDataUrl} alt="Signature"
-                       sx={{ maxWidth: '200px', borderRadius: 1, border: '1px solid', borderColor: 'divider' }} />
-                </Box>
-              )}
-
-              <Divider sx={{ my: 2 }} />
-
-              {/* Quiz Summary */}
-              {viewJson.quiz && (
-                <Typography variant="body1" sx={{ mb: 1 }}>
-                  {`${viewJson.quiz.correct ?? 0}/${viewJson.quiz.total ?? 0} correct answers `}
-                  {(viewJson.quiz.total && viewJson.quiz.correct === viewJson.quiz.total) ? '✅' : ''}
-                </Typography>
-              )}
-
-              {/* Quiz Details */}
-              {(() => {
-                const subProjId = typeof viewJson.projectId === 'string' ? viewJson.projectId : (viewJson.projectId && viewJson.projectId._id)
-                const project = projects.find(p => p._id === subProjId)
-                const questions = project?.config?.questions || []
-                const answers = viewJson?.quiz?.answers
-                if (!questions.length) return null
-                return (
-                  <Box sx={{ mt: 1 }}>
-                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Questionnaire</Typography>
-                    <Stack spacing={1}>
-                      {questions.map((q, qi) => {
-                        const selectedIdx = Array.isArray(answers) ? answers[qi] : undefined
-                        const correctIdx = q?.correctIndex
-                        const selectedText = typeof selectedIdx === 'number' ? q?.answers?.[selectedIdx] : undefined
-                        const correctText = typeof correctIdx === 'number' ? q?.answers?.[correctIdx] : undefined
-                        const isCorrect = typeof selectedIdx === 'number' && selectedIdx === correctIdx
-                        return (
-                          <Paper key={qi} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>Q{qi+1}. {q?.questionText}</Typography>
-                            {selectedText != null ? (
-                              <Typography variant="body2" color={isCorrect ? 'success.main' : 'error.main'}>
-                                Selected: {selectedText} {isCorrect ? '✓' : '✗'}
-                              </Typography>
-                            ) : (
-                              <Typography variant="body2" color="text.secondary">No stored answer</Typography>
-                            )}
-                            {(!isCorrect && correctText != null) && (
-                              <Typography variant="body2" color="text.secondary">Correct: {correctText}</Typography>
-                            )}
-                          </Paper>
-                        )
-                      })}
-                    </Stack>
-                  </Box>
-                )
-              })()}
-
-              {/* Uploads */}
-              {Array.isArray(viewJson.uploads) && viewJson.uploads.length > 0 && (
-                <Box sx={{ mt: 1 }}>
-                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>Uploads</Typography>
-                  <List dense>
-                    {viewJson.uploads.map((u, idx) => {
-                      const key = typeof u === 'string' ? u : (u?.key || '')
-                      const type = typeof u === 'string' ? undefined : u?.type
-                      const imgUrl = (type === 'image' || type === 'camera') ? (viewUploadUrls[key] || '') : ''
-                      return (
-                        <ListItem key={`${key}-${idx}`} sx={{ py: 0.5, alignItems: 'flex-start' }}>
-                          {imgUrl ? (
-                            <Box component="img" src={imgUrl} alt={key}
-                                 sx={{ width: 96, height: 72, objectFit: 'cover', borderRadius: 1, border: '1px solid', borderColor: 'divider', mr: 1 }} />
-                          ) : (
-                            <InsertDriveFileIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary', mt: '2px' }} />
-                          )}
-                          <ListItemText
-                            primary={key || '(missing key)'}
-                            secondary={type ? `Type: ${type}` : undefined}
-                          />
-                        </ListItem>
-                      )
-                    })}
-                  </List>
-                </Box>
-              )}
-            </Box>
-          ) : (
-            viewTitle === 'Project Configuration' && viewJson
-              ? <ProjectConfigViewer config={viewJson} />
-              : <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{viewJson ? JSON.stringify(viewJson, null, 2) : ''}</pre>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeView}>Close</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Decline Dialog */}
-      <Dialog open={declineOpen} onClose={closeDecline} maxWidth="sm" fullWidth>
-        <DialogTitle>Decline {declineKind === 'project' ? 'Project Review' : 'Submission'}</DialogTitle>
-        <DialogContent>
-          <TextField fullWidth label="Reason" value={declineReason} onChange={e=> setDeclineReason(e.target.value)} />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDecline}>Cancel</Button>
-          <AsyncButton color="error" variant="contained" onClick={declineKind==='project' ? declineProject : declineSubmission}>Decline</AsyncButton>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Submission Dialog */}
-      <Dialog open={deleteOpen} onClose={closeDelete} maxWidth="xs" fullWidth>
-        <DialogTitle>Delete Submission</DialogTitle>
-        <DialogContent>
-          <Typography>Are you sure? This action cannot be undone.</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDelete}>Cancel</Button>
-          <AsyncButton color="error" variant="contained" onClick={deleteSubmission}>Delete</AsyncButton>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Review Dialog (admin only) */}
-      <Dialog open={deleteReviewOpen} onClose={closeDeleteReview} maxWidth="xs" fullWidth>
-        <DialogTitle>Delete Review</DialogTitle>
-        <DialogContent>
-          <Typography>Are you sure you want to delete this review? This action cannot be undone.</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDeleteReview}>Cancel</Button>
-          <AsyncButton color="error" variant="contained" onClick={deleteReview}>Delete</AsyncButton>
-        </DialogActions>
-      </Dialog>
-    </Stack>
-  )
-}
-
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  DialogContent, DialogActions, TextField, Grid, Box, Divider, List, ListItem, ListItemText,
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  Table, TableBody, TableCell, TableHead, TableRow, Tooltip, MenuItem
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]} from '@mui/material'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]import GroupIcon from '@mui/icons-material/Group'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]import DownloadIcon from '@mui/icons-material/Download'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]import DescriptionIcon from '@mui/icons-material/Description'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]import SlideshowIcon from '@mui/icons-material/Slideshow'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]import ImageIcon from '@mui/icons-material/Image'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]import api from '../utils/api.js'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]import { presignGet } from '../utils/upload.js'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]import AsyncButton from '../components/AsyncButton.jsx'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]import { useAuthStore } from '../store/auth.js'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]import { notifyError, notifySuccess } from '../notifications/store.js'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]function StatusChip({ status }) {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const color = status === 'approved' ? 'success' : status === 'declined' ? 'error' : status === 'cancelled' ? 'default' : 'warning'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const label = status ? (status === 'cancelled' ? 'Cancelled' : status.charAt(0).toUpperCase() + status.slice(1)) : 'Pending'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  return <Chip size="small" color={color} label={label} />
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]// Project Configuration viewer with tabs
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]function ProjectConfigViewer({ config }) {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [tab, setTab] = React.useState(0)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const cfg = config || {}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const pinfoAll = cfg.projectInfo || {}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const mapKey = pinfoAll?.projectMapKey || pinfoAll?.mapKey || ''
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [projectMapUrl, setProjectMapUrl] = React.useState('')
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  React.useEffect(() => {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]    let cancelled = false
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]    async function load() {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      try {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        if (!mapKey) { setProjectMapUrl(''); return }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        if (/^https?:/i.test(mapKey)) { setProjectMapUrl(mapKey); return }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        const { url } = await presignGet(mapKey)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        if (!cancelled) setProjectMapUrl(url || '')
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      } catch (_) {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        if (!cancelled) setProjectMapUrl(mapKey ? `/${mapKey}` : '')
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]    }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]    load()
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]    return () => { cancelled = true }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  }, [mapKey])
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const hasProjectInfo = !!cfg.projectInfo && Object.keys(cfg.projectInfo || {}).length > 0
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const hasPersonal = !!cfg.personalDetails && Array.isArray(cfg.personalDetails?.fields) && cfg.personalDetails.fields.length > 0
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const slides = cfg.slides || cfg.materials
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const uploads = cfg?.uploads || cfg?.files
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const hasSlides = !!slides && ((Array.isArray(slides) && slides.length > 0) || (!!slides && Object.keys(slides).length > 0))
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]    || (Array.isArray(uploads) && uploads.length > 0)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const hasQuestions = Array.isArray(cfg.questions) && cfg.questions.length > 0
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const tabs = [
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]    hasProjectInfo && { key: 'info', label: 'Project Info' },
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]    hasPersonal && { key: 'personal', label: 'Personal Details' },
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]    hasSlides && { key: 'slides', label: 'Slides & Files' },
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]    hasQuestions && { key: 'questions', label: 'Questions' }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  ].filter(Boolean)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const effectiveIndex = Math.min(tab, Math.max(0, tabs.length - 1))
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const doExport = () => {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]    try {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' })
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      const url = URL.createObjectURL(blob)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      const a = document.createElement('a')
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      a.href = url
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      a.download = 'project-config.json'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      document.body.appendChild(a)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      a.click()
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      document.body.removeChild(a)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      URL.revokeObjectURL(url)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]    } catch (_) {}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  return (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]    <Box sx={{ py: 1 }}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        <Typography variant="h6" sx={{ fontWeight: 600, flex: 1 }}>Project Configuration</Typography>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        <Button size="small" startIcon={<DownloadIcon />} onClick={doExport}>Export JSON</Button>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      </Box>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      <Tabs value={effectiveIndex} onChange={(_,v)=> setTab(v)} sx={{ borderBottom: '1px solid #eee' }} variant="scrollable" scrollButtons allowScrollButtonsMobile>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        {tabs.map((t, idx) => (<Tab key={t.key} label={t.label} value={idx} />))}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      </Tabs>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      <Box sx={{ mt: 2 }}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        {tabs[effectiveIndex]?.key === 'info' && (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]          <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]            {(() => {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              const pinfo = cfg.projectInfo || {}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              const mapKey = pinfo?.projectMapKey || pinfo?.mapKey
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              return (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                <>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  {mapKey ? (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    <Box sx={{ mb: 2 }}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                      <Box component="img" src={projectMapUrl || (mapKey ? `/${mapKey}` : '')} alt="Project Map" sx={{ width: '100%', maxWidth: 300, borderRadius: 1 }} />
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Map key: {String(mapKey)}</Typography>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    </Box>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  ) : null}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  {Object.keys(pinfo).length ? (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    <Table size="small">
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                      <TableBody>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                        {Object.entries(pinfo).map(([k, v]) => (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                          <TableRow key={k}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                            <TableCell sx={{ width: '35%' }}><Typography variant="subtitle2">{String(k)}</Typography></TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                            <TableCell>{typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')}</TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                          </TableRow>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                        ))}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                      </TableBody>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    </Table>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  ) : (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    <Typography color="text.secondary">No data available</Typography>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  )}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                </>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              )
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]            })()}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]          </Paper>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        )}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        {tabs[effectiveIndex]?.key === 'personal' && (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]          <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]            {Array.isArray(cfg.personalDetails?.fields) && cfg.personalDetails.fields.length ? (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              <Table size="small">
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                <TableHead>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  <TableRow>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    <TableCell>Label</TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    <TableCell>Type</TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    <TableCell>Required</TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  </TableRow>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                </TableHead>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                <TableBody>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  {cfg.personalDetails.fields.map((f, idx) => (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    <TableRow key={idx}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                      <TableCell>{f.label || f.name || '-'}</TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                      <TableCell>{f.type || '-'}</TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                      <TableCell>{f.required ? <Chip size="small" color="success" label="Required" /> : <Chip size="small" label="Optional" />}</TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    </TableRow>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  ))}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                </TableBody>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              </Table>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]            ) : (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              <Typography color="text.secondary">No data available</Typography>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]            )}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]          </Paper>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        )}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        {tabs[effectiveIndex]?.key === 'slides' && (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]          <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]            {(() => {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              const toArray = (v) => Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : [])
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              const raw = [
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                ...toArray(cfg.slides || cfg.materials),
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                ...toArray(cfg.uploads),
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                ...toArray(cfg.files)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              ]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              const norm = raw.map((item) => {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                if (typeof item === 'string') {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  const key = item
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  const name = key.split('/').pop() || key
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  const url = `/${key}`
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  return { key, name, url }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                const key = item?.key || item?.path || item?.url || ''
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                const name = item?.name || item?.title || (typeof key === 'string' ? (key.split('/').pop() || key) : 'file')
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                const url = item?.url || (item?.key ? `/${item.key}` : (typeof key === 'string' ? `/${key}` : ''))
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                const type = item?.type || item?.mime
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                return { key, name, url, type }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              }).filter((f) => f && (f.url || f.key))
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              if (!norm.length) return <Typography color="text.secondary">No files uploaded</Typography>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              const ext = (s) => {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                try { return String(s || '').split('?')[0].split('#')[0].split('.').pop().toLowerCase() } catch { return '' }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              const isImage = (s, t) => ['png','jpg','jpeg','webp','gif','bmp'].includes(ext(s)) || (typeof t === 'string' && t.startsWith('image'))
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              const iconFor = (s) => {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                const e = ext(s)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                if (['pdf'].includes(e)) return <PictureAsPdfIcon sx={{ fontSize: 48, color: 'error.main' }} />
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                if (['ppt','pptx','key'].includes(e)) return <SlideshowIcon sx={{ fontSize: 48, color: 'warning.main' }} />
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                if (['doc','docx','txt','rtf','csv','xls','xlsx'].includes(e)) return <DescriptionIcon sx={{ fontSize: 48, color: 'info.main' }} />
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                return <InsertDriveFileIcon sx={{ fontSize: 42, color: 'text.secondary' }} />
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              const isSlidesKey = (k) => /^slides\//.test(String(k || ''))
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              const displayName = (f) => f?.name || f?.title || (isSlidesKey(f?.key) ? 'Slides' : ((f?.key || '').split('/').pop() || 'file'))
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              const openItem = async (f) => {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                try {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  if (f?.key && isSlidesKey(f.key)) {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    const e = ext(f?.name) || ext(f?.title) || ext(f?.url) || 'pptx'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    const n = displayName(f) || 'Slides'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    const params = new URLSearchParams({ key: f.key, name: n, ext: e })
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    window.open(`/slides-viewer?${params.toString()}`, '_blank', 'noopener,noreferrer')
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    return
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  if (f?.url) { window.open(f.url, '_blank', 'noopener,noreferrer'); return }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  if (f?.key) {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    const { url } = await presignGet(f.key)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    if (url) window.open(url, '_blank', 'noopener,noreferrer')
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                } catch (_) {}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              }
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              return (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                <Box>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                <Grid container spacing={2}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  {norm.map((f, idx) => (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    <Grid key={`${f.key || f.url || idx}-${idx}`} item xs={12} sm={6} md={4} lg={3}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                      <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, height: '100%' }}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                          <Box sx={{ width: 72, height: 72, borderRadius: 1, border: '1px solid', borderColor: 'divider', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', mr: 1.5 }}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                            {isImage(f.url || f.key, f.type) ? (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                              <Box component="img" src={f.url} alt={f.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                            ) : (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                              iconFor(f.url || f.key)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                            )}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                          </Box>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                          <Box sx={{ minWidth: 0, flex: 1 }}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                            <Typography variant="subtitle2" noWrap title={displayName(f)}>{displayName(f)}</Typography>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                              <Button size="small" variant="outlined" onClick={()=> openItem(f)}>Open</Button>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                            </Stack>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                          </Box>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                        </Box>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                      </Paper>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    </Grid>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  ))}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                </Grid>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                <List>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  {norm.map((f, idx) => {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    const url = f?.url || ''
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    const type = f?.type || ext(f?.name) || ext(url) || (f?.key ? ext(f.key) : '-')
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    const title = displayName(f)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    return (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                      <ListItem key={idx} secondaryAction={<Button size="small" onClick={()=> openItem(f)}>Open</Button>}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                        <ListItemText primary={title} secondary={`Type: ${type}${(url || f?.key) ? ' • link' : ''}`} />
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                      </ListItem>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    )
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  })}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                </List>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                </Box>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              )
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]            })()}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]          </Paper>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        )}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        {tabs[effectiveIndex]?.key === 'questions' && (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]          <Paper variant="outlined" sx={{ p: 2, maxHeight: '60vh', overflowY: 'auto' }}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]            {Array.isArray(cfg.questions) && cfg.questions.length ? (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              <Table size="small">
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                <TableHead>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  <TableRow>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    <TableCell>Question</TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    <TableCell>Type</TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    <TableCell>Correct Answer(s)</TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  </TableRow>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                </TableHead>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                <TableBody>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  {cfg.questions.map((q, idx) => {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    const qText = q?.text || q?.question || `Q${idx+1}`
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    const qType = q?.type || (Array.isArray(q?.options) ? 'multiple-choice' : '-')
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    const correct = q?.correct ?? q?.answer ?? q?.answers
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    let correctText = '-'
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    if (Array.isArray(correct)) correctText = correct
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    else if (typeof correct === 'object' && correct != null) correctText = [JSON.stringify(correct)]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    else if (correct != null) correctText = [String(correct)]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    return (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                      <TableRow key={idx}>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                        <TableCell>{qText}</TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                        <TableCell>{qType}</TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                        <TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                          {Array.isArray(correctText)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                            ? correctText.map((a, i) => (<Typography key={i} component="span" sx={{ fontWeight: 600, mr: 1 }}>{String(a)}</Typography>))
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                            : <Typography color="text.secondary">-</Typography>}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                        </TableCell>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                      </TableRow>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                    )
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                  })}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]                </TableBody>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              </Table>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]            ) : (
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]              <Typography color="text.secondary">No data available</Typography>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]            )}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]          </Paper>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]        )}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]      </Box>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]    </Box>
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  )
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]}
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]export default function ReviewQueue() {
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const { user } = useAuthStore()
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [tab, setTab] = useState(0)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [subs, setSubs] = useState([])
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [allSubs, setAllSubs] = useState([])
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [historyFilter, setHistoryFilter] = useState('all') // all | pending | approved | declined
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [projReviews, setProjReviews] = useState([])
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [projects, setProjects] = useState([])
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [team, setTeam] = useState([])
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [teamLoading, setTeamLoading] = useState(false)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [teamQueried, setTeamQueried] = useState(false)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [viewOpen, setViewOpen] = useState(false)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [viewTitle, setViewTitle] = useState('')
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [viewJson, setViewJson] = useState(null)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [declineOpen, setDeclineOpen] = useState(false)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [declineId, setDeclineId] = useState(null)
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [declineKind, setDeclineKind] = useState('submission')
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [declineReason, setDeclineReason] = useState('Not adequate')
+ 
+  // My Team (manager) state
+  const [teamProjectId, setTeamProjectId] = useState("")
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState("")
+  const [workerOptions, setWorkerOptions] = useState([])
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get("/users");
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === "worker"))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId("") }
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === "worker"))
+    } catch { setProjectWorkers([]) }
+  }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post("/assignments", { user: addWorkerId, project: teamProjectId, role: "worker" })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  } System.Object[]  const [viewUploadUrls, setViewUploadUrls] = useState({}) // { [key:string]: url }
