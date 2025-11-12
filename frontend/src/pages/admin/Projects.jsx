@@ -78,9 +78,16 @@ export default function Projects() {
 
   const saveConfig = async () => {
     if (!selectedId) return
-    await api.put(`/projects/${selectedId}`, { config })
-    setInitialConfig(config)
-    setHasUnsavedChanges(false)
+    try {
+      await api.put(`/projects/${selectedId}`, { config })
+      notifySuccess('Project saved successfully')
+      // Saving must not trigger or update any review
+      setInitialConfig(config)
+      setHasUnsavedChanges(false)
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Failed to save project'
+      notifyError(msg)
+    }
   }
 
   const sendForReview = async () => {
