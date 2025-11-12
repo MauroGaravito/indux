@@ -301,6 +301,10 @@ export default function ReviewQueue() {
   const [viewJson, setViewJson] = useState(null)
   const [deleteReviewOpen, setDeleteReviewOpen] = useState(false)
   const [deleteReviewId, setDeleteReviewId] = useState(null)
+  // Submission decline modal state
+  const [declineOpen, setDeclineOpen] = useState(false)
+  const [declineId, setDeclineId] = useState(null)
+  const [declineReason, setDeclineReason] = useState('Not adequate')
   // My Team state (manager)
   const [teamProjectId, setTeamProjectId] = useState('')
   const [projectWorkers, setProjectWorkers] = useState([])
@@ -328,6 +332,17 @@ export default function ReviewQueue() {
 
   const approveProject = async (id) => { await api.post(`/reviews/projects/${id}/approve`); await load() }
   const declineProject = async (id) => { await api.post(`/reviews/projects/${id}/decline`, { reason: 'Not adequate' }); await load() }
+  // Submission review actions
+  const approveSubmission = async (id) => { await api.post(`/submissions/${id}/approve`); await load() }
+  const openDeclineSubmission = (id) => { setDeclineId(id); setDeclineOpen(true) }
+  const doDeclineSubmission = async () => {
+    if (!declineId) return
+    await api.post(`/submissions/${declineId}/decline`, { reason: declineReason || 'Not adequate' })
+    setDeclineOpen(false)
+    setDeclineId(null)
+    setDeclineReason('Not adequate')
+    await load()
+  }
   const deleteReview = async () => {
     if (!deleteReviewId) return
     try {
@@ -443,11 +458,22 @@ export default function ReviewQueue() {
                 <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={1}>
                   <Box>
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Submission {s._id}</Typography>
-                    <Stack direction="row" spacing={1}>
+                    <Stack direction="row" spacing={1} alignItems="center">
                       <StatusChip status={s.status || 'pending'} />
                       <Typography variant="caption" sx={{ opacity: 0.7 }}>Date: {new Date(s.createdAt).toLocaleString()}</Typography>
+                      {s?.userId && <Typography variant="caption" sx={{ opacity: 0.7 }}>• Worker: {s?.userId?.name || s?.user?.name || ''}</Typography>}
+                      {s?.projectId && <Typography variant="caption" sx={{ opacity: 0.7 }}>• Project: {s?.projectId?.name || ''}</Typography>}
                     </Stack>
                   </Box>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Button size="small" onClick={()=> openView('Submission', s)}>View</Button>
+                    {s.status === 'pending' && (
+                      <>
+                        <Button size="small" color="error" variant="outlined" onClick={()=> openDeclineSubmission(s._id)}>Decline</Button>
+                        <AsyncButton size="small" color="success" variant="contained" onClick={()=> approveSubmission(s._id)}>Approve</AsyncButton>
+                      </>
+                    )}
+                  </Stack>
                 </Stack>
               </Paper>
             </Grid>
@@ -556,6 +582,18 @@ export default function ReviewQueue() {
         </DialogContent>
         <DialogActions>
           <Button onClick={closeView}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Decline Submission Dialog */}
+      <Dialog open={declineOpen} onClose={()=> setDeclineOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Decline Submission</DialogTitle>
+        <DialogContent>
+          <TextField autoFocus fullWidth multiline minRows={2} label="Reason" value={declineReason} onChange={(e)=> setDeclineReason(e.target.value)} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={()=> setDeclineOpen(false)}>Cancel</Button>
+          <AsyncButton color="error" variant="contained" onClick={doDeclineSubmission}>Decline</AsyncButton>
         </DialogActions>
       </Dialog>
 
