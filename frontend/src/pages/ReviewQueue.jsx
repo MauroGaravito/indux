@@ -226,6 +226,23 @@ export default function ReviewQueue() {
   if (user.role === 'worker') return <Alert severity="warning">Managers/Admins only.</Alert>
 
   const openView = (title, data) => { setViewTitle(title); setViewJson(data); setViewUploadUrls({}); setViewOpen(true) }
+  // When viewing a Project Review, fetch latest project config live from DB
+  const viewProjectReview = async (pr) => {
+    try {
+      const projId = typeof pr?.projectId === 'string' ? pr.projectId : (pr?.projectId && pr.projectId._id)
+      setViewTitle('Project Configuration')
+      setViewUploadUrls({})
+      setViewOpen(true)
+      if (projId) {
+        const r = await api.get(`/projects/${projId}`)
+        const latest = r?.data?.config || {}
+        setViewJson(latest)
+        return
+      }
+    } catch (_) {}
+    // Fallback to snapshot stored on the review if live fetch fails
+    setViewJson(pr?.data || {})
+  }
   const closeView = () => setViewOpen(false)
   const openDecline = (kind, id) => { setDeclineKind(kind); setDeclineId(id); setDeclineOpen(true) }
   const closeDecline = () => setDeclineOpen(false)
@@ -327,7 +344,7 @@ export default function ReviewQueue() {
                     </Stack>
                   </Box>
                   <Stack direction="row" spacing={1}>
-                    <Button variant="outlined" onClick={()=> openView('Project Configuration', pr.data)}>View</Button>
+                    <Button variant="outlined" onClick={()=> viewProjectReview(pr)}>View</Button>
                     {pr.status !== 'cancelled' && (
                       <>
                         <Button color="error" variant="outlined" onClick={()=> openDecline('project', pr._id)}>Decline</Button>
