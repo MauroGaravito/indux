@@ -11,6 +11,7 @@ import reviewRoutes from './routes/reviews.js';
 import userRoutes from './routes/users.js';
 import assignmentsRoutes from './routes/assignments.js';
 import brandConfigRoutes from './routes/brandConfigRoutes.js';
+import { errorHandler } from './middleware/errorHandler.js';
 import { seedAll } from './seed.js';
 import { ensureBucket } from './services/minio.js';
 // NOTE: Reverse proxy (e.g., Caddy) handles the '/api' prefix externally using
@@ -110,5 +111,8 @@ async function start() {
     process.exit(1);
   }
 }
+
+// Error handler must be last
+app.use(errorHandler);
 
 start();

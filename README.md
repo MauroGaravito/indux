@@ -313,6 +313,31 @@ BASE_URL=http://localhost:8080 node check-health.js
 
 ---
 
+## Backend Architecture (Controllers/Services)
+
+The API follows a thin-routes, controller/service structure:
+- Routes (`api/src/routes/*.ts`) define URLs, auth guards, and delegate to controllers.
+- Controllers (`api/src/controllers/*.ts`) parse/validate input (Zod), read `req.user`, call services, and shape responses.
+- Services (`api/src/services/*.ts`) contain DB queries and business rules (Mongoose models, MinIO, mail, PDFs). They throw `HttpError` for consistent error handling.
+- Global error handling lives in `api/src/middleware/errorHandler.ts` and standardizes responses.
+
+Shared utilities:
+- `api/src/utils/pagination.ts`
+  - `PaginationQuerySchema` parses optional `page`/`pageSize`.
+  - `wrapPaginated(items, total, page, pageSize)` returns a standard listing payload.
+- `api/src/utils/response.ts`
+  - `ok(data, message?)` helper for success responses when the endpoint returns an object payload.
+
+Optional pagination contract (list endpoints):
+- Without `page` and `pageSize`: the API returns a plain array (backward‑compatible behavior).
+- With both `page` and `pageSize`: the API returns `{ items, total, page, pageSize }`.
+
+Controllers currently supporting this contract:
+- `/submissions` (manager/admin)
+- `/projects` (all roles; scoped for non‑admin)
+- `/reviews/projects` (manager/admin)
+- `/assignments/user/:id`, `/assignments/project/:id`, `/assignments/manager/:id/team`
+
 ## Troubleshooting
 
 - CORS/Login:
