@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import {
   Alert, Button, Paper, Stack, Typography, Tabs, Tab, Chip, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Grid, Box, Divider, List, ListItem, ListItemText,
-  Table, TableBody, TableCell, TableHead, TableRow, Tooltip
+  Table, TableBody, TableCell, TableHead, TableRow, Tooltip, MenuItem
 } from '@mui/material'
 import GroupIcon from '@mui/icons-material/Group'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
@@ -301,6 +301,12 @@ export default function ReviewQueue() {
   const [viewJson, setViewJson] = useState(null)
   const [deleteReviewOpen, setDeleteReviewOpen] = useState(false)
   const [deleteReviewId, setDeleteReviewId] = useState(null)
+  // My Team state (manager)
+  const [teamProjectId, setTeamProjectId] = useState('')
+  const [projectWorkers, setProjectWorkers] = useState([])
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [addWorkerId, setAddWorkerId] = useState('')
+  const [workerOptions, setWorkerOptions] = useState([])
 
   const load = () => Promise.all([
     api.get('/submissions').then(r => setSubs(r.data || [])),
@@ -309,6 +315,8 @@ export default function ReviewQueue() {
   ])
   useEffect(()=> { if (user) load() }, [user])
   useEffect(()=> { api.get('/projects').then(r => setProjects(r.data || [])) }, [])
+  // Reload workers when project changes (only for managers)
+  useEffect(() => { if (teamProjectId) loadProjectWorkers(teamProjectId) }, [teamProjectId])
 
   if (!user) return <Alert severity="info">Please log in as manager/admin.</Alert>
   if (user.role === 'worker') return <Alert severity="warning">Managers/Admins only.</Alert>
@@ -351,6 +359,36 @@ export default function ReviewQueue() {
     setViewJson(pr?.data || {})
   }
 
+  // ---- My Team helpers ----
+  const loadProjectWorkers = async (pid) => {
+    if (!pid) { setProjectWorkers([]); return }
+    try {
+      const r = await api.get(`/assignments/project/${pid}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setProjectWorkers(list.filter(a => a.role === 'worker'))
+    } catch { setProjectWorkers([]) }
+  }
+  const openAddWorker = async () => {
+    setAddWorkerOpen(true)
+    try {
+      const r = await api.get('/users')
+      const list = Array.isArray(r.data) ? r.data : []
+      setWorkerOptions(list.filter(u => u.role === 'worker'))
+    } catch { setWorkerOptions([]) }
+  }
+  const closeAddWorker = () => { setAddWorkerOpen(false); setAddWorkerId('') }
+  const addWorker = async () => {
+    if (!teamProjectId || !addWorkerId) return
+    await api.post('/assignments', { user: addWorkerId, project: teamProjectId, role: 'worker' })
+    closeAddWorker()
+    await loadProjectWorkers(teamProjectId)
+  }
+  const removeWorker = async (assignmentId) => {
+    if (!assignmentId) return
+    await api.delete(`/assignments/${assignmentId}`)
+    await loadProjectWorkers(teamProjectId)
+  }
+
   return (
     <Stack spacing={2}>
       <Typography variant="h5">Manager Review</Typography>
@@ -358,6 +396,7 @@ export default function ReviewQueue() {
         <Tab label="Project Reviews" />
         <Tab label="Worker Submissions" />
         <Tab label="All Submissions" />
+        <Tab icon={<GroupIcon />} iconPosition="start" label="My Team" />
       </Tabs>
 
       {/* Project Reviews */}
@@ -462,6 +501,50 @@ export default function ReviewQueue() {
         })()}
       </Box>
 
+      {/* My Team */}
+      <Box hidden={tab!==3}>
+        <Stack spacing={2} sx={{ mt: 2 }}>
+          <Stack direction={{ xs:'column', sm:'row' }} spacing={2} alignItems={{ sm:'center' }}>
+            <TextField select label="Select Project" value={teamProjectId} onChange={(e)=> setTeamProjectId(e.target.value)} sx={{ minWidth: 260 }}>
+              {projects.map(p => (<MenuItem key={p._id} value={p._id}>{p.name}</MenuItem>))}
+            </TextField>
+            <Box sx={{ flex: 1 }} />
+            <Button variant="contained" disabled={!teamProjectId} onClick={openAddWorker} sx={{ textTransform: 'none' }}>Add Worker</Button>
+          </Stack>
+
+          <Paper sx={{ width: '100%', overflowX: 'auto' }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Worker</TableCell>
+                  <TableCell>Email</TableCell>
+                  <TableCell>Assignment Id</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {projectWorkers.map(a => (
+                  <TableRow key={a._id} hover>
+                    <TableCell>{a?.user?.name || a.user}</TableCell>
+                    <TableCell>{a?.user?.email || '-'}</TableCell>
+                    <TableCell>{a._id}</TableCell>
+                    <TableCell align="right">
+                      <Button color="error" size="small" onClick={()=> removeWorker(a._id)}>Unassign</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {!projectWorkers.length && teamProjectId && (
+              <Alert severity="info" sx={{ m: 2 }}>No workers assigned yet.</Alert>
+            )}
+            {!teamProjectId && (
+              <Alert severity="info" sx={{ m: 2 }}>Select a project to manage its team.</Alert>
+            )}
+          </Paper>
+        </Stack>
+      </Box>
+
       {/* View Dialog */}
       <Dialog open={viewOpen} onClose={closeView} maxWidth="md" fullWidth>
         <DialogTitle>{viewTitle}</DialogTitle>
@@ -484,6 +567,22 @@ export default function ReviewQueue() {
         <DialogActions>
           <Button onClick={closeDeleteReview}>Cancel</Button>
           <AsyncButton color="error" variant="contained" onClick={deleteReview}>Delete</AsyncButton>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add Worker Modal */}
+      <Dialog open={addWorkerOpen} onClose={closeAddWorker} maxWidth="sm" fullWidth>
+        <DialogTitle>Add Worker</DialogTitle>
+        <DialogContent>
+          <TextField fullWidth select label="Worker" value={addWorkerId} onChange={(e)=> setAddWorkerId(e.target.value)} helperText="Select a worker to assign">
+            {workerOptions.map(u => (
+              <MenuItem key={u._id} value={u._id}>{u.name} ({u.email})</MenuItem>
+            ))}
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeAddWorker}>Cancel</Button>
+          <AsyncButton variant="contained" onClick={addWorker} disabled={!addWorkerId || !teamProjectId}>Add</AsyncButton>
         </DialogActions>
       </Dialog>
     </Stack>
