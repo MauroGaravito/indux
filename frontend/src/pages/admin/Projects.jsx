@@ -94,7 +94,8 @@ export default function Projects() {
     if (!selectedId) return
     if (hasPendingReview && !hasUnsavedChanges) return
     try {
-      const r = await api.post('/reviews/projects', { projectId: selectedId, data: config })
+      // Backend will fetch the latest project config from DB; only send projectId
+      const r = await api.post('/reviews/projects', { projectId: selectedId })
       if (r?.status === 200 || r?.data?.ok) {
         notifySuccess('Existing review updated with latest project changes.')
       } else {
