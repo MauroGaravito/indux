@@ -211,11 +211,36 @@ export default function Projects() {
             </List>
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2" sx={{ mb: 1 }}>Create Project</Typography>
-            <Stack direction="row" spacing={1}>
-              <TextField size="small" label="Name" value={name} onChange={e=> setName(e.target.value)} />
-              <TextField size="small" label="Description" value={desc} onChange={e=> setDesc(e.target.value)} />
+            <Stack direction={{ xs:'column', sm:'row' }} spacing={1}>
+              <TextField
+                size="small"
+                label="Name"
+                placeholder="Project name"
+                fullWidth
+                value={name}
+                onChange={e=> setName(e.target.value)}
+                sx={{ minWidth: 200 }}
+              />
+              <TextField
+                size="small"
+                label="Description"
+                placeholder="Short description"
+                fullWidth
+                value={desc}
+                onChange={e=> setDesc(e.target.value)}
+                sx={{ minWidth: 240 }}
+              />
               {isAdmin && (
-                <TextField size="small" select label="Project Manager" value={createManagerId} onChange={(e)=> setCreateManagerId(e.target.value)} sx={{ minWidth: 220 }}>
+                <TextField
+                  size="small"
+                  select
+                  label="Project Manager"
+                  placeholder="Select manager"
+                  fullWidth
+                  value={createManagerId}
+                  onChange={(e)=> setCreateManagerId(e.target.value)}
+                  sx={{ minWidth: 220 }}
+                >
                   {(users.filter(u => u.role === 'manager') || []).map(u => (
                     <MenuItem key={u._id} value={u._id}>{u.name} ({u.email})</MenuItem>
                   ))}
