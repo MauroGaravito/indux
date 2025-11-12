@@ -2,7 +2,6 @@ import type { Request, Response, NextFunction } from 'express'
 import { z } from 'zod'
 import { SubmissionCreateSchema } from '../utils/validators.js'
 import { PaginationQuerySchema, wrapPaginated } from '../utils/pagination.js'
-import { ok } from '../utils/response.js'
 import * as svc from '../services/submissionsService.js'
 
 export async function create(req: Request, res: Response, next: NextFunction) {
@@ -35,7 +34,7 @@ export async function list(req: Request, res: Response, next: NextFunction) {
     })
     // Backwards compatible: if no page/pageSize specified, return array only
     if (!q.data.page || !q.data.pageSize) return res.json(result.items)
-    return res.json(ok(wrapPaginated(result.items, result.total!, q.data.page!, q.data.pageSize!)))
+    return res.json(wrapPaginated(result.items, result.total!, q.data.page!, q.data.pageSize!))
   } catch (err) { next(err) }
 }
 

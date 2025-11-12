@@ -3,7 +3,6 @@ import { z } from 'zod'
 import { ProjectSchema } from '../utils/validators.js'
 import * as svc from '../services/projectsService.js'
 import { PaginationQuerySchema, wrapPaginated } from '../utils/pagination.js'
-import { ok } from '../utils/response.js'
 
 const ListQuery = PaginationQuerySchema
 
@@ -18,7 +17,7 @@ export async function list(req: Request, res: Response, next: NextFunction) {
       pageSize: parsed.data.pageSize,
     })
     if (!parsed.data.page || !parsed.data.pageSize) return res.json(result.items)
-    return res.json(ok(wrapPaginated(result.items, result.total!, parsed.data.page!, parsed.data.pageSize!)))
+    return res.json(wrapPaginated(result.items, result.total!, parsed.data.page!, parsed.data.pageSize!))
   } catch (err) { next(err) }
 }
 
@@ -27,14 +26,14 @@ export async function create(req: Request, res: Response, next: NextFunction) {
     const parsed = ProjectSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
     const out = await svc.createProject(parsed.data)
-    res.status(201).json(ok(out))
+    res.status(201).json(out)
   } catch (err) { next(err) }
 }
 
 export async function getOne(req: Request, res: Response, next: NextFunction) {
   try {
     const p = await svc.getProject(req.params.id)
-    res.json(ok(p))
+    res.json(p)
   } catch (err) { next(err) }
 }
 
@@ -43,13 +42,13 @@ export async function update(req: Request, res: Response, next: NextFunction) {
     const parsed = ProjectSchema.partial().safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
     const p = await svc.updateProject(req.params.id, parsed.data)
-    res.json(ok(p))
+    res.json(p)
   } catch (err) { next(err) }
 }
 
 export async function remove(req: Request, res: Response, next: NextFunction) {
   try {
     const out = await svc.deleteProject(req.params.id)
-    res.json(ok(out))
+    res.json(out)
   } catch (err) { next(err) }
 }

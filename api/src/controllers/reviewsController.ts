@@ -2,7 +2,6 @@ import type { Request, Response, NextFunction } from 'express'
 import { z } from 'zod'
 import * as svc from '../services/reviewsService.js'
 import { PaginationQuerySchema, wrapPaginated } from '../utils/pagination.js'
-import { ok } from '../utils/response.js'
 
 const RequestSchema = z.object({ projectId: z.string().min(1) })
 const ListQuery = PaginationQuerySchema.extend({
@@ -15,7 +14,8 @@ export async function requestProject(req: Request, res: Response, next: NextFunc
     const parsed = RequestSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
     const out = await svc.requestProjectReview(parsed.data.projectId, req.user!.sub)
-    res.status((out as any)?.ok ? 200 : 201).json(ok(out))
+    // Keep legacy behavior: 200 with { ok, message } when updated, 201 with review object when created
+    res.status((out as any)?.ok ? 200 : 201).json(out)
   } catch (err) { next(err) }
 }
 
@@ -31,21 +31,21 @@ export async function listProjects(req: Request, res: Response, next: NextFuncti
       pageSize: parsed.data.pageSize,
     })
     if (!parsed.data.page || !parsed.data.pageSize) return res.json(result.items)
-    return res.json(ok(wrapPaginated(result.items, result.total!, parsed.data.page!, parsed.data.pageSize!)))
+    return res.json(wrapPaginated(result.items, result.total!, parsed.data.page!, parsed.data.pageSize!))
   } catch (err) { next(err) }
 }
 
 export async function remove(req: Request, res: Response, next: NextFunction) {
   try {
     const out = await svc.deleteReview(req.params.id)
-    res.json(ok(out))
+    res.json(out)
   } catch (err) { next(err) }
 }
 
 export async function approveProject(req: Request, res: Response, next: NextFunction) {
   try {
     const out = await svc.approveReview(req.params.id, req.user!.sub)
-    res.json(ok(out))
+    res.json(out)
   } catch (err) { next(err) }
 }
 
