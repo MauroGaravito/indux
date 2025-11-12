@@ -10,16 +10,26 @@ router.post('/projects', requireAuth, requireRole('admin'), async (req, res) => 
   const schema = z.object({ projectId: z.string().min(1), data: z.record(z.any()) });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  // Prevent duplicate pending reviews for the same project
-  const existing = await ProjectReview.findOne({ projectId: parsed.data.projectId, status: 'pending' }).lean();
-  if (existing) return res.status(400).json({ error: 'This project is already under review.' });
+  const { projectId, data } = parsed.data;
+
+  // If there is already a pending review, update it with latest data
+  const existing = await ProjectReview.findOne({ projectId, status: 'pending' });
+  if (existing) {
+    existing.data = data;
+    (existing as any).message = 'Updated with latest project changes';
+    existing.markModified('data');
+    await existing.save();
+    return res.status(200).json({ ok: true, message: 'Existing review updated with latest project changes.' });
+  }
+
+  // Otherwise, create a new review
   const review = await ProjectReview.create({
-    projectId: parsed.data.projectId,
+    projectId,
     requestedBy: req.user!.sub as any,
-    data: parsed.data.data,
+    data,
     status: 'pending'
   });
-  res.status(201).json(review);
+  return res.status(201).json(review);
 });
 
 // Manager/Admin list project reviews pending

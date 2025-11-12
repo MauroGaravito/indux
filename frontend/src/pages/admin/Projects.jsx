@@ -36,6 +36,8 @@ export default function Projects() {
   const isAdmin = user?.role === 'admin'
   const [managers, setManagers] = useState([])
   const [hasPendingReview, setHasPendingReview] = useState(false)
+  const [initialConfig, setInitialConfig] = useState({ projectInfo: {}, personalDetails: {}, slides: {}, questions: [] })
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
   const load = async () => {
     const r = await api.get('/projects')
@@ -52,7 +54,10 @@ export default function Projects() {
   const onSelect = (id) => {
     setSelectedId(id)
     const p = projects.find(x => x._id === id)
-    setConfig(p?.config || { projectInfo: {}, personalDetails: {}, slides: {}, questions: [] })
+    const nextCfg = p?.config || { projectInfo: {}, personalDetails: {}, slides: {}, questions: [] }
+    setConfig(nextCfg)
+    setInitialConfig(nextCfg)
+    setHasUnsavedChanges(false)
     // load assignments for this project
     if (id) {
       api.get(`/assignments/project/${id}`).then(r => setAssignments(r.data || [])).catch(()=> setAssignments([]))
@@ -74,13 +79,27 @@ export default function Projects() {
   const saveConfig = async () => {
     if (!selectedId) return
     await api.put(`/projects/${selectedId}`, { config })
+    setInitialConfig(config)
+    setHasUnsavedChanges(false)
   }
 
   const sendForReview = async () => {
     if (!selectedId) return
-    if (hasPendingReview) return
-    await api.post('/reviews/projects', { projectId: selectedId, data: config })
-    setHasPendingReview(true)
+    if (hasPendingReview && !hasUnsavedChanges) return
+    try {
+      const r = await api.post('/reviews/projects', { projectId: selectedId, data: config })
+      if (r?.status === 200 || r?.data?.ok) {
+        notifySuccess('Existing review updated with latest project changes.')
+      } else {
+        notifySuccess('Review sent successfully.')
+      }
+      setHasPendingReview(true)
+      setInitialConfig(config)
+      setHasUnsavedChanges(false)
+    } catch (e) {
+      const msg = e?.response?.data?.error || e?.message || 'Failed to send review'
+      notifyError(msg)
+    }
   }
 
   const confirmDelete = () => setDeleteOpen(true)
@@ -127,6 +146,18 @@ export default function Projects() {
 
   const accent = '#1976d2'
 
+  // Track unsaved changes comparing config vs initialConfig
+  useEffect(() => {
+    try {
+      const a = JSON.stringify(initialConfig || {})
+      const b = JSON.stringify(config || {})
+      setHasUnsavedChanges(a !== b)
+    } catch {
+      // fall back to truthy change when stringify fails
+      setHasUnsavedChanges(true)
+    }
+  }, [config, initialConfig])
+
   return (
     <>
     <Grid container spacing={2}>
@@ -164,8 +195,10 @@ export default function Projects() {
             <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={1}>
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Edit Project</Typography>
               <Stack direction="row" spacing={1}>
-                <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveConfig} disabled={!selectedId} sx={{ textTransform: 'none' }}>Save</AsyncButton>
-                <AsyncButton startIcon={<SendIcon />} variant="contained" onClick={sendForReview} disabled={!selectedId || hasPendingReview} sx={{ textTransform: 'none', bgcolor: accent }} title={hasPendingReview ? 'This project is already pending review.' : ''}>Send For Review</AsyncButton>
+                <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveConfig} disabled={!selectedId || !hasUnsavedChanges} sx={{ textTransform: 'none' }}>Save</AsyncButton>
+                <AsyncButton startIcon={<SendIcon />} variant="contained" onClick={sendForReview} disabled={!selectedId || (hasPendingReview && !hasUnsavedChanges)} sx={{ textTransform: 'none', bgcolor: accent }} title={(hasPendingReview && !hasUnsavedChanges) ? 'This project is already pending review.' : ''}>
+                  {hasPendingReview && hasUnsavedChanges ? 'Resend Updated Version' : 'Send For Review'}
+                </AsyncButton>
                 {isAdmin && !!selectedId && (
                   <Button startIcon={<DeleteForeverIcon />} color="error" variant="outlined" onClick={confirmDelete} sx={{ textTransform: 'none' }}>
                     Delete Project

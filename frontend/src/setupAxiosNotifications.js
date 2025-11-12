@@ -49,6 +49,9 @@ export function attachAxiosNotifications() {
         if (successMethods.has(method)) {
           // Generic messages; pages can still show their own detailed ones
           const url = response?.config?.url || ''
+          // Skip generic toast for explicit flows handled in-page
+          if (/reviews\/projects/i.test(url)) return response
+
           if (/login|auth\/refresh/i.test(url)) {
             // avoid noisy auth messages
           } else if (/approve|decline/i.test(url)) {
