@@ -28,6 +28,24 @@ function StatusChip({ status }) {
 function ProjectConfigViewer({ config }) {
   const [tab, setTab] = React.useState(0)
   const cfg = config || {}
+  const pinfoAll = cfg.projectInfo || {}
+  const mapKey = pinfoAll?.projectMapKey || pinfoAll?.mapKey || ''
+  const [projectMapUrl, setProjectMapUrl] = React.useState('')
+  React.useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        if (!mapKey) { setProjectMapUrl(''); return }
+        if (/^https?:/i.test(mapKey)) { setProjectMapUrl(mapKey); return }
+        const { url } = await presignGet(mapKey)
+        if (!cancelled) setProjectMapUrl(url || '')
+      } catch (_) {
+        if (!cancelled) setProjectMapUrl(mapKey ? `/${mapKey}` : '')
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [mapKey])
   const hasProjectInfo = !!cfg.projectInfo && Object.keys(cfg.projectInfo || {}).length > 0
   const hasPersonal = !!cfg.personalDetails && Array.isArray(cfg.personalDetails?.fields) && cfg.personalDetails.fields.length > 0
   const slides = cfg.slides || cfg.materials
@@ -78,7 +96,7 @@ function ProjectConfigViewer({ config }) {
                 <>
                   {mapKey ? (
                     <Box sx={{ mb: 2 }}>
-                      <Box component="img" src={`/${mapKey}`} alt="Project Map" sx={{ width: '100%', maxWidth: 300, borderRadius: 1 }} />
+                      <Box component="img" src={projectMapUrl || (mapKey ? `/${mapKey}` : '')} alt="Project Map" sx={{ width: '100%', maxWidth: 300, borderRadius: 1 }} />
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Map key: {String(mapKey)}</Typography>
                     </Box>
                   ) : null}
@@ -195,7 +213,7 @@ function ProjectConfigViewer({ config }) {
                   ))}
                 </Grid>
                 <List>
-                  {items.map((it, idx) => {
+                  {norm.map() => {
                     const title = it?.name || it?.title || `Item ${idx+1}`
                     const type = it?.type || it?.mime || '-'
                     const url = it?.url || it?.href || it?.link || ''
