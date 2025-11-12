@@ -185,6 +185,25 @@ function ProjectConfigViewer({ config }) {
                 return <InsertDriveFileIcon sx={{ fontSize: 42, color: 'text.secondary' }} />
               }
 
+              const isSlidesDocKey = (k) => /^slides\//.test(String(k || '')) && ['pdf','ppt','pptx'].includes(ext(k))
+              const displayName = (f) => f?.name || f?.title || (isSlidesDocKey(f?.key) ? 'Slides' : ((f?.key || '').split('/').pop() || 'file'))
+              const openItem = async (f) => {
+                try {
+                  if (f?.key && isSlidesDocKey(f.key)) {
+                    const e = ext(f.key)
+                    const n = displayName(f)
+                    const params = new URLSearchParams({ key: f.key, name: n, ext: e })
+                    window.open(`/slides-viewer?${params.toString()}`, '_blank', 'noopener,noreferrer')
+                    return
+                  }
+                  if (f?.url) { window.open(f.url, '_blank', 'noopener,noreferrer'); return }
+                  if (f?.key) {
+                    const { url } = await presignGet(f.key)
+                    if (url) window.open(url, '_blank', 'noopener,noreferrer')
+                  }
+                } catch (_) {}
+              }
+
               return (
                 <Box>
                 <Grid container spacing={2}>
@@ -200,11 +219,9 @@ function ProjectConfigViewer({ config }) {
                             )}
                           </Box>
                           <Box sx={{ minWidth: 0, flex: 1 }}>
-                            <Typography variant="subtitle2" noWrap title={f.name}>{f.name}</Typography>
+                            <Typography variant="subtitle2" noWrap title={displayName(f)}>{displayName(f)}</Typography>
                             <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                              {f.url && (
-                                <Button size="small" variant="outlined" component="a" href={f.url} target="_blank" rel="noopener">Open</Button>
-                              )}
+                              <Button size="small" variant="outlined" onClick={()=> openItem(f)}>Open</Button>
                             </Stack>
                           </Box>
                         </Box>
@@ -214,12 +231,12 @@ function ProjectConfigViewer({ config }) {
                 </Grid>
                 <List>
                   {norm.map((f, idx) => {
-                    const title = f?.name || `Item ${idx+1}`
-                    const url = f?.url || (f?.key ? `/${f.key}` : '')
-                    const type = f?.type || ext(url) || '-'
+                    const url = f?.url || ''
+                    const type = f?.type || ext(url) || (f?.key ? ext(f.key) : '-')
+                    const title = displayName(f)
                     return (
-                      <ListItem key={idx} secondaryAction={url ? <Button size="small" onClick={()=> window.open(url, '_blank')}>Open</Button> : null}>
-                        <ListItemText primary={title} secondary={`Type: ${type}${url ? ' • link' : ''}`} />
+                      <ListItem key={idx} secondaryAction={<Button size="small" onClick={()=> openItem(f)}>Open</Button>}>
+                        <ListItemText primary={title} secondary={`Type: ${type}${(url || f?.key) ? ' • link' : ''}`} />
                       </ListItem>
                     )
                   })}
