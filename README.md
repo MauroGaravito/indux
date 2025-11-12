@@ -328,6 +328,93 @@ edicion
 
 ---
 
+## Arquitectura técnica (Resumen)
+
+### Backend
+- Framework: Express + TypeScript (`api/`). Persistencia con MongoDB (Mongoose) y almacenamiento S3‑compatible (MinIO).
+- Rutas principales:
+  - `/auth` login, refresh, registro y verificación de email.
+  - `/projects` CRUD de proyectos y lectura con managers poblados.
+  - `/assignments` asigna usuarios a proyectos (rol `manager` o `worker`), lista por usuario/proyecto y borra asignaciones.
+  - `/submissions` crea envíos del worker y permite a manager/admin listar y aprobar/declinar.
+  - `/reviews` gestiona “Project Reviews” (solicitudes de aprobación de proyecto) para managers/admin.
+  - `/uploads` firma URLs para PUT/GET contra S3 y endpoint `/uploads/stream` como fallback mismo origen.
+  - `/brand-config` configuración de branding utilizada por el frontend (colores, logo, nombre).
+- Modelos:
+  - `User` (`role: admin|manager|worker`, `status`, `emailVerified`). Password almacenado como hash bcrypt (campo `password`).
+  - `Project` (`name`, `config`, `managers[]`). `config` contiene projectInfo, personalDetails, slides, questions.
+  - `Assignment` (`user`, `project`, `role`) con índice único `(user, project)`.
+  - `Submission` (`projectId`, `userId`, `personal`, `uploads[]`, `quiz`, `signatureDataUrl`, `status`, `reviewedBy`, `certificateKey`).
+  - `ProjectReview` (`projectId`, `data`, `status`, `requestedBy`, `reviewedBy`, `reason`, `message`).
+- Autenticación y autorización:
+  - JWT Access + Refresh (`services/tokens.ts`). Access TTL configurable, refresh TTL 7d por defecto.
+  - `requireAuth` valida access token y estado del usuario (aprobado, no deshabilitado y email verificado).
+  - `requireRole(...roles)` limita por rol.
+  - `requireProjectManagerOrAdmin` para modificaciones de proyecto.
+  - Reglas de negocio adicionales:
+    - Managers sólo ven submissions y reviews de proyectos que gestionan.
+    - Managers sólo pueden asignar workers a proyectos que gestionan; sólo admin puede asignar managers.
+    - No se permite crear una nueva Project Review si ya existe una `approved` para ese proyecto.
+- Archivos y presign:
+  - MinIO client (`services/minio.ts`): `ensureBucket`, `presignPutUrl`, `presignGetUrl`. Soporta `PUBLIC_S3_ENDPOINT` para firmar URLs públicas.
+  - Subidas: frontend obtiene `key,url` vía `/uploads/presign` y hace `PUT` directo; luego consume la `key` en la app.
+  - Descargas/preview: `/uploads/presign-get` devuelve URL temporal; `/uploads/stream` sirve como alternativa misma‑origen.
+- Validación y errores:
+  - Zod en endpoints de entrada (`validators.ts`).
+  - Manejo de errores consistente con `status` y mensaje legible. Rate‑limit 300 req/min.
+  - CORS con lista de orígenes (`FRONTEND_URL`). `TRUST_PROXY` configurable para cabeceras `X‑Forwarded-*`.
+- Otras utilidades:
+  - `services/pdf.ts` genera certificados PDF y los guarda en S3 (`certificateKey`).
+  - `services/mailer.ts` envíos SMTP (verificación de email, notificaciones).
+
+### Frontend
+- Stack: React + Vite + MUI. Estado global con Zustand (`store/auth.js`). Axios centralizado con interceptor de auth/refresh (`utils/api.js`).
+- Routing (`src/main.jsx`):
+  - Rutas públicas: `/`, `/login`, `/register`, `/pending`, `/slides-viewer`.
+  - Worker: `/wizard` (asistente de inducción: datos personales, captura de cámara/firma, slides, quiz, submit).
+  - Manager/Admin: `/review` (Project Reviews, Worker Submissions, All Submissions, My Team).
+  - Admin: `/admin` con secciones Dashboard, Projects, Reviews, Users, Settings.
+- Acceso por rol: `AdminGuard` protege `/admin`. Nav oculta/expone enlaces según `user.role`.
+- Branding: hook `useBrandConfig` aplica colores y logo al tema MUI.
+- Flujos clave:
+  - Creación de proyecto (Admin) y asignación de manager/worker.
+  - Envío de Project Review (Admin) y aprobación/declinación (Manager/Admin).
+  - Subida de materiales y generación de presign en UI (`utils/upload.js`).
+  - Induction Wizard (Worker): completa datos, visualiza slides, realiza quiz y envía Submission.
+  - Revisión (Manager): lista submissions de sus proyectos, ve el detalle enriquecido, aprueba o declina.
+
+### Seguridad y arquitectura
+- Monolito modular: API Express con rutas separadas y modelos Mongoose; frontend SPA React.
+- Puntos sensibles:
+  - Tokens en `localStorage` (XSS los expone). Refresh token también en cliente.
+  - Endpoints de carga/descarga dependen de presign; clave de objeto se confía desde el cliente (mitigado por expiración y auth requerida para presign).
+  - Validación de contenido de archivos no implementada (antivirus/MIME real).
+- Controles actuales:
+  - RBAC en middleware y reglas de negocio. Filtros por proyecto para managers.
+  - Rate‑limit y CORS restringidos.
+  - Bucket auto‑creado y presign con expiración corta.
+
+## Recomendaciones
+- Seguridad
+  - Mover Access/Refresh a cookies `HttpOnly` + CSRF token; o almacenar sólo refresh en cookie y usar rotación/blacklist de refresh.
+  - Validar tamaño/MIME real de archivos en S3 (por ejemplo, encabezados `Content‑Type` y `Content‑MD5`), y/o antivirus (ClamAV/Lambda).
+  - Namespace por proyecto/tenant en claves S3 (`projects/{id}/...`).
+  - Políticas más estrictas: impedir múltiples `approved` por proyecto (ya implementado a nivel de endpoint) y añadir índice único condicional si aplica.
+- Código/estructura
+  - Separar capas: `controllers/`, `services/`, `repositories/` para aislar negocio de Express.
+  - Centralizar manejo de errores/respuestas (middleware `errorHandler`).
+  - Añadir tests de integración con supertest y una base Mongo en memoria.
+- Escalabilidad
+  - Extraer envío de emails y generación de PDFs a workers/colas (BullMQ + Redis).
+  - Añadir paginación a listados (`/users`, `/submissions`, `/reviews`).
+  - Cache de configuración de marca y proyecto.
+- Observabilidad
+  - Logs estructurados (pino), trazas (OpenTelemetry) y métricas (Prometheus).
+- Multi‑tenancy (futuro)
+  - Campo `tenantId` en todos los modelos + índices compuestos `{ tenantId, ... }`.
+  - Aislar S3 por tenant (`bucket/tenantId/...`) y CORS por subdominio.
+  - Panel de superadmin para gestionar tenants.
+
 ## Creación automática de contraseñas
 
 Cuando un administrador crea un usuario desde `/admin/users` y no proporciona el campo `password`, el backend genera automáticamente una contraseña temporal alfanumérica de 8 caracteres. Esta contraseña se encripta con `bcrypt` y se almacena en el campo `password` del documento (que contiene el hash). La creación del usuario continúa normalmente y la respuesta incluye un mensaje informativo.
