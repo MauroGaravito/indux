@@ -2,31 +2,38 @@ import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { z } from 'zod';
 import { ProjectReview } from '../models/ProjectReview.js';
+import { Project } from '../models/Project.js';
 
 const router = Router();
 
 // Admin creates a project review request (aka sendForReview)
 router.post('/projects', requireAuth, requireRole('admin'), async (req, res) => {
-  const schema = z.object({ projectId: z.string().min(1), data: z.record(z.any()) });
+  // Only trust the projectId; always fetch latest data from DB
+  const schema = z.object({ projectId: z.string().min(1) });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { projectId, data } = parsed.data;
+  const { projectId } = parsed.data;
+
+  // Load current project config from DB to ensure managers see up-to-date values
+  const project = await Project.findById(projectId).lean();
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+  const latestData = project?.config || {};
 
   // If there is already a pending review, update it with latest data
   const existing = await ProjectReview.findOne({ projectId, status: 'pending' });
   if (existing) {
-    existing.data = data;
-    (existing as any).message = 'Updated with latest project changes';
+    existing.data = latestData;
+    (existing as any).message = 'Updated with latest project data';
     existing.markModified('data');
     await existing.save();
-    return res.status(200).json({ ok: true, message: 'Existing review updated with latest project changes.' });
+    return res.status(200).json({ ok: true, message: 'Existing review updated with latest project data.' });
   }
 
-  // Otherwise, create a new review
+  // Otherwise, create a new review with current project data
   const review = await ProjectReview.create({
     projectId,
     requestedBy: req.user!.sub as any,
-    data,
+    data: latestData,
     status: 'pending'
   });
   return res.status(201).json(review);
