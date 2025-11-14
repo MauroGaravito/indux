@@ -6,7 +6,7 @@ import RateReviewIcon from '@mui/icons-material/RateReviewOutlined'
 import SettingsIcon from '@mui/icons-material/SettingsOutlined'
 import { useTheme, alpha } from '@mui/material/styles'
 import { useLocation, Link as RouterLink } from 'react-router-dom'
-import logo from '../../assets/indux-logo.PNG'
+import logo from '../../assets/indux-logo.png'
 
 const drawerItems = [
   { label: 'Dashboard', to: '/manager/dashboard', icon: <DashboardIcon />, match: '/manager/dashboard' },

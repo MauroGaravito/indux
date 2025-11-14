@@ -2,7 +2,7 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material'
 import { useAuthStore } from '../context/authStore.js'
-import logo from '../assets/indux-logo.PNG'
+import logo from '../assets/indux-logo.png'
 
 export default function AppNav({ brand }) {
   const { user, logout } = useAuthStore()

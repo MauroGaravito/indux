@@ -6,7 +6,7 @@ import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium'
 import SettingsIcon from '@mui/icons-material/SettingsOutlined'
 import { useTheme, alpha } from '@mui/material/styles'
 import { useLocation, Link as RouterLink } from 'react-router-dom'
-import logo from '../../assets/indux-logo.PNG'
+import logo from '../../assets/indux-logo.png'
 
 const drawerItems = [
   { label: 'Dashboard', to: '/worker/dashboard', icon: <DashboardIcon />, match: '/worker/dashboard' },

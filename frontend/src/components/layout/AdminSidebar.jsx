@@ -7,7 +7,7 @@ import PeopleIcon from '@mui/icons-material/PeopleAltOutlined'
 import SettingsIcon from '@mui/icons-material/SettingsOutlined'
 import { useLocation, Link as RouterLink } from 'react-router-dom'
 import { alpha, useTheme } from '@mui/material/styles'
-import logo from '../../assets/indux-logo.PNG'
+import logo from '../../assets/indux-logo.png'
 
 const drawerItems = [
   { label: 'Dashboard', to: '/admin/dashboard', icon: <DashboardIcon />, match: '/admin/dashboard' },
