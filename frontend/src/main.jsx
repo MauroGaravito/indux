@@ -18,7 +18,12 @@ import AdminReviews from './pages/admin/Reviews.jsx'
 import AdminUsers from './pages/admin/Users.jsx'
 import AdminSettings from './pages/admin/Settings.jsx'
 import ManagerDashboard from './pages/manager/ManagerDashboard.jsx'
+import ManagerProjects from './pages/manager/ManagerProjects.jsx'
+import ManagerSettings from './pages/manager/ManagerSettings.jsx'
 import WorkerDashboard from './pages/worker/WorkerDashboard.jsx'
+import WorkerInductions from './pages/worker/WorkerInductions.jsx'
+import WorkerCertificates from './pages/worker/WorkerCertificates.jsx'
+import WorkerSettings from './pages/worker/WorkerSettings.jsx'
 import AppNav from './layout/AppNav.jsx'
 import MainLayout from './components/layout/MainLayout.jsx'
 import AdminLayout from './components/layout/AdminLayout.jsx'
@@ -84,9 +89,24 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<ManagerDashboard />} />
+        <Route path="projects" element={<ManagerProjects />} />
         <Route path="review" element={<ReviewQueue />} />
+        <Route path="settings" element={<ManagerSettings />} />
       </Route>
-      <Route path="/worker/dashboard" element={<RequireAuth roles={['worker']}><WorkerLayout><WorkerDashboard /></WorkerLayout></RequireAuth>} />
+      <Route
+        path="/worker/*"
+        element={(
+          <RequireAuth allowedRoles={['worker']}>
+            <WorkerLayout />
+          </RequireAuth>
+        )}
+      >
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<WorkerDashboard />} />
+        <Route path="inductions" element={<WorkerInductions />} />
+        <Route path="certificates" element={<WorkerCertificates />} />
+        <Route path="settings" element={<WorkerSettings />} />
+      </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
