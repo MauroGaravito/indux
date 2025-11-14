@@ -2,7 +2,7 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { CssBaseline, Container } from '@mui/material'
-import { ThemeProvider, createTheme, responsiveFontSizes } from '@mui/material/styles'
+import { ThemeProvider } from '@mui/material/styles'
 import useBrandConfig from './hooks/useBrandConfig.js'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
@@ -25,6 +25,7 @@ import AdminLayout from './components/layout/AdminLayout.jsx'
 import ManagerLayout from './components/layout/ManagerLayout.jsx'
 import WorkerLayout from './components/layout/WorkerLayout.jsx'
 import { useAuthStore } from './context/authStore.js'
+import { modernTheme } from './theme/index.js'
 
 function getDashboardPath(user) {
   if (!user) return '/login'
@@ -72,7 +73,6 @@ function AppRoutes() {
 function App({ brand }) {
   return (
     <BrowserRouter>
-      <CssBaseline />
       <AppNav brand={brand} />
       <MainLayout>
         <Container maxWidth={false} disableGutters sx={{ mt: 2, px: { xs: 2, md: 3 } }}>
@@ -85,14 +85,9 @@ function App({ brand }) {
 
 function ThemedRoot() {
   const { brandConfig } = useBrandConfig()
-  const primary = brandConfig?.primaryColor || '#1976d2'
-  const secondary = brandConfig?.secondaryColor || '#6b7280'
-  const theme = React.useMemo(() => responsiveFontSizes(createTheme({
-    palette: { primary: { main: primary }, secondary: { main: secondary } }
-  })), [primary, secondary])
-
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={modernTheme}>
+      <CssBaseline />
       <App brand={brandConfig} />
     </ThemeProvider>
   )

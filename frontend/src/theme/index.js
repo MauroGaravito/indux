@@ -1,7 +1,4 @@
-import { baseThemeConfig } from './baseTheme.js'
+import modernTheme from './modern.js'
+import baseTheme from './baseTheme.js'
 
-export function getThemeConfig() {
-  return baseThemeConfig
-}
-
-export default getThemeConfig
+export { modernTheme, baseTheme }
