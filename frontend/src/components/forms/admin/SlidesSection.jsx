@@ -15,7 +15,7 @@ import SlideshowIcon from '@mui/icons-material/Slideshow'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
-import { uploadFile, presignGet } from '../../utils/upload.js'
+import { uploadFile, presignGet } from '../../../utils/upload.js'
 
 export default function SlidesSection({ value, onChange }) {
   const v = value || {}
@@ -165,6 +165,7 @@ export default function SlidesSection({ value, onChange }) {
     </Card>
   )
 }
+
 
 
 

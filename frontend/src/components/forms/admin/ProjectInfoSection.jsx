@@ -27,7 +27,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import ContentPasteIcon from '@mui/icons-material/ContentPaste'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
-import { uploadFile, presignGet } from '../../utils/upload.js'
+import { uploadFile, presignGet } from '../../../utils/upload.js'
 
 export default function ProjectInfoSection({ value, onChange }) {
   const v = value || {}
