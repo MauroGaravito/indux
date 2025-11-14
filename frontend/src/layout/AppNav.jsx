@@ -2,6 +2,7 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material'
 import { useAuthStore } from '../context/authStore.js'
+import logo from '../assets/indux-logo.PNG'
 
 export default function AppNav({ brand }) {
   const { user, logout } = useAuthStore()
@@ -21,10 +22,8 @@ export default function AppNav({ brand }) {
     <AppBar position="static">
       <Toolbar>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1 }}>
-          {logoUrl ? (
-            <Box component="img" src={logoUrl} alt={brandName} sx={{ height: 28, width: 'auto', borderRadius: 0.5, bgcolor: 'rgba(255,255,255,0.12)' }} />
-          ) : null}
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>{brandName}</Typography>
+          <img src={logo} alt="Indux Logo" style={{ height: 28 }} />
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>INDUX</Typography>
         </Box>
         <Button color="inherit" component={Link} to="/">Home</Button>
         {user && <Button color="inherit" component={Link} to={dashboardPath}>Dashboard</Button>}

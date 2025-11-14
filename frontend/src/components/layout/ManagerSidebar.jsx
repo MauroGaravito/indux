@@ -6,6 +6,7 @@ import RateReviewIcon from '@mui/icons-material/RateReviewOutlined'
 import SettingsIcon from '@mui/icons-material/SettingsOutlined'
 import { useTheme, alpha } from '@mui/material/styles'
 import { useLocation, Link as RouterLink } from 'react-router-dom'
+import logo from '../../assets/indux-logo.PNG'
 
 const drawerItems = [
   { label: 'Dashboard', to: '/manager/dashboard', icon: <DashboardIcon />, match: '/manager/dashboard' },
@@ -21,13 +22,9 @@ export default function ManagerSidebar({ variant = 'permanent', open, onClose, d
   const content = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Toolbar sx={{ px: 3 }}>
-        <Box>
-          <Typography variant="subtitle2" color="text.secondary" sx={{ letterSpacing: '0.08em' }}>
-            INDUX
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Manager Console
-          </Typography>
+        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <img src={logo} alt="Indux" style={{ height: 32 }} />
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Indux</Typography>
         </Box>
       </Toolbar>
       <List sx={{ px: 1, flexGrow: 1 }}>

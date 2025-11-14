@@ -7,6 +7,7 @@ import PeopleIcon from '@mui/icons-material/PeopleAltOutlined'
 import SettingsIcon from '@mui/icons-material/SettingsOutlined'
 import { useLocation, Link as RouterLink } from 'react-router-dom'
 import { alpha, useTheme } from '@mui/material/styles'
+import logo from '../../assets/indux-logo.PNG'
 
 const drawerItems = [
   { label: 'Dashboard', to: '/admin/dashboard', icon: <DashboardIcon />, match: '/admin/dashboard' },
@@ -23,13 +24,9 @@ export default function AdminSidebar({ variant = 'permanent', open, onClose, dra
   const content = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
       <Toolbar sx={{ px: 3 }}>
-        <Box>
-          <Typography variant="subtitle2" color="text.secondary" sx={{ letterSpacing: '0.08em' }}>
-            INDUX
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Admin Console
-          </Typography>
+        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <img src={logo} alt="Indux" style={{ height: 32 }} />
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Indux</Typography>
         </Box>
       </Toolbar>
       <List sx={{ px: 1, flexGrow: 1 }}>
