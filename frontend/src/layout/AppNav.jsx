@@ -13,6 +13,7 @@ export default function AppNav({ brand }) {
         : user
           ? '/worker/dashboard'
           : '/login'
+  const reviewPath = user?.role === 'admin' ? '/admin/review' : '/manager/review'
   const brandName = brand?.companyName || 'Indux'
   const logoUrl = brand?.logoUrl || ''
 
@@ -28,7 +29,7 @@ export default function AppNav({ brand }) {
         <Button color="inherit" component={Link} to="/">Home</Button>
         {user && <Button color="inherit" component={Link} to={dashboardPath}>Dashboard</Button>}
         {user?.role !== 'worker' && user && (
-          <Button color="inherit" component={Link} to="/review">Review</Button>
+          <Button color="inherit" component={Link} to={reviewPath}>Review</Button>
         )}
         {user?.role === 'admin' && (
           <Button color="inherit" component={Link} to="/admin/dashboard">Admin</Button>

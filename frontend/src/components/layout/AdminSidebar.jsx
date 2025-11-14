@@ -11,7 +11,7 @@ import { alpha, useTheme } from '@mui/material/styles'
 const drawerItems = [
   { label: 'Dashboard', to: '/admin/dashboard', icon: <DashboardIcon />, match: '/admin/dashboard' },
   { label: 'Projects', to: '/admin/projects', icon: <FolderIcon />, match: '/admin/projects' },
-  { label: 'Reviews', to: '/review', icon: <RateReviewIcon />, match: '/review' },
+  { label: 'Reviews', to: '/admin/review', icon: <RateReviewIcon />, match: '/admin/review' },
   { label: 'Users', to: '/admin/users', icon: <PeopleIcon />, match: '/admin/users' },
   { label: 'Settings', to: '/admin/settings', icon: <SettingsIcon />, match: '/admin/settings' }
 ]

@@ -34,12 +34,13 @@ function getDashboardPath(user) {
   return '/worker/dashboard'
 }
 
-function RequireAuth({ children, roles }) {
+function RequireAuth({ children, roles, allowedRoles }) {
   const { user } = useAuthStore()
+  const requiredRoles = allowedRoles || roles
   if (!user) {
     return <Navigate to="/login" replace />
   }
-  if (roles?.length && !roles.includes(user.role)) {
+  if (requiredRoles?.length && !requiredRoles.includes(user.role)) {
     return <Navigate to="/" replace />
   }
   return children
@@ -56,14 +57,35 @@ function AppRoutes() {
       <Route path="/register" element={!user ? <Register /> : <Navigate to={dashboardPath} replace />} />
       <Route path="/pending" element={<Pending />} />
       <Route path="/wizard" element={<RequireAuth><InductionWizard /></RequireAuth>} />
-      <Route path="/review" element={<RequireAuth roles={['admin', 'manager']}><ManagerLayout><ReviewQueue /></ManagerLayout></RequireAuth>} />
       <Route path="/slides-viewer" element={<SlidesViewer />} />
-      <Route path="/admin/dashboard" element={<RequireAuth roles={['admin']}><AdminLayout><AdminDashboard /></AdminLayout></RequireAuth>} />
-      <Route path="/admin/projects" element={<RequireAuth roles={['admin']}><AdminLayout><AdminProjects /></AdminLayout></RequireAuth>} />
-      <Route path="/admin/reviews" element={<RequireAuth roles={['admin']}><AdminLayout><AdminReviews /></AdminLayout></RequireAuth>} />
-      <Route path="/admin/users" element={<RequireAuth roles={['admin']}><AdminLayout><AdminUsers /></AdminLayout></RequireAuth>} />
-      <Route path="/admin/settings" element={<RequireAuth roles={['admin']}><AdminLayout><AdminSettings /></AdminLayout></RequireAuth>} />
-      <Route path="/manager/dashboard" element={<RequireAuth roles={['manager']}><ManagerLayout><ManagerDashboard /></ManagerLayout></RequireAuth>} />
+      <Route
+        path="/admin/*"
+        element={(
+          <RequireAuth allowedRoles={['admin']}>
+            <AdminLayout />
+          </RequireAuth>
+        )}
+      >
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="projects" element={<AdminProjects />} />
+        <Route path="reviews" element={<AdminReviews />} />
+        <Route path="users" element={<AdminUsers />} />
+        <Route path="settings" element={<AdminSettings />} />
+        <Route path="review" element={<ReviewQueue />} />
+      </Route>
+      <Route
+        path="/manager/*"
+        element={(
+          <RequireAuth allowedRoles={['manager']}>
+            <ManagerLayout />
+          </RequireAuth>
+        )}
+      >
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<ManagerDashboard />} />
+        <Route path="review" element={<ReviewQueue />} />
+      </Route>
       <Route path="/worker/dashboard" element={<RequireAuth roles={['worker']}><WorkerLayout><WorkerDashboard /></WorkerLayout></RequireAuth>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

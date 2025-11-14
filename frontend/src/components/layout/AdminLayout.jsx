@@ -1,4 +1,5 @@
 import React from 'react'
+import { Outlet } from 'react-router-dom'
 import { Box, useMediaQuery } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import AdminSidebar from './AdminSidebar.jsx'
@@ -6,7 +7,7 @@ import AdminHeader from './AdminHeader.jsx'
 
 const DRAWER_WIDTH = 260
 
-export default function AdminLayout({ children }) {
+export default function AdminLayout() {
   const theme = useTheme()
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'))
   const [mobileOpen, setMobileOpen] = React.useState(false)
@@ -32,7 +33,7 @@ export default function AdminLayout({ children }) {
       <Box component="main" sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <AdminHeader onMenuClick={!isDesktop ? handleToggleSidebar : undefined} />
         <Box sx={{ flexGrow: 1, px: { xs: 2, md: 3 }, py: { xs: 2, md: 3 } }}>
-          {children}
+          <Outlet />
         </Box>
       </Box>
     </Box>
