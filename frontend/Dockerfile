@@ -23,6 +23,7 @@ FROM nginx:alpine
 
 # Copiar archivos estáticos generados
 COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/public /usr/share/nginx/html
 
 # Configuración básica de Nginx para SPAs
 RUN echo 'server { \
