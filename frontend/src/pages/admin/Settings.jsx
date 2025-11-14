@@ -1,6 +1,6 @@
 import React from 'react'
 import { Card, CardContent, Typography, TextField, Stack, Button, Alert, Grid, Paper, Box } from '@mui/material'
-import AsyncButton from '../../components/AsyncButton.jsx'
+import AsyncButton from '../../components/common/AsyncButton.jsx'
 import api from '../../utils/api.js'
 
 // Admin Settings: BrandConfig editor

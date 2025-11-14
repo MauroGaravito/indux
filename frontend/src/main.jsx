@@ -1,7 +1,7 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
-import { CssBaseline, AppBar, Toolbar, Typography, Container, Button, Box } from '@mui/material'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { CssBaseline, Container } from '@mui/material'
 import { ThemeProvider, createTheme, responsiveFontSizes } from '@mui/material/styles'
 import useBrandConfig from './hooks/useBrandConfig.js'
 import Login from './pages/Login.jsx'
@@ -12,46 +12,60 @@ import Landing from './pages/Landing.jsx'
 import InductionWizard from './pages/InductionWizard.jsx'
 import ReviewQueue from './pages/ReviewQueue.jsx'
 import SlidesViewer from './pages/SlidesViewer.jsx'
-import AdminLayout from './pages/admin/AdminLayout.jsx'
 import AdminDashboard from './pages/admin/AdminDashboard.jsx'
 import AdminProjects from './pages/admin/Projects.jsx'
 import AdminReviews from './pages/admin/Reviews.jsx'
 import AdminUsers from './pages/admin/Users.jsx'
 import AdminSettings from './pages/admin/Settings.jsx'
-import { useAuthStore } from './store/auth.js'
+import ManagerDashboard from './pages/manager/ManagerDashboard.jsx'
+import WorkerDashboard from './pages/worker/WorkerDashboard.jsx'
+import AppNav from './layout/AppNav.jsx'
+import MainLayout from './components/layout/MainLayout.jsx'
+import AdminLayout from './components/layout/AdminLayout.jsx'
+import ManagerLayout from './components/layout/ManagerLayout.jsx'
+import WorkerLayout from './components/layout/WorkerLayout.jsx'
+import { useAuthStore } from './context/authStore.js'
 
-function Nav({ brand }) {
-  const { user, logout } = useAuthStore()
-  const dashboardPath = user?.role === 'admin' ? '/admin' : user?.role === 'manager' ? '/review' : user ? '/wizard' : '/login'
-  const brandName = brand?.companyName || 'Indux'
-  const logoUrl = brand?.logoUrl || ''
+function getDashboardPath(user) {
+  if (!user) return '/login'
+  if (user.role === 'admin') return '/admin/dashboard'
+  if (user.role === 'manager') return '/manager/dashboard'
+  return '/worker/dashboard'
+}
+
+function RequireAuth({ children, roles }) {
+  const { user } = useAuthStore()
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+  if (roles?.length && !roles.includes(user.role)) {
+    return <Navigate to="/" replace />
+  }
+  return children
+}
+
+function AppRoutes() {
+  const { user } = useAuthStore()
+  const dashboardPath = getDashboardPath(user)
+
   return (
-    <AppBar position="static">
-      <Toolbar>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1 }}>
-          {logoUrl ? (
-            <Box component="img" src={logoUrl} alt={brandName} sx={{ height: 28, width: 'auto', borderRadius: 0.5, bgcolor: 'rgba(255,255,255,0.12)' }} />
-          ) : null}
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>{brandName}</Typography>
-        </Box>
-        <Button color="inherit" component={Link} to="/">Home</Button>
-        <Button color="inherit" component={Link} to={dashboardPath}>Dashboard</Button>
-        {user?.role !== 'worker' && (
-          <Button color="inherit" component={Link} to="/review">Review</Button>
-        )}
-        {user?.role === 'admin' && (
-          <Button color="inherit" component={Link} to="/admin">Admin</Button>
-        )}
-        {!user && (
-          <Button color="inherit" component={Link} to="/register">Register</Button>
-        )}
-        {user ? (
-          <Button color="inherit" onClick={logout}>Logout</Button>
-        ) : (
-          <Button color="inherit" component={Link} to="/login">Login</Button>
-        )}
-      </Toolbar>
-    </AppBar>
+    <Routes>
+      <Route path="/" element={!user ? <Landing /> : <Navigate to={dashboardPath} replace />} />
+      <Route path="/login" element={!user ? <Login /> : <Navigate to={dashboardPath} replace />} />
+      <Route path="/register" element={!user ? <Register /> : <Navigate to={dashboardPath} replace />} />
+      <Route path="/pending" element={<Pending />} />
+      <Route path="/wizard" element={<RequireAuth><InductionWizard /></RequireAuth>} />
+      <Route path="/review" element={<RequireAuth roles={['admin', 'manager']}><ManagerLayout><ReviewQueue /></ManagerLayout></RequireAuth>} />
+      <Route path="/slides-viewer" element={<SlidesViewer />} />
+      <Route path="/admin/dashboard" element={<RequireAuth roles={['admin']}><AdminLayout><AdminDashboard /></AdminLayout></RequireAuth>} />
+      <Route path="/admin/projects" element={<RequireAuth roles={['admin']}><AdminLayout><AdminProjects /></AdminLayout></RequireAuth>} />
+      <Route path="/admin/reviews" element={<RequireAuth roles={['admin']}><AdminLayout><AdminReviews /></AdminLayout></RequireAuth>} />
+      <Route path="/admin/users" element={<RequireAuth roles={['admin']}><AdminLayout><AdminUsers /></AdminLayout></RequireAuth>} />
+      <Route path="/admin/settings" element={<RequireAuth roles={['admin']}><AdminLayout><AdminSettings /></AdminLayout></RequireAuth>} />
+      <Route path="/manager/dashboard" element={<RequireAuth roles={['manager']}><ManagerLayout><ManagerDashboard /></ManagerLayout></RequireAuth>} />
+      <Route path="/worker/dashboard" element={<RequireAuth roles={['worker']}><WorkerLayout><WorkerDashboard /></WorkerLayout></RequireAuth>} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 
@@ -59,35 +73,14 @@ function App({ brand }) {
   return (
     <BrowserRouter>
       <CssBaseline />
-      <Nav brand={brand} />
-      <Container maxWidth={false} disableGutters sx={{ mt: 2, px: { xs: 2, md: 3 } }}>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/wizard" element={<InductionWizard />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/pending" element={<Pending />} />
-          <Route path="/review" element={<ReviewQueue />} />
-          <Route path="/slides-viewer" element={<SlidesViewer />} />
-          <Route path="/admin" element={<AdminGuard><AdminLayout /></AdminGuard>}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="projects" element={<AdminProjects />} />
-            <Route path="reviews" element={<AdminReviews />} />
-            <Route path="users" element={<AdminUsers />} />
-            <Route path="settings" element={<AdminSettings />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Container>
+      <AppNav brand={brand} />
+      <MainLayout>
+        <Container maxWidth={false} disableGutters sx={{ mt: 2, px: { xs: 2, md: 3 } }}>
+          <AppRoutes />
+        </Container>
+      </MainLayout>
     </BrowserRouter>
   )
-}
-
-function AdminGuard({ children }) {
-  const { user } = useAuthStore()
-  if (!user) return <Navigate to="/login" replace />
-  if (user.role !== 'admin') return <Navigate to="/" replace />
-  return children
 }
 
 function ThemedRoot() {

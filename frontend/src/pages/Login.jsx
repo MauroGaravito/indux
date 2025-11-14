@@ -3,8 +3,8 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { TextField, Stack, Typography, Alert } from '@mui/material'
-import AsyncButton from '../components/AsyncButton.jsx'
-import { useAuthStore } from '../store/auth.js'
+import AsyncButton from '../components/common/AsyncButton.jsx'
+import { useAuthStore } from '../context/authStore.js'
 import { useNavigate, useLocation } from 'react-router-dom'
 
 const schema = z.object({
@@ -42,9 +42,9 @@ export default function Login() {
       setError('root', { message: reason })
     } else {
       const role = useAuthStore.getState().user?.role
-      if (role === 'admin') navigate('/admin')
-      else if (role === 'manager') navigate('/review')
-      else navigate('/')
+      if (role === 'admin') navigate('/admin/dashboard')
+      else if (role === 'manager') navigate('/manager/dashboard')
+      else navigate('/worker/dashboard')
     }
   }
 

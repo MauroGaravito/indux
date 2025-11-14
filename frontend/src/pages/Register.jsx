@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Stack, TextField, Typography, Alert } from '@mui/material'
-import AsyncButton from '../components/AsyncButton.jsx'
+import AsyncButton from '../components/common/AsyncButton.jsx'
 import api from '../utils/api.js'
 
 const schema = z.object({

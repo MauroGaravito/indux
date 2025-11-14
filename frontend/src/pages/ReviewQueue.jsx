@@ -14,9 +14,9 @@ import ImageIcon from '@mui/icons-material/Image'
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
 import api from '../utils/api.js'
 import { presignGet } from '../utils/upload.js'
-import AsyncButton from '../components/AsyncButton.jsx'
-import { useAuthStore } from '../store/auth.js'
-import { notifyError, notifySuccess } from '../notifications/store.js'
+import AsyncButton from '../components/common/AsyncButton.jsx'
+import { useAuthStore } from '../context/authStore.js'
+import { notifyError, notifySuccess } from '../context/notificationStore.js'
 
 function StatusChip({ status }) {
   const color = status === 'approved' ? 'success' : status === 'declined' ? 'error' : status === 'cancelled' ? 'default' : 'warning'

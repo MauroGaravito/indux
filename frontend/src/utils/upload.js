@@ -1,5 +1,5 @@
 import api from './api.js'
-import { notifyError, notifyInfo, notifySuccess } from '../notifications/store'
+import { notifyError, notifyInfo, notifySuccess } from '../context/notificationStore.js'
 
 export async function presign(prefix='uploads/') {
   // Normalize: no leading '/', ensure trailing '/'

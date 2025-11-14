@@ -31,11 +31,11 @@ import {
 } from '@mui/material'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 
-import SignaturePad from '../components/SignaturePad.jsx'
-import { useAuthStore } from '../store/auth.js'
+import SignaturePad from '../components/forms/SignaturePad.jsx'
+import { useAuthStore } from '../context/authStore.js'
 import api from '../utils/api.js'
 import { uploadFile, presignGet } from '../utils/upload.js'
-import AsyncButton from '../components/AsyncButton.jsx'
+import AsyncButton from '../components/common/AsyncButton.jsx'
 
 // =========================================================
 // DynamicField: renderiza campos del bloque Personal Details

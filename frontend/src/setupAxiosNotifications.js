@@ -1,9 +1,9 @@
 // Global Axios interceptors to surface success/errors via notifications
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { notifyError, notifySuccess } from './notifications/store'
-import NotificationCenter from './components/NotificationCenter'
-import api from './utils/api'
+import { notifyError, notifySuccess } from './context/notificationStore.js'
+import NotificationCenter from './components/common/NotificationCenter.jsx'
+import api from './utils/api.js'
 
 // Simple heuristic: surface success toast for mutating methods if response ok
 const successMethods = new Set(['post', 'put', 'patch', 'delete'])
