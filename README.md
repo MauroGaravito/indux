@@ -9,6 +9,26 @@ Incluye:
 
 ---
 
+## Actualizaciones recientes (2025-11-15)
+
+- **Frontend – Reorganización y componentes base (Fase 1)**  
+  - `src` ahora se estructura en `pages/`, `components/common|layout|forms|tables`, `hooks/`, `context/`, `layout/`, `utils/`, `theme/`.  
+  - Componentes reutilizables (`DUSButton`, `DUSTable`, `DUSCard`, etc.) y layouts base (`MainLayout`, `AdminLayout`, `ManagerLayout`, `WorkerLayout`) fueron creados para escalar sin tocar lógica de negocio.
+- **Frontend – Theme Moderno (Fase 2)**  
+  - Se añadió `src/theme/` con `baseTheme`, `modernTheme` y overrides globales (palette #6366F1, tipografía Inter, botones, inputs, tablas, cards).  
+  - `ThemeProvider` usa `modernTheme` y `CssBaseline` centralizado, preparando la UI para variantes de marca futuras.
+- **Frontend – Layouts y rutas (Fase 3)**  
+  - `AdminLayout`, `ManagerLayout` y `WorkerLayout` ahora incluyen sidebar responsivo + header con estado móvil/desktop, usando `Outlet` para las páginas hijas.  
+  - `ReviewQueue` se sirve bajo `/admin/review` y `/manager/review`. También se añadieron placeholders (`ManagerProjects`, `ManagerSettings`, `WorkerInductions`, `WorkerCertificates`, `WorkerSettings`).  
+  - `AppNav` y todas las sidebars muestran el logo global (`src/assets/indux-logo.png`) y respetan el branding definido.
+- **Branding y assets**  
+  - El favicon oficial vive en `public/indux-icon.png`; `index.html` lo referencia y el Dockerfile copia `/public` dentro de la imagen de Nginx para servirlo.  
+  - Se eliminó la copia redundante del ícono dentro de `src/assets/`.  
+  - El Caddyfile (producción) se actualizó para enrutar `/indux-icon.png` al frontend antes que al proxy de MinIO, evitando respuestas 403.
+- **Infra & Deploy**  
+  - Dockerfile multi-stage: después de `npm run build`, copia tanto `/dist` como `/public` a `/usr/share/nginx/html`.  
+  - Mantener `VITE_API_URL` como `ARG` durante el build y reutilizar la red `shared_caddy_net` para Caddy/Dokploy.
+
 ## Actualizaciones recientes (2025-11-08)
 
 - Review (Manager/Admin)
