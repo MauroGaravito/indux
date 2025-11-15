@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import { Box, Grid, Card, CardContent, Typography, Button, Stack, TextField, MenuItem, Divider, Tabs, Tab, List, ListItemButton, ListItemIcon, ListItemText, CardHeader, Dialog } from '@mui/material'
+import { Box, Grid, Card, CardContent, Typography, Button, Stack, TextField, MenuItem, Tabs, Tab, List, ListItemButton, ListItemIcon, ListItemText, CardHeader, Dialog } from '@mui/material'
 import api from '../../utils/api.js'
 import AsyncButton from '../../components/common/AsyncButton.jsx'
 import ProjectInfoSection from '../../components/forms/admin/ProjectInfoSection.jsx'
 import PersonalDetailsSection from '../../components/forms/admin/PersonalDetailsSection.jsx'
 import SlidesSection from '../../components/forms/admin/SlidesSection.jsx'
 import QuestionsSection from '../../components/forms/admin/QuestionsSection.jsx'
-import FolderIcon from '@mui/icons-material/Folder'
+import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import GroupIcon from '@mui/icons-material/Group'
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
 import SaveIcon from '@mui/icons-material/Save'
@@ -175,6 +175,14 @@ export default function Projects() {
   }
 
   const accent = '#1976d2'
+  const cardStyles = {
+    borderRadius: 3,
+    p: 3,
+    backgroundColor: '#fff',
+    border: '1px solid',
+    borderColor: 'divider',
+    boxShadow: '0 20px 45px rgba(15, 23, 42, 0.04)'
+  }
 
   // Track unsaved changes comparing config vs initialConfig
   useEffect(() => {
@@ -190,52 +198,66 @@ export default function Projects() {
 
   return (
     <>
-    <Grid container spacing={2}>
-      <Grid item xs={12} md={4}>
-        <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-          <CardHeader title={<Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Projects</Typography>} />
-          <CardContent>
-            <List sx={{ mb: 1 }}>
-              {projects.map(p => {
-                const selected = selectedId===p._id
-                return (
-                  <ListItemButton key={p._id} selected={selected} onClick={()=> onSelect(p._id)} sx={{ borderRadius: 1 }}>
-                    <ListItemIcon sx={{ minWidth: 36, color: selected ? accent : 'action.active' }}>
-                      <FolderIcon />
-                    </ListItemIcon>
-                    <ListItemText primary={p.name} primaryTypographyProps={{ fontWeight: selected ? 600 : 400 }} />
-                  </ListItemButton>
-                )
-              })}
-              {!projects.length && <Typography variant="body2" sx={{ opacity: 0.7, px: 2, py: 1 }}>No projects yet.</Typography>}
-            </List>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>Create Project</Typography>
-            <Grid container spacing={1}>
-              <Grid item xs={12} sm={6}>
+      <Grid container spacing={3} alignItems="stretch">
+        <Grid item xs={12} md={4}>
+          <Stack spacing={3}>
+            <Card elevation={0} sx={cardStyles}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Projects</Typography>
+              <List sx={{ p: 0, m: 0 }}>
+                {projects.map(p => {
+                  const selected = selectedId===p._id
+                  return (
+                    <ListItemButton
+                      key={p._id}
+                      selected={selected}
+                      onClick={()=> onSelect(p._id)}
+                      sx={{
+                        borderRadius: 2,
+                        mb: 1.5,
+                        px: 2,
+                        py: 1.5,
+                        border: '1px solid',
+                        borderColor: selected ? 'primary.main' : 'grey.200',
+                        backgroundColor: selected ? 'rgba(25, 118, 210, 0.08)' : '#fff',
+                        transition: 'all 0.2s ease',
+                        '&:hover': { backgroundColor: 'rgba(25, 118, 210, 0.08)', borderColor: 'primary.main' },
+                        '&.Mui-selected': { backgroundColor: 'rgba(25, 118, 210, 0.12)', borderColor: 'primary.main' },
+                        '&.Mui-selected:hover': { backgroundColor: 'rgba(25, 118, 210, 0.16)' }
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 36, color: selected ? 'primary.main' : 'text.secondary' }}>
+                        <FolderOutlinedIcon />
+                      </ListItemIcon>
+                      <ListItemText primary={p.name} primaryTypographyProps={{ fontWeight: 500 }} />
+                    </ListItemButton>
+                  )
+                })}
+              </List>
+              {!projects.length && (
+                <Box sx={{ textAlign: 'center', color: 'text.secondary', py: 4 }}>
+                  <Typography variant="body2">No projects yet.</Typography>
+                </Box>
+              )}
+            </Card>
+            <Card elevation={0} sx={cardStyles}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Create Project</Typography>
+              <Stack spacing={2}>
                 <TextField
-                  size="small"
                   fullWidth
                   label="Name"
                   placeholder="Project name"
                   value={name}
                   onChange={e=> setName(e.target.value)}
                 />
-              </Grid>
-              <Grid item xs={12} sm={6}>
                 <TextField
-                  size="small"
                   fullWidth
                   label="Description"
                   placeholder="Short description"
                   value={desc}
                   onChange={e=> setDesc(e.target.value)}
                 />
-              </Grid>
-              {isAdmin && (
-                <Grid item xs={12}>
+                {isAdmin && (
                   <TextField
-                    size="small"
                     select
                     fullWidth
                     label="Project Manager"
@@ -247,99 +269,117 @@ export default function Projects() {
                       <MenuItem key={u._id} value={u._id}>{u.name} ({u.email})</MenuItem>
                     ))}
                   </TextField>
-                </Grid>
-              )}
-              <Grid item xs={12}>
-                <AsyncButton startIcon={<AddCircleOutlineIcon />} sx={{ mt: 0.5, textTransform: 'none' }} variant="contained" onClick={createProject} disabled={!name}>Create</AsyncButton>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
-      </Grid>
-      <Grid item xs={12} md={8}>
-        <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-          <CardContent>
-            <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={1}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Edit Project</Typography>
-              <Stack direction="row" spacing={1}>
-                <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveConfig} disabled={!selectedId || !hasUnsavedChanges} sx={{ textTransform: 'none' }}>Save</AsyncButton>
-                <AsyncButton startIcon={<SendIcon />} variant="contained" onClick={sendForReview} disabled={!selectedId || (hasPendingReview && !hasUnsavedChanges)} sx={{ textTransform: 'none', bgcolor: accent }} title={(hasPendingReview && !hasUnsavedChanges) ? 'This project is already pending review.' : ''}>
-                  {hasPendingReview && hasUnsavedChanges ? 'Resend Updated Version' : 'Send For Review'}
-                </AsyncButton>
-                {isAdmin && !!selectedId && (
-                  <Button startIcon={<DeleteForeverIcon />} color="error" variant="outlined" onClick={confirmDelete} sx={{ textTransform: 'none' }}>
-                    Delete Project
-                  </Button>
                 )}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <AsyncButton
+                    startIcon={<AddCircleOutlineIcon />}
+                    variant="contained"
+                    size="large"
+                    onClick={createProject}
+                    disabled={!name}
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Create
+                  </AsyncButton>
+                </Box>
               </Stack>
-            </Stack>
-            {selectedId ? (
-              <Box sx={{ mt: 2 }}>
-                <Tabs value={tab} onChange={(_,v)=> setTab(v)} sx={{ borderBottom: '1px solid #eee', '& .MuiTabs-indicator': { backgroundColor: accent } }}>
-                  <Tab icon={<InfoIcon />} iconPosition="start" label="Project Info" sx={{ '&.Mui-selected': { color: accent } }} />
-                  <Tab icon={<PersonIcon />} iconPosition="start" label="Personal Details" sx={{ '&.Mui-selected': { color: accent } }} />
-                  <Tab icon={<SlideshowIcon />} iconPosition="start" label="Slides" sx={{ '&.Mui-selected': { color: accent } }} />
-                  <Tab icon={<QuizIcon />} iconPosition="start" label="Questions" sx={{ '&.Mui-selected': { color: accent } }} />
-                  <Tab icon={<GroupIcon />} iconPosition="start" label="Assigned Users" sx={{ '&.Mui-selected': { color: accent } }} />
-                </Tabs>
-                <Box sx={{ mt: 2 }} hidden={tab!==0}>
-                  <ProjectInfoSection value={config.projectInfo} onChange={(val)=> setConfig({ ...config, projectInfo: val })} />
-                  {/* Managers List */}
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Managers</Typography>
-                    {managers && managers.length ? (
-                      <List dense>
-                        {managers.map((m) => (
-                          <ListItemButton key={m._id} sx={{ cursor: 'default' }}>
-                            <ListItemIcon sx={{ minWidth: 36 }}><PersonIcon /></ListItemIcon>
-                            <ListItemText primary={m.name || m.email || m._id} secondary={m.email || ''} />
-                          </ListItemButton>
-                        ))}
-                      </List>
-                    ) : (
-                      <Typography variant="body2" sx={{ opacity: 0.7 }}>No managers assigned.</Typography>
-                    )}
-                  </Box>
-                </Box>
-                <Box sx={{ mt: 2 }} hidden={tab!==1}>
-                  <PersonalDetailsSection value={config.personalDetails} onChange={(val)=> setConfig({ ...config, personalDetails: val })} />
-                </Box>
-                <Box sx={{ mt: 2 }} hidden={tab!==2}>
-                  <SlidesSection value={config.slides} onChange={(val)=> setConfig({ ...config, slides: val })} />
-                </Box>
-                <Box sx={{ mt: 2 }} hidden={tab!==3}>
-                  <QuestionsSection value={config.questions} onChange={(val)=> setConfig({ ...config, questions: val })} />
-                </Box>
-                <Box sx={{ mt: 2 }} hidden={tab!==4}>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                    <GroupIcon color="action" />
-                    <Typography variant="subtitle2">Assigned Users</Typography>
-                    <Box sx={{ flex: 1 }} />
-                    <Button variant="contained" onClick={openAssign} sx={{ textTransform: 'none' }}>{isAdmin ? 'Assign Manager' : 'Assign Worker'}</Button>
-                  </Stack>
-                  <List>
-                    {assignments.map((a) => (
-                      <ListItemButton key={a._id} sx={{ borderRadius: 1 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}><PersonIcon /></ListItemIcon>
-                        <ListItemText primary={`${a?.user?.name || a?.user} - ${a.role}`} secondary={a?.user?.email || ''} />
-                        <Button color="error" onClick={()=> removeAssignment(a._id)}>Remove</Button>
-                      </ListItemButton>
-                    ))}
-                  </List>
-                  {!assignments.length && (
-                    <Typography variant="body2" sx={{ opacity: 0.7 }}>No users assigned to this project.</Typography>
+            </Card>
+          </Stack>
+        </Grid>
+        <Grid item xs={12} md={8}>
+          <Card elevation={0} sx={cardStyles}>
+            <Stack spacing={3}>
+              <Stack direction={{ xs:'column', md:'row' }} spacing={2} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between">
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>Edit Project</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: { xs: 'flex-start', md: 'flex-end' }, width: { xs: '100%', md: 'auto' } }}>
+                  <AsyncButton startIcon={<SaveIcon />} variant="contained" color="primary" size="large" onClick={saveConfig} disabled={!selectedId || !hasUnsavedChanges} sx={{ textTransform: 'none' }}>Save</AsyncButton>
+                  <AsyncButton
+                    startIcon={<SendIcon />}
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    onClick={sendForReview}
+                    disabled={!selectedId || (hasPendingReview && !hasUnsavedChanges)}
+                    sx={{ textTransform: 'none' }}
+                    title={(hasPendingReview && !hasUnsavedChanges) ? 'This project is already pending review.' : ''}
+                  >
+                    {hasPendingReview && hasUnsavedChanges ? 'Resend Updated Version' : 'Send For Review'}
+                  </AsyncButton>
+                  {isAdmin && !!selectedId && (
+                    <Button startIcon={<DeleteForeverIcon />} color="error" variant="outlined" onClick={confirmDelete} sx={{ textTransform: 'none' }}>
+                      Delete Project
+                    </Button>
                   )}
                 </Box>
-              </Box>
-            ) : (
-              <Typography variant="body2" sx={{ mt: 2, opacity: 0.7 }}>Select a project to edit.</Typography>
-            )}
-          </CardContent>
-        </Card>
+              </Stack>
+              {selectedId ? (
+                <>
+                  <Tabs value={tab} onChange={(_,v)=> setTab(v)} sx={{ borderBottom: '1px solid', borderColor: 'grey.200', '& .MuiTabs-indicator': { backgroundColor: accent } }}>
+                    <Tab icon={<InfoIcon />} iconPosition="start" label="Project Info" sx={{ '&.Mui-selected': { color: accent } }} />
+                    <Tab icon={<PersonIcon />} iconPosition="start" label="Personal Details" sx={{ '&.Mui-selected': { color: accent } }} />
+                    <Tab icon={<SlideshowIcon />} iconPosition="start" label="Slides" sx={{ '&.Mui-selected': { color: accent } }} />
+                    <Tab icon={<QuizIcon />} iconPosition="start" label="Questions" sx={{ '&.Mui-selected': { color: accent } }} />
+                    <Tab icon={<GroupIcon />} iconPosition="start" label="Assigned Users" sx={{ '&.Mui-selected': { color: accent } }} />
+                  </Tabs>
+                  <Box sx={{ mt: 3 }} hidden={tab!==0}>
+                    <ProjectInfoSection value={config.projectInfo} onChange={(val)=> setConfig({ ...config, projectInfo: val })} />
+                    <Box sx={{ mt: 3 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 1 }}>Managers</Typography>
+                      {managers && managers.length ? (
+                        <List dense>
+                          {managers.map((m) => (
+                            <ListItemButton key={m._id} sx={{ cursor: 'default', borderRadius: 1 }}>
+                              <ListItemIcon sx={{ minWidth: 36 }}><PersonIcon /></ListItemIcon>
+                              <ListItemText primary={m.name || m.email || m._id} secondary={m.email || ''} />
+                            </ListItemButton>
+                          ))}
+                        </List>
+                      ) : (
+                        <Typography variant="body2" sx={{ opacity: 0.7 }}>No managers assigned.</Typography>
+                      )}
+                    </Box>
+                  </Box>
+                  <Box sx={{ mt: 3 }} hidden={tab!==1}>
+                    <PersonalDetailsSection value={config.personalDetails} onChange={(val)=> setConfig({ ...config, personalDetails: val })} />
+                  </Box>
+                  <Box sx={{ mt: 3 }} hidden={tab!==2}>
+                    <SlidesSection value={config.slides} onChange={(val)=> setConfig({ ...config, slides: val })} />
+                  </Box>
+                  <Box sx={{ mt: 3 }} hidden={tab!==3}>
+                    <QuestionsSection value={config.questions} onChange={(val)=> setConfig({ ...config, questions: val })} />
+                  </Box>
+                  <Box sx={{ mt: 3 }} hidden={tab!==4}>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                      <GroupIcon color="action" />
+                      <Typography variant="subtitle2">Assigned Users</Typography>
+                      <Box sx={{ flex: 1 }} />
+                      <Button variant="contained" onClick={openAssign} sx={{ textTransform: 'none' }}>{isAdmin ? 'Assign Manager' : 'Assign Worker'}</Button>
+                    </Stack>
+                    <List>
+                      {assignments.map((a) => (
+                        <ListItemButton key={a._id} sx={{ borderRadius: 1 }}>
+                          <ListItemIcon sx={{ minWidth: 36 }}><PersonIcon /></ListItemIcon>
+                          <ListItemText primary={`${a?.user?.name || a?.user} - ${a.role}`} secondary={a?.user?.email || ''} />
+                          <Button color="error" onClick={()=> removeAssignment(a._id)}>Remove</Button>
+                        </ListItemButton>
+                      ))}
+                    </List>
+                    {!assignments.length && (
+                      <Typography variant="body2" sx={{ opacity: 0.7 }}>No users assigned to this project.</Typography>
+                    )}
+                  </Box>
+                </>
+              ) : (
+                <Box sx={{ mt: 2, minHeight: 260, borderRadius: 2, border: '1px dashed', borderColor: 'divider', backgroundColor: 'grey.50', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: 'text.secondary' }}>
+                  <Typography variant="body1">Select a project to edit.</Typography>
+                </Box>
+              )}
+            </Stack>
+          </Card>
+        </Grid>
       </Grid>
-    </Grid>
 
-    {/* Assign Modal */}
+      {/* Assign Modal */}
     <Dialog open={assignOpen} onClose={closeAssign} maxWidth="sm" fullWidth>
       <CardHeader title={<Typography variant="subtitle1">{isAdmin ? 'Assign Project Manager' : 'Assign Worker to Project'}</Typography>} />
       <CardContent>
@@ -387,3 +427,4 @@ export default function Projects() {
     </>
   )
 }
+
