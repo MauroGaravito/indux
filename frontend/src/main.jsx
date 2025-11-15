@@ -1,6 +1,6 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { CssBaseline, Container } from '@mui/material'
 import { ThemeProvider } from '@mui/material/styles'
 import useBrandConfig from './hooks/useBrandConfig.js'
@@ -24,8 +24,8 @@ import WorkerDashboard from './pages/worker/WorkerDashboard.jsx'
 import WorkerInductions from './pages/worker/WorkerInductions.jsx'
 import WorkerCertificates from './pages/worker/WorkerCertificates.jsx'
 import WorkerSettings from './pages/worker/WorkerSettings.jsx'
-import AppNav from './layout/AppNav.jsx'
 import MainLayout from './components/layout/MainLayout.jsx'
+import LoginLayout from './components/layout/LoginLayout.jsx'
 import AdminLayout from './components/layout/AdminLayout.jsx'
 import ManagerLayout from './components/layout/ManagerLayout.jsx'
 import WorkerLayout from './components/layout/WorkerLayout.jsx'
@@ -58,9 +58,30 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={!user ? <Landing /> : <Navigate to={dashboardPath} replace />} />
-      <Route path="/login" element={!user ? <Login /> : <Navigate to={dashboardPath} replace />} />
-      <Route path="/register" element={!user ? <Register /> : <Navigate to={dashboardPath} replace />} />
-      <Route path="/pending" element={<Pending />} />
+      <Route
+        path="/login"
+        element={!user ? (
+          <LoginLayout>
+            <Login />
+          </LoginLayout>
+        ) : <Navigate to={dashboardPath} replace />}
+      />
+      <Route
+        path="/register"
+        element={!user ? (
+          <LoginLayout>
+            <Register />
+          </LoginLayout>
+        ) : <Navigate to={dashboardPath} replace />}
+      />
+      <Route
+        path="/pending"
+        element={(
+          <LoginLayout>
+            <Pending />
+          </LoginLayout>
+        )}
+      />
       <Route path="/wizard" element={<RequireAuth><InductionWizard /></RequireAuth>} />
       <Route path="/slides-viewer" element={<SlidesViewer />} />
       <Route
@@ -112,15 +133,28 @@ function AppRoutes() {
   )
 }
 
+function AppShell({ brand }) {
+  const location = useLocation()
+  const minimalRoutes = ['/login', '/register', '/pending']
+  const isMinimalRoute = minimalRoutes.includes(location.pathname)
+
+  if (isMinimalRoute) {
+    return <AppRoutes />
+  }
+
+  return (
+    <MainLayout brand={brand}>
+      <Container maxWidth={false} disableGutters sx={{ mt: 2, px: { xs: 2, md: 3 } }}>
+        <AppRoutes />
+      </Container>
+    </MainLayout>
+  )
+}
+
 function App({ brand }) {
   return (
     <BrowserRouter>
-      <AppNav brand={brand} />
-      <MainLayout>
-        <Container maxWidth={false} disableGutters sx={{ mt: 2, px: { xs: 2, md: 3 } }}>
-          <AppRoutes />
-        </Container>
-      </MainLayout>
+      <AppShell brand={brand} />
     </BrowserRouter>
   )
 }

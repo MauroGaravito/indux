@@ -2,10 +2,11 @@ import React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { TextField, Stack, Typography, Alert } from '@mui/material'
+import { TextField, Stack, Typography, Alert, Card, Box } from '@mui/material'
 import AsyncButton from '../components/common/AsyncButton.jsx'
 import { useAuthStore } from '../context/authStore.js'
 import { useNavigate, useLocation } from 'react-router-dom'
+import logo from '../assets/indux-logo.png'
 
 const schema = z.object({
   email: z.string().trim().min(3).refine(v => v.includes('@'), { message: 'Invalid email' }),
@@ -49,14 +50,30 @@ export default function Login() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <Stack spacing={2} maxWidth={400}>
-        <Typography variant="h5">Login</Typography>
+    <Card elevation={4} sx={{ p: 4, borderRadius: 3 }}>
+      <Stack component="form" spacing={3} onSubmit={handleSubmit(onSubmit)}>
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+          <Box component="img" src={logo} alt="Indux logo" sx={{ height: 40 }} />
+        </Box>
+        <Typography variant="h5" align="center" sx={{ fontWeight: 600 }}>Login</Typography>
         {errors.root && <Alert severity="error">{errors.root.message}</Alert>}
-        <TextField label="Email" type="email" {...register('email')} error={!!errors.email} helperText={errors.email?.message} />
-        <TextField label="Password" type="password" {...register('password')} error={!!errors.password} helperText={errors.password?.message} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSubmit(onSubmit)() } }} />
+        <TextField label="Email" type="email" {...register('email')} error={!!errors.email} helperText={errors.email?.message} fullWidth />
+        <TextField
+          label="Password"
+          type="password"
+          {...register('password')}
+          error={!!errors.password}
+          helperText={errors.password?.message}
+          fullWidth
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              handleSubmit(onSubmit)()
+            }
+          }}
+        />
         <AsyncButton type="submit" variant="contained" onClick={handleSubmit(onSubmit)}>Login</AsyncButton>
       </Stack>
-    </form>
+    </Card>
   )
 }
