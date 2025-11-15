@@ -9,6 +9,29 @@ Incluye:
 
 ---
 
+## Actualizaciones recientes (2025-11-15 - UI Refresh & Branding)
+
+- **Autenticación / Layouts**
+  - Nuevo `LoginLayout` minimalista y rutas `/login|/register|/pending` sin `AppNav`. El formulario de Login ahora muestra logo, card centrada y redirecciones según rol.
+- **Manager Experience**
+  - `ManagerDashboard` renovado con métricas en vivo, tabla de actividad y pipeline de revisiones (`/submissions`, `/reviews/projects`, `/projects`, `/users`).
+  - `ManagerProjects` convertido en panel enterprise: lista de proyectos, detalle tabulado (Overview/Team/Activity) y acciones con estados.
+  - `ManagerSettings` actualizado con cards (perfil, password, notificaciones) para mantener coherencia visual.
+  - `ReviewQueue` reorganizado en cards y tabs empresariales, reutilizando la misma lógica existente.
+- **Worker Experience**
+  - Dashboard, Inductions, Certificates y Settings modernizados con cards, métricas y datos reales usando solo `/projects` y `/submissions`. Certificates muestra placeholders cuando no hay `certificateKey`.
+  - Ajustes en frontend para que todas las pantallas de worker usen la misma experiencia enterprise y no hagan llamadas con parámetros no soportados.
+- **Admin Dashboard**
+  - Sección “Activity” ahora consume `/projects`, `/submissions`, `/reviews/projects`, `/users` y muestra:
+    - Timeline de actividad combinada.
+    - Snapshot semanal con mini-gráficas.
+    - System Status con métricas clave, todo en cards estilo enterprise.
+- **Admin Settings / Branding**
+  - `AdminSettings.jsx` reorganizado en cuatro cards (Brand Identity, Live Brand Preview, System Information, Future Options) manteniendo los mismos endpoints (`/brand-config`).
+  - Preview muestra cómo quedarían acciones, chips y header con los colores configurados; las opciones futuras están documentadas con TODOs backend.
+- **API**
+  - `GET /submissions` ahora soporta acceso de workers devolviendo solo sus submissions (`routes/submissions.ts`). Manager/Admin conservan la lógica anterior.
+
 ## Actualizaciones recientes (2025-11-15)
 
 - **Frontend – Reorganización y componentes base (Fase 1)**  
