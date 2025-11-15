@@ -372,6 +372,32 @@ export default function ReviewQueue() {
       setDeleteReviewId(null)
     }
   }
+  const deleteSubmission = async (id) => {
+    if (!id || user?.role !== 'admin') return
+    try {
+      const r = await api.delete(`/submissions/${id}`)
+      notifySuccess(r?.data?.message || 'Submission deleted')
+      await load()
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.response?.data?.error || 'Failed to delete submission'
+      notifyError(msg)
+    }
+  }
+  const deleteAllOrphaned = async () => {
+    if (user?.role !== 'admin') return
+    const orphanIds = subs.filter(s => s?.orphaned).map(s => s._id)
+    if (!orphanIds.length) return
+    try {
+      for (const id of orphanIds) {
+        await api.delete(`/submissions/${id}`)
+      }
+      notifySuccess(`Deleted ${orphanIds.length} orphan submissions`)
+      await load()
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.response?.data?.error || 'Failed to delete orphan submissions'
+      notifyError(msg)
+    }
+  }
 
   // Fetch latest project config when viewing a project review
   const viewProjectReview = async (pr) => {
@@ -470,38 +496,55 @@ export default function ReviewQueue() {
 
       {/* Worker Submissions */}
       <Box hidden={tab!==1} sx={{ mt: 3 }}>
+        {user?.role === 'admin' && subs.some(s => s?.orphaned) && (
+          <Alert severity="warning" sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+            <span>⚠ You have {subs.filter(s => s?.orphaned).length} orphan submissions that need cleanup.</span>
+            <AsyncButton size="small" color="error" variant="contained" onClick={deleteAllOrphaned}>Delete All Orphaned</AsyncButton>
+          </Alert>
+        )}
         <Grid container spacing={2}>
-          {subs.map(s => (
-            <Grid key={s._id} item xs={12}>
-              <Card sx={itemCardStyles}>
-                <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={2}>
-                  <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Submission {s._id}</Typography>
-                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                      <StatusChip status={s.status || 'pending'} />
-                      <Typography variant="caption" color="text.secondary">Date: {new Date(s.createdAt).toLocaleString()}</Typography>
-                      {s?.userId && <Typography variant="caption" color="text.secondary">• Worker: {s?.userId?.name || s?.user?.name || ''}</Typography>}
-                      {s?.projectId && <Typography variant="caption" color="text.secondary">• Project: {s?.projectId?.name || ''}</Typography>}
+          {subs.map(s => {
+            const isOrphaned = !!s?.orphaned
+            const isAdmin = user?.role === 'admin'
+            return (
+              <Grid key={s._id} item xs={12}>
+                <Card sx={itemCardStyles}>
+                  <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={2}>
+                    <Box>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Submission {s._id}</Typography>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                        <StatusChip status={s.status || 'pending'} />
+                        {isOrphaned && <Chip size="small" color="error" label="Orphaned (Project removed)" />}
+                        <Typography variant="caption" color="text.secondary">Date: {new Date(s.createdAt).toLocaleString()}</Typography>
+                        {s?.userId && <Typography variant="caption" color="text.secondary">• Worker: {s?.userId?.name || s?.user?.name || ''}</Typography>}
+                        {s?.projectId && <Typography variant="caption" color="text.secondary">• Project: {s?.projectId?.name || ''}</Typography>}
+                      </Stack>
+                    </Box>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      {(!isOrphaned || !isAdmin) && (
+                        <Button size="small" onClick={()=> openView('Submission', s)}>View</Button>
+                      )}
+                      {isOrphaned && isAdmin ? (
+                        <AsyncButton size="small" color="error" variant="contained" startIcon={<DeleteForeverIcon />} onClick={()=> deleteSubmission(s._id)}>
+                          Delete Submission
+                        </AsyncButton>
+                      ) : (
+                        s.status === 'pending' && (
+                          <>
+                            <Button size="small" color="error" variant="outlined" onClick={()=> openDeclineSubmission(s._id)}>Decline</Button>
+                            <AsyncButton size="small" color="success" variant="contained" onClick={()=> approveSubmission(s._id)}>Approve</AsyncButton>
+                          </>
+                        )
+                      )}
                     </Stack>
-                  </Box>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Button size="small" onClick={()=> openView('Submission', s)}>View</Button>
-                    {s.status === 'pending' && (
-                      <>
-                        <Button size="small" color="error" variant="outlined" onClick={()=> openDeclineSubmission(s._id)}>Decline</Button>
-                        <AsyncButton size="small" color="success" variant="contained" onClick={()=> approveSubmission(s._id)}>Approve</AsyncButton>
-                      </>
-                    )}
                   </Stack>
-                </Stack>
-              </Card>
-            </Grid>
-          ))}
+                </Card>
+              </Grid>
+            )
+          })}
         </Grid>
         {!subs.length && <Alert severity="info" sx={{ mt: 2 }}>No pending worker submissions.</Alert>}
-      </Box>
-
-        {/* All Submissions */}
+      </Box>        {/* All Submissions */}
         <Box hidden={tab!==2} sx={{ mt: 3 }}>
           {(() => {
             const counts = allSubs.reduce((acc, s) => { acc.all++; acc[s.status] = (acc[s.status] || 0) + 1; return acc }, { all: 0, pending: 0, approved: 0, declined: 0 })

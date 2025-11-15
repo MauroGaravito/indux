@@ -16,17 +16,31 @@ export interface ListParams {
   status: 'pending'|'approved'|'declined'|'all'
   page?: number
   pageSize?: number
+  projectId?: string
 }
 
 export async function listSubmissions(params: ListParams) {
   const { callerRole, callerId } = params
   const filter: any = {}
   if (params.status !== 'all') filter.status = params.status
+  if (params.projectId) {
+    if (!Types.ObjectId.isValid(params.projectId)) {
+      throw new HttpError(400, 'Invalid project id')
+    }
+    filter.projectId = params.projectId
+  }
 
   if (callerRole === 'manager') {
     const managed = await Assignment.find({ user: callerId, role: 'manager' }).lean()
     const ids = managed.map(a => a.project)
-    filter.projectId = { $in: ids }
+    if (params.projectId) {
+      const allowed = ids.some(p => p?.toString() === params.projectId)
+      if (!allowed) {
+        filter.projectId = { $in: [] }
+      }
+    } else {
+      filter.projectId = { $in: ids }
+    }
   }
 
   const q = Submission.find(filter)
@@ -38,15 +52,31 @@ export async function listSubmissions(params: ListParams) {
   const page = params.page && params.page > 0 ? params.page : undefined
   const pageSize = params.pageSize && params.pageSize > 0 ? params.pageSize : undefined
 
+  const annotateOrphans = async (entries: any[]) => {
+    const ids = Array.from(new Set(entries
+      .map(item => item?.projectId)
+      .filter(Boolean)
+      .map(id => id.toString())))
+    const existing = ids.length
+      ? await Project.find({ _id: { $in: ids } }).select('_id').lean()
+      : []
+    const existingSet = new Set(existing.map(doc => doc._id.toString()))
+    return entries.map(item => {
+      const pid = item?.projectId ? item.projectId.toString() : undefined
+      const projectExists = pid ? existingSet.has(pid) : false
+      return { ...item, orphaned: !projectExists }
+    })
+  }
+
   if (page && pageSize) {
     const [items, total] = await Promise.all([
       q.skip((page - 1) * pageSize).limit(pageSize).lean(),
       Submission.countDocuments(filter)
     ])
-    return { items, total, page, pageSize }
+    return { items: await annotateOrphans(items), total, page, pageSize }
   }
   const items = await q.lean()
-  return { items }
+  return { items: await annotateOrphans(items) }
 }
 
 export async function createSubmission(workerId: string, body: any) {
@@ -101,9 +131,12 @@ export async function declineSubmission(id: string, callerId: string, callerRole
 }
 
 export async function deleteSubmission(id: string) {
-  const existing = await Submission.findById(id)
-  if (!existing) throw new HttpError(404, 'Submission not found')
+  const submission = await Submission.findById(id)
+  if (!submission) throw new HttpError(404, 'Submission not found')
+  const projectExists = submission.projectId
+    ? await Project.exists({ _id: submission.projectId })
+    : null
+  const isOrphaned = !projectExists
   await Submission.findByIdAndDelete(id)
-  return { ok: true, message: 'Submission deleted successfully' }
+  return { ok: true, orphaned: isOrphaned, message: 'Submission deleted' }
 }
-

@@ -1,5 +1,6 @@
 import { Assignment } from '../models/Assignment.js'
 import { Project } from '../models/Project.js'
+import { Submission } from '../models/Submission.js'
 import { ProjectReview } from '../models/ProjectReview.js'
 import { HttpError } from '../middleware/errorHandler.js'
 
@@ -54,6 +55,8 @@ export async function deleteProject(id: string) {
   const existing = await Project.findById(id)
   if (!existing) throw new HttpError(404, 'Project not found')
 
+  // Delete submissions linked to this project
+  await Submission.deleteMany({ projectId: existing._id })
   await Project.findByIdAndDelete(id)
   await Assignment.deleteMany({ project: id })
   try {
@@ -64,4 +67,3 @@ export async function deleteProject(id: string) {
   } catch {}
   return { ok: true, message: 'Project deleted successfully' }
 }
-

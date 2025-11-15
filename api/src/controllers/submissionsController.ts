@@ -18,7 +18,8 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 }
 
 const ListQuery = PaginationQuerySchema.extend({
-  status: z.enum(['pending','approved','declined','all']).default('pending')
+  status: z.enum(['pending','approved','declined','all']).default('pending'),
+  projectId: z.string().optional()
 })
 
 export async function list(req: Request, res: Response, next: NextFunction) {
@@ -31,6 +32,7 @@ export async function list(req: Request, res: Response, next: NextFunction) {
       status: q.data.status,
       page: q.data.page,
       pageSize: q.data.pageSize,
+      projectId: q.data.projectId,
     })
     // Backwards compatible: if no page/pageSize specified, return array only
     if (!q.data.page || !q.data.pageSize) return res.json(result.items)

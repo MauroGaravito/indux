@@ -33,6 +33,7 @@ export default function Projects() {
   const [assignUserId, setAssignUserId] = useState('')
   const [assignRole, setAssignRole] = useState('worker')
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteSubCount, setDeleteSubCount] = useState(0)
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
   const [managers, setManagers] = useState([])
@@ -126,8 +127,18 @@ export default function Projects() {
     }
   }
 
-  const confirmDelete = () => setDeleteOpen(true)
-  const closeDelete = () => setDeleteOpen(false)
+  const confirmDelete = async () => {
+    if (!selectedId) return
+    try {
+      const r = await api.get(`/submissions?projectId=${selectedId}`)
+      const list = Array.isArray(r?.data) ? r.data : []
+      setDeleteSubCount(list.length)
+    } catch {
+      setDeleteSubCount(0)
+    }
+    setDeleteOpen(true)
+  }
+  const closeDelete = () => { setDeleteOpen(false); setDeleteSubCount(0) }
   const doDelete = async () => {
     if (!selectedId) return
     try {
@@ -142,6 +153,7 @@ export default function Projects() {
       notifyError(msg)
     } finally {
       setDeleteOpen(false)
+      setDeleteSubCount(0)
     }
   }
 
@@ -415,13 +427,19 @@ export default function Projects() {
 
     {/* Delete Project Confirmation */}
     <Dialog open={deleteOpen} onClose={closeDelete} maxWidth="xs" fullWidth>
-      <CardHeader title={<Typography variant="subtitle1">Delete Project</Typography>} />
+      <CardHeader title={<Typography variant="subtitle1">{deleteSubCount > 0 ? `This project still has ${deleteSubCount} submissions.` : 'Delete Project'}</Typography>} />
       <CardContent>
-        <Typography variant="body2">Are you sure? This action cannot be undone.</Typography>
+        <Typography variant="body2">
+          {deleteSubCount > 0
+            ? 'Deleting this project will also delete all related submissions. This action cannot be undone.'
+            : 'Are you sure? This action cannot be undone.'}
+        </Typography>
       </CardContent>
       <Stack direction="row" spacing={1} sx={{ px: 2, pb: 2, justifyContent: 'flex-end' }}>
         <Button onClick={closeDelete}>Cancel</Button>
-        <AsyncButton color="error" variant="contained" onClick={doDelete}>Delete</AsyncButton>
+        <AsyncButton color="error" variant="contained" onClick={doDelete}>
+          {deleteSubCount > 0 ? 'Delete Project & Submissions' : 'Delete'}
+        </AsyncButton>
       </Stack>
     </Dialog>
     </>
