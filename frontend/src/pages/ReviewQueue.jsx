@@ -656,7 +656,7 @@ export default function ReviewQueue() {
           <AsyncButton variant="contained" onClick={addWorker} disabled={!addWorkerId || !teamProjectId}>Add</AsyncButton>
         </DialogActions>
       </Dialog>
-    </Stack>
+    </Box>
   )
 }
 
