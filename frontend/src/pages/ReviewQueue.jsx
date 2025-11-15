@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import {
   Alert, Button, Paper, Stack, Typography, Tabs, Tab, Chip, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Grid, Box, Divider, List, ListItem, ListItemText,
-  Table, TableBody, TableCell, TableHead, TableRow, Tooltip, MenuItem
+  Table, TableBody, TableCell, TableHead, TableRow, Tooltip, MenuItem, Card
 } from '@mui/material'
 import GroupIcon from '@mui/icons-material/Group'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
@@ -17,6 +17,21 @@ import { presignGet } from '../utils/upload.js'
 import AsyncButton from '../components/common/AsyncButton.jsx'
 import { useAuthStore } from '../context/authStore.js'
 import { notifyError, notifySuccess } from '../context/notificationStore.js'
+
+const cardStyles = {
+  borderRadius: 3,
+  p: 3,
+  bgcolor: '#fff',
+  boxShadow: '0 8px 30px rgba(15, 23, 42, 0.03)'
+}
+
+const itemCardStyles = {
+  borderRadius: 2,
+  border: '1px solid',
+  borderColor: 'divider',
+  p: 2.5,
+  boxShadow: 'none'
+}
 
 function StatusChip({ status }) {
   const color = status === 'approved' ? 'success' : status === 'declined' ? 'error' : status === 'cancelled' ? 'default' : 'warning'
@@ -406,27 +421,31 @@ export default function ReviewQueue() {
   }
 
   return (
-    <Stack spacing={2}>
-      <Typography variant="h5">Manager Review</Typography>
-      <Tabs value={tab} onChange={(_,v)=> setTab(v)} sx={{ borderBottom: '1px solid #eee' }}>
-        <Tab label="Project Reviews" />
-        <Tab label="Worker Submissions" />
-        <Tab label="All Submissions" />
-        <Tab icon={<GroupIcon />} iconPosition="start" label="My Team" />
-      </Tabs>
+    <Box>
+      <Typography variant="h5" sx={{ fontWeight: 600 }}>Manager Review</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Approve project configurations, validate submissions, and manage your team assignments.
+      </Typography>
+      <Card sx={cardStyles}>
+        <Tabs value={tab} onChange={(_,v)=> setTab(v)} sx={{ borderBottom: '1px solid', borderColor: 'grey.200' }}>
+          <Tab label="Project Reviews" />
+          <Tab label="Worker Submissions" />
+          <Tab label="All Submissions" />
+          <Tab icon={<GroupIcon />} iconPosition="start" label="My Team" />
+        </Tabs>
 
       {/* Project Reviews */}
-      <Box hidden={tab!==0}>
-        <Grid container spacing={2} sx={{ mt: 1 }}>
+      <Box hidden={tab!==0} sx={{ mt: 3 }}>
+        <Grid container spacing={2}>
           {projReviews.map(pr => (
             <Grid key={pr._id} item xs={12}>
-              <Paper sx={{ p:2 }}>
-                <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={1}>
+              <Card sx={itemCardStyles}>
+                <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={2}>
                   <Box>
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{pr?.projectId?.name || pr.projectId}</Typography>
-                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                       <StatusChip status={pr.status || 'pending'} />
-                      <Typography variant="caption" sx={{ opacity: 0.7 }}>Requested: {new Date(pr.createdAt).toLocaleString()}</Typography>
+                      <Typography variant="caption" color="text.secondary">Requested: {new Date(pr.createdAt).toLocaleString()}</Typography>
                     </Stack>
                   </Box>
                   <Stack direction="row" spacing={1}>
@@ -442,7 +461,7 @@ export default function ReviewQueue() {
                     )}
                   </Stack>
                 </Stack>
-              </Paper>
+              </Card>
             </Grid>
           ))}
         </Grid>
@@ -450,19 +469,19 @@ export default function ReviewQueue() {
       </Box>
 
       {/* Worker Submissions */}
-      <Box hidden={tab!==1}>
-        <Grid container spacing={2} sx={{ mt: 1 }}>
+      <Box hidden={tab!==1} sx={{ mt: 3 }}>
+        <Grid container spacing={2}>
           {subs.map(s => (
             <Grid key={s._id} item xs={12}>
-              <Paper sx={{ p:2 }}>
-                <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={1}>
+              <Card sx={itemCardStyles}>
+                <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={2}>
                   <Box>
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Submission {s._id}</Typography>
-                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                       <StatusChip status={s.status || 'pending'} />
-                      <Typography variant="caption" sx={{ opacity: 0.7 }}>Date: {new Date(s.createdAt).toLocaleString()}</Typography>
-                      {s?.userId && <Typography variant="caption" sx={{ opacity: 0.7 }}>• Worker: {s?.userId?.name || s?.user?.name || ''}</Typography>}
-                      {s?.projectId && <Typography variant="caption" sx={{ opacity: 0.7 }}>• Project: {s?.projectId?.name || ''}</Typography>}
+                      <Typography variant="caption" color="text.secondary">Date: {new Date(s.createdAt).toLocaleString()}</Typography>
+                      {s?.userId && <Typography variant="caption" color="text.secondary">• Worker: {s?.userId?.name || s?.user?.name || ''}</Typography>}
+                      {s?.projectId && <Typography variant="caption" color="text.secondary">• Project: {s?.projectId?.name || ''}</Typography>}
                     </Stack>
                   </Box>
                   <Stack direction="row" spacing={1} alignItems="center">
@@ -475,102 +494,109 @@ export default function ReviewQueue() {
                     )}
                   </Stack>
                 </Stack>
-              </Paper>
+              </Card>
             </Grid>
           ))}
         </Grid>
         {!subs.length && <Alert severity="info" sx={{ mt: 2 }}>No pending worker submissions.</Alert>}
       </Box>
 
-      {/* All Submissions */}
-      <Box hidden={tab!==2}>
-        {(() => {
-          const counts = allSubs.reduce((acc, s) => { acc.all++; acc[s.status] = (acc[s.status] || 0) + 1; return acc }, { all: 0, pending: 0, approved: 0, declined: 0 })
-          const filtered = allSubs.filter(s => historyFilter==='all' ? true : s.status===historyFilter)
-          const statusColor = (st) => st==='approved' ? 'success' : st==='declined' ? 'error' : 'warning'
-          return (
-            <Stack spacing={2} sx={{ mt: 2 }}>
-              <Tabs value={historyFilter} onChange={(_,v)=> setHistoryFilter(v)} variant="scrollable" scrollButtons allowScrollButtonsMobile>
-                <Tab value="all" label={`All (${counts.all})`} />
-                <Tab value="pending" label={`Pending (${counts.pending})`} />
-                <Tab value="approved" label={`Approved (${counts.approved})`} />
-                <Tab value="declined" label={`Declined (${counts.declined})`} />
-              </Tabs>
-              <Paper sx={{ width: '100%', overflowX: 'auto' }}>
+        {/* All Submissions */}
+        <Box hidden={tab!==2} sx={{ mt: 3 }}>
+          {(() => {
+            const counts = allSubs.reduce((acc, s) => { acc.all++; acc[s.status] = (acc[s.status] || 0) + 1; return acc }, { all: 0, pending: 0, approved: 0, declined: 0 })
+            const filtered = allSubs.filter(s => historyFilter==='all' ? true : s.status===historyFilter)
+            const statusColor = (st) => st==='approved' ? 'success' : st==='declined' ? 'error' : st==='pending' ? 'warning' : 'default'
+            return (
+              <Stack spacing={2}>
+                <Stack direction={{ xs:'column', sm:'row' }} spacing={1.5} alignItems={{ sm:'center' }}>
+                  <Chip label={`All (${counts.all})`} color={historyFilter==='all' ? 'primary' : 'default'} onClick={()=> setHistoryFilter('all')} />
+                  <Chip label={`Pending (${counts.pending})`} color={historyFilter==='pending' ? 'primary' : 'default'} onClick={()=> setHistoryFilter('pending')} />
+                  <Chip label={`Approved (${counts.approved})`} color={historyFilter==='approved' ? 'primary' : 'default'} onClick={()=> setHistoryFilter('approved')} />
+                  <Chip label={`Declined (${counts.declined})`} color={historyFilter==='declined' ? 'primary' : 'default'} onClick={()=> setHistoryFilter('declined')} />
+                </Stack>
+
+                <Card sx={{ ...itemCardStyles, p: 0 }}>
+                  <Box sx={{ width: '100%', overflowX: 'auto' }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Worker</TableCell>
+                          <TableCell>Project</TableCell>
+                          <TableCell>Status</TableCell>
+                          <TableCell>Submitted At</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {filtered.map((s) => {
+                          const workerName = s?.userId?.name || s?.user?.name || String(s.userId || '')
+                          const projectName = s?.projectId?.name || String(s.projectId || '')
+                          return (
+                            <TableRow key={s._id} hover>
+                              <TableCell>{workerName}</TableCell>
+                              <TableCell>{projectName}</TableCell>
+                              <TableCell><Chip size="small" color={statusColor(s.status)} label={s.status} /></TableCell>
+                              <TableCell>{new Date(s.createdAt).toLocaleString()}</TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                  {!filtered.length && <Alert severity="info" sx={{ m: 2 }}>No submissions found.</Alert>}
+                </Card>
+              </Stack>
+            )
+          })()}
+        </Box>
+
+
+        {/* My Team */}
+        <Box hidden={tab!==3} sx={{ mt: 3 }}>
+          <Stack spacing={2}>
+            <Stack direction={{ xs:'column', sm:'row' }} spacing={2} alignItems={{ sm:'center' }}>
+              <TextField select label="Select Project" value={teamProjectId} onChange={(e)=> setTeamProjectId(e.target.value)} sx={{ minWidth: 260 }}>
+                {projects.map(p => (<MenuItem key={p._id} value={p._id}>{p.name}</MenuItem>))}
+              </TextField>
+              <Box sx={{ flex: 1 }} />
+              <Button variant="contained" disabled={!teamProjectId} onClick={openAddWorker} sx={{ textTransform: 'none' }}>Add Worker</Button>
+            </Stack>
+
+            <Card sx={{ ...itemCardStyles, p: 0 }}>
+              <Box sx={{ width: '100%', overflowX: 'auto' }}>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
                       <TableCell>Worker</TableCell>
-                      <TableCell>Project</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Submitted At</TableCell>
+                      <TableCell>Email</TableCell>
+                      <TableCell>Assignment Id</TableCell>
+                      <TableCell align="right">Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {filtered.map((s) => {
-                      const workerName = s?.userId?.name || s?.user?.name || String(s.userId || '')
-                      const projectName = s?.projectId?.name || String(s.projectId || '')
-                      return (
-                        <TableRow key={s._id} hover>
-                          <TableCell>{workerName}</TableCell>
-                          <TableCell>{projectName}</TableCell>
-                          <TableCell><Chip size="small" color={statusColor(s.status)} label={s.status} /></TableCell>
-                          <TableCell>{new Date(s.createdAt).toLocaleString()}</TableCell>
-                        </TableRow>
-                      )
-                    })}
+                    {projectWorkers.map(a => (
+                      <TableRow key={a._id} hover>
+                        <TableCell>{a?.user?.name || a.user}</TableCell>
+                        <TableCell>{a?.user?.email || '-'}</TableCell>
+                        <TableCell>{a._id}</TableCell>
+                        <TableCell align="right">
+                          <Button color="error" size="small" onClick={()=> removeWorker(a._id)}>Unassign</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
-                {!filtered.length && <Alert severity="info" sx={{ m: 2 }}>No submissions found.</Alert>}
-              </Paper>
-            </Stack>
-          )
-        })()}
-      </Box>
-
-      {/* My Team */}
-      <Box hidden={tab!==3}>
-        <Stack spacing={2} sx={{ mt: 2 }}>
-          <Stack direction={{ xs:'column', sm:'row' }} spacing={2} alignItems={{ sm:'center' }}>
-            <TextField select label="Select Project" value={teamProjectId} onChange={(e)=> setTeamProjectId(e.target.value)} sx={{ minWidth: 260 }}>
-              {projects.map(p => (<MenuItem key={p._id} value={p._id}>{p.name}</MenuItem>))}
-            </TextField>
-            <Box sx={{ flex: 1 }} />
-            <Button variant="contained" disabled={!teamProjectId} onClick={openAddWorker} sx={{ textTransform: 'none' }}>Add Worker</Button>
+              </Box>
+              {!projectWorkers.length && teamProjectId && (
+                <Alert severity="info" sx={{ m: 2 }}>No workers assigned yet.</Alert>
+              )}
+              {!teamProjectId && (
+                <Alert severity="info" sx={{ m: 2 }}>Select a project to manage its team.</Alert>
+              )}
+            </Card>
           </Stack>
-
-          <Paper sx={{ width: '100%', overflowX: 'auto' }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Worker</TableCell>
-                  <TableCell>Email</TableCell>
-                  <TableCell>Assignment Id</TableCell>
-                  <TableCell align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {projectWorkers.map(a => (
-                  <TableRow key={a._id} hover>
-                    <TableCell>{a?.user?.name || a.user}</TableCell>
-                    <TableCell>{a?.user?.email || '-'}</TableCell>
-                    <TableCell>{a._id}</TableCell>
-                    <TableCell align="right">
-                      <Button color="error" size="small" onClick={()=> removeWorker(a._id)}>Unassign</Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {!projectWorkers.length && teamProjectId && (
-              <Alert severity="info" sx={{ m: 2 }}>No workers assigned yet.</Alert>
-            )}
-            {!teamProjectId && (
-              <Alert severity="info" sx={{ m: 2 }}>Select a project to manage its team.</Alert>
-            )}
-          </Paper>
-        </Stack>
-      </Box>
+        </Box>
+      </Card>
 
       {/* View Dialog */}
       <Dialog open={viewOpen} onClose={closeView} maxWidth="md" fullWidth>
@@ -739,3 +765,4 @@ function SubmissionViewer({ submission }) {
     </Stack>
   )
 }
+
