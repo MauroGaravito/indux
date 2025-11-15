@@ -32,6 +32,16 @@ Incluye:
 - **API**
   - `GET /submissions` ahora soporta acceso de workers devolviendo solo sus submissions (`routes/submissions.ts`). Manager/Admin conservan la lógica anterior.
 
+## Project Fields (Custom Personal Details)
+
+Backend now includes a scoped CRUD system for per-project field definitions exposed via the existing API namespace:
+- `GET /projects/:projectId/fields` – list ordered field metadata for that project.
+- `POST /projects/:projectId/fields` – create a new field (validates key uniqueness per project, type, options).
+- `PUT /fields/:id` – update label, key, type, required flag, help text or order for an existing field.
+- `DELETE /fields/:id` – remove a field definition.
+
+On the frontend, the Admin > Projects experience now ships with `ProjectFieldsEditor`, a professional UI that replaces the legacy `PersonalDetailsSection`. Admins can create, edit, delete and reorder custom fields with validation, contextual icons, select options management and confirmation flows without touching `project.config.personalDetails`. Workers still consume the legacy payload until the next phase aligns the submission wizard with these definitions.
+
 ## Actualizaciones recientes (2025-11-15)
 
 - **Frontend – Reorganización y componentes base (Fase 1)**  

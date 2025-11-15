@@ -3,7 +3,7 @@ import { Box, Grid, Card, CardContent, Typography, Button, Stack, TextField, Men
 import api from '../../utils/api.js'
 import AsyncButton from '../../components/common/AsyncButton.jsx'
 import ProjectInfoSection from '../../components/forms/admin/ProjectInfoSection.jsx'
-import PersonalDetailsSection from '../../components/forms/admin/PersonalDetailsSection.jsx'
+import ProjectFieldsEditor from '../../components/admin/ProjectFieldsEditor.jsx'
 import SlidesSection from '../../components/forms/admin/SlidesSection.jsx'
 import QuestionsSection from '../../components/forms/admin/QuestionsSection.jsx'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
@@ -352,7 +352,7 @@ export default function Projects() {
                     </Box>
                   </Box>
                   <Box sx={{ mt: 3 }} hidden={tab!==1}>
-                    <PersonalDetailsSection value={config.personalDetails} onChange={(val)=> setConfig({ ...config, personalDetails: val })} />
+                    <ProjectFieldsEditor projectId={selectedId} />
                   </Box>
                   <Box sx={{ mt: 3 }} hidden={tab!==2}>
                     <SlidesSection value={config.slides} onChange={(val)=> setConfig({ ...config, slides: val })} />

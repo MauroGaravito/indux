@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+const ObjectIdString = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid object id');
+
 export const LoginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6)
@@ -66,4 +68,50 @@ export const UserUpdateSchema = z.object({
 
 export const UserStatusPatchSchema = z.object({
   status: z.enum(['pending','approved','disabled'])
+});
+
+const ProjectFieldTypeEnum = z.enum(['text','number','date','select','boolean','file']);
+const KeySchema = z.string().min(1).regex(/^\S+$/, 'Key cannot contain spaces');
+const OptionsArray = z.array(z.string());
+
+export const ProjectFieldCreateSchema = z.object({
+  projectId: ObjectIdString,
+  key: KeySchema,
+  label: z.string().min(1),
+  type: ProjectFieldTypeEnum,
+  required: z.boolean().default(false),
+  order: z.number().default(0),
+  helpText: z.string().optional(),
+  options: OptionsArray.optional(),
+  step: z.literal('personal')
+}).superRefine((data, ctx) => {
+  if (data.type === 'select') {
+    if (!data.options || data.options.length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Options are required for select fields', path: ['options'] });
+    }
+  } else if (typeof data.options !== 'undefined') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Options are only allowed for select fields', path: ['options'] });
+  }
+});
+
+export const ProjectFieldUpdateSchema = z.object({
+  projectId: ObjectIdString,
+  key: KeySchema.optional(),
+  label: z.string().min(1).optional(),
+  type: ProjectFieldTypeEnum.optional(),
+  required: z.boolean().optional(),
+  order: z.number().optional(),
+  helpText: z.string().optional(),
+  options: OptionsArray.optional(),
+  step: z.literal('personal').optional()
+}).superRefine((data, ctx) => {
+  if (data.type === 'select') {
+    if (!data.options || data.options.length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Options are required when type is select', path: ['options'] });
+    }
+  } else if (data.type && typeof data.options !== 'undefined') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Options are only allowed for select fields', path: ['options'] });
+  } else if (!data.type && typeof data.options !== 'undefined') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Specify type=select when providing options', path: ['type'] });
+  }
 });
