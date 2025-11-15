@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import * as controller from '../controllers/submissionsController.js';
-import Submission from '../models/submission.js';
+import { Submission } from '../models/Submission.js';
 
 const router = Router();
 
@@ -12,7 +12,7 @@ router.get('/', requireAuth, async (req, res, next) => {
   try {
     const user = req.user;
     if (user?.role === 'worker') {
-      const items = await Submission.find({ userId: user._id }).sort({ createdAt: -1 });
+      const items = await Submission.find({ userId: user.sub }).sort({ createdAt: -1 });
       return res.json(items);
     }
     return controller.list(req, res, next);
