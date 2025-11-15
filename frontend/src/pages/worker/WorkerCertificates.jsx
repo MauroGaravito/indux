@@ -38,13 +38,10 @@ export default function WorkerCertificates() {
       setLoading(true)
       setError('')
       try {
-        const res = await api.get('/submissions', { params: { status: 'approved' } })
+        const res = await api.get('/submissions')
         if (!active) return
         const list = Array.isArray(res.data) ? res.data : []
-        setSubmissions(list.filter((s) => {
-          const sUser = typeof s?.userId === 'string' ? s.userId : s?.userId?._id || s?.user?._id
-          return sUser === String(userId)
-        }))
+        setSubmissions(list.filter((s) => s?.status === 'approved'))
       } catch (e) {
         if (active) setError(e?.response?.data?.message || 'Failed to load certificates')
       } finally {
@@ -118,4 +115,3 @@ export default function WorkerCertificates() {
     </Box>
   )
 }
-

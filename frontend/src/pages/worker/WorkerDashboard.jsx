@@ -61,17 +61,13 @@ export default function WorkerDashboard() {
       try {
         const [projectsRes, submissionsRes] = await Promise.all([
           api.get('/projects'),
-          api.get('/submissions', { params: { status: 'all' } })
+          api.get('/submissions')
         ])
         if (!active) return
         const ownedProjects = Array.isArray(projectsRes.data) ? projectsRes.data : []
         const subs = Array.isArray(submissionsRes.data) ? submissionsRes.data : []
-        const mySubs = subs.filter((s) => {
-          const sUser = typeof s?.userId === 'string' ? s.userId : s?.userId?._id || s?.user?._id
-          return sUser === String(userId)
-        })
         setProjects(ownedProjects)
-        setSubmissions(mySubs)
+        setSubmissions(subs)
       } catch (e) {
         if (active) setError(e?.response?.data?.message || 'Failed to load worker data')
       } finally {
@@ -85,7 +81,7 @@ export default function WorkerDashboard() {
   const metrics = useMemo(() => {
     const totalProjects = projects.length
     const totalSubs = submissions.length
-    const pendingSubs = submissions.filter((s) => !s?.status || s.status === 'pending').length
+    const pendingSubs = submissions.filter((s) => s?.status === 'pending').length
     const completedSubs = submissions.filter((s) => s?.status === 'approved').length
     return { totalProjects, totalSubs, pendingSubs, completedSubs }
   }, [projects, submissions])

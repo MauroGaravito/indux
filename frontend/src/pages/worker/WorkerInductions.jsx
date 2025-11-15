@@ -41,14 +41,11 @@ export default function WorkerInductions() {
       try {
         const [projectsRes, submissionsRes] = await Promise.all([
           api.get('/projects'),
-          api.get('/submissions', { params: { status: 'all' } })
+          api.get('/submissions')
         ])
         if (!active) return
         const ownedProjects = Array.isArray(projectsRes.data) ? projectsRes.data : []
-        const mySubs = (Array.isArray(submissionsRes.data) ? submissionsRes.data : []).filter((s) => {
-          const sUser = typeof s?.userId === 'string' ? s.userId : s?.userId?._id || s?.user?._id
-          return sUser === String(userId)
-        })
+        const mySubs = Array.isArray(submissionsRes.data) ? submissionsRes.data : []
         setProjects(ownedProjects)
         setSubmissions(mySubs)
       } catch (e) {
@@ -134,4 +131,3 @@ export default function WorkerInductions() {
     </Box>
   )
 }
-
