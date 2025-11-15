@@ -107,6 +107,8 @@ export default function AdminDashboard() {
     })
   }, [projects, submissions, reviews, users])
 
+  const overallLoading = projectsLoading || submissionsLoading || reviewsLoading || usersLoading
+
   return (
     <Box>
       <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>Overview</Typography>
