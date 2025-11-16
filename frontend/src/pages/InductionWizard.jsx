@@ -543,10 +543,6 @@ export default function InductionWizard() {
     nextStep()
   }
 
-  const handlePersonalChange = (field, value) => {
-    setPersonalValues((prev) => ({ ...prev, [field.__key]: value }))
-  }
-
   const buildPersonalPayload = () => {
     const payload = {}
     personalFields.forEach((field) => {

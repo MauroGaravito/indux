@@ -9,6 +9,23 @@ Incluye:
 
 ---
 
+## Actualizaciones recientes (2025-11-16 - Submission Flow & Review UX)
+
+- **Backend – Submissions resistentes a IDs corruptos**  
+  - `api/src/services/submissionsService.ts` ahora normaliza cualquier `projectId` usando un helper interno antes de ejecutar `find()`, `findById()` o `populate()`.  
+  - `createSubmission` garantiza **una sola submission por worker/proyecto**: si existe una pending/declined se reemplaza, y si ya hay una `approved` se bloquea.  
+  - Todos los endpoints existentes (`POST /submissions`, `POST /submissions/:id/approve|decline`, `DELETE /submissions/:id`) trabajan siempre con ObjectIds limpios, evitando los CastError cuando el frontend enviaba objetos.
+- **Manager/Admin Review Experience**  
+  - `frontend/src/pages/ReviewQueue.jsx` muestra acciones rápidas en la tabla: `Review`, `Approve`, `Decline`, `Retry` y `Delete` (solo admins).  
+  - El modal `SubmissionReviewModal` expone los mismos controles (“Approve”, “Decline / Send Back” y “Delete”) con confirmaciones y refresca la tabla automáticamente al completar una acción.
+- **Worker Wizard Dinámico**  
+  - El paso “Personal Details” ahora se construye **100% a partir de la configuración del proyecto** (`project.config.personalDetails.fields` + `extraFields`), soportando tipos text/date/number/select/boolean/textarea + uploads.  
+  - Al abrir el wizard se consulta `/submissions` del worker:  
+    - `approved` → bloquea el flujo con un mensaje.  
+    - `pending` → avisa que la submission está en revisión.  
+    - `declined` → precarga la data anterior para retry y, al volver a enviar, reemplaza la submission existente.  
+  - El payload enviado a `/submissions` siempre persiste `personal[field.label]`, por lo que coincide con los campos creados desde Admin.
+
 ## Actualizaciones recientes (2025-11-15 - UI Refresh & Branding)
 
 - **Autenticación / Layouts**
