@@ -6,6 +6,7 @@ import {
   Typography,
   Stack,
   List,
+  ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
@@ -24,6 +25,13 @@ import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined'
 import TimelineOutlinedIcon from '@mui/icons-material/TimelineOutlined'
 import AssignmentIndOutlinedIcon from '@mui/icons-material/AssignmentIndOutlined'
+import TextFieldsOutlinedIcon from '@mui/icons-material/TextFieldsOutlined'
+import PinOutlinedIcon from '@mui/icons-material/PinOutlined'
+import EventOutlinedIcon from '@mui/icons-material/EventOutlined'
+import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined'
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
+import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined'
+import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
 import { Link as RouterLink } from 'react-router-dom'
 import api from '../../utils/api.js'
 
@@ -32,6 +40,29 @@ const statusChipColor = (status) => {
   if (status === 'approved') return 'success'
   if (status === 'declined' || status === 'rejected') return 'error'
   return 'default'
+}
+
+const fieldTypeIcon = (type) => {
+  switch (type) {
+    case 'text':
+      return <TextFieldsOutlinedIcon color="primary" />
+    case 'number':
+      return <PinOutlinedIcon color="secondary" />
+    case 'date':
+      return <EventOutlinedIcon color="action" />
+    case 'select':
+      return <ListAltOutlinedIcon color="info" />
+    case 'boolean':
+      return <CheckCircleOutlineIcon color="success" />
+    case 'file':
+    case 'document':
+      return <AttachFileOutlinedIcon color="warning" />
+    case 'photo':
+    case 'image':
+      return <ImageOutlinedIcon color="success" />
+    default:
+      return <TextFieldsOutlinedIcon color="disabled" />
+  }
 }
 
 export default function ManagerProjects() {
@@ -53,6 +84,16 @@ export default function ManagerProjects() {
   const [reviews, setReviews] = useState([])
   const [reviewsLoading, setReviewsLoading] = useState(false)
   const [reviewsError, setReviewsError] = useState('')
+  const [fields, setFields] = useState([])
+  const [fieldsLoading, setFieldsLoading] = useState(false)
+  const [fieldsError, setFieldsError] = useState('')
+  const orderedFields = useMemo(() => {
+    return [...fields].sort((a, b) => {
+      const orderA = typeof a?.order === 'number' ? a.order : 0
+      const orderB = typeof b?.order === 'number' ? b.order : 0
+      return orderA - orderB
+    })
+  }, [fields])
 
   const cardStyles = {
     borderRadius: 3,
@@ -123,6 +164,32 @@ export default function ManagerProjects() {
       }
     }
     loadTeam()
+    return () => { active = false }
+  }, [selectedProjectId])
+
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setFields([])
+      setFieldsError('')
+      return
+    }
+    let active = true
+    async function loadFields() {
+      setFieldsLoading(true)
+      setFieldsError('')
+      try {
+        const r = await api.get(`/projects/${selectedProjectId}/fields`)
+        if (active) setFields(Array.isArray(r.data) ? r.data : [])
+      } catch (e) {
+        if (active) {
+          setFieldsError(e?.response?.data?.message || 'Failed to load project fields')
+          setFields([])
+        }
+      } finally {
+        if (active) setFieldsLoading(false)
+      }
+    }
+    loadFields()
     return () => { active = false }
   }, [selectedProjectId])
 
@@ -228,6 +295,59 @@ export default function ManagerProjects() {
         </List>
       </Stack>
     </Card>
+  )
+
+  const projectFormTab = (
+    <Box sx={{ mt: 3 }}>
+      <Card sx={cardStyles}>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>Project Form</Typography>
+        {fieldsLoading && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            Loading project fields…
+          </Typography>
+        )}
+        {fieldsError && !fieldsLoading && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            {fieldsError}
+          </Typography>
+        )}
+        {!fieldsLoading && !fieldsError && !orderedFields.length && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            No custom fields defined for this project.
+          </Typography>
+        )}
+        {!fieldsLoading && !!orderedFields.length && (
+          <List sx={{ mt: 2 }}>
+            {orderedFields.map((field) => (
+              <ListItem key={field._id || field.key} divider alignItems="flex-start">
+                <ListItemIcon sx={{ minWidth: 48, mt: 0.5 }}>
+                  {fieldTypeIcon(field.type)}
+                </ListItemIcon>
+                <Box sx={{ flexGrow: 1 }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      {field.label}
+                    </Typography>
+                    {field.required && <Chip size="small" color="error" label="Required" />}
+                  </Stack>
+                  <Typography variant="caption" color="text.secondary">
+                    {field.type ? field.type.charAt(0).toUpperCase() + field.type.slice(1) : 'Text'}
+                  </Typography>
+                  {field.helpText && (
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      {field.helpText}
+                    </Typography>
+                  )}
+                </Box>
+                <Typography variant="caption" color="text.secondary" sx={{ minWidth: 60, textAlign: 'right' }}>
+                  Order {typeof field.order === 'number' ? field.order : '-'}
+                </Typography>
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </Card>
+    </Box>
   )
 
   const overviewTab = (
@@ -425,10 +545,12 @@ export default function ManagerProjects() {
           <Tab label="Overview" />
           <Tab label="Team" />
           <Tab label="Activity" />
+          <Tab label="Project Form" />
         </Tabs>
         <Box hidden={tab !== 0}>{overviewTab}</Box>
         <Box hidden={tab !== 1}>{teamTab}</Box>
         <Box hidden={tab !== 2}>{activityTab}</Box>
+        <Box hidden={tab !== 3}>{projectFormTab}</Box>
       </Card>
     )
   }
