@@ -27,7 +27,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Switch
 } from '@mui/material'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 
@@ -36,6 +37,13 @@ import { useAuthStore } from '../context/authStore.js'
 import api from '../utils/api.js'
 import { uploadFile, presignGet } from '../utils/upload.js'
 import AsyncButton from '../components/common/AsyncButton.jsx'
+
+const deriveFieldKey = (field, index) => {
+  if (field?.label) return field.label
+  if (field?.key) return field.key
+  if (field?._id) return field._id
+  return `field-${index}`
+}
 
 // =========================================================
 // DynamicField: renderiza campos del bloque Personal Details
@@ -344,6 +352,7 @@ export default function InductionWizard() {
 
   const [projects, setProjects] = useState([])
   const [project, setProject] = useState(null)
+  const [projectLoading, setProjectLoading] = useState(false)
   const [step, setStep] = useState(0)
 
   const [personalValues, setPersonalValues] = useState({})
@@ -359,56 +368,61 @@ export default function InductionWizard() {
     api.get('/projects').then((r) => setProjects(r.data || [])).catch(() => setProjects([]))
   }, [])
 
-  const defaultPersonalFields = useMemo(
-    () => [
-      { key: 'name', label: 'Name', type: 'text', required: false, builtin: true },
-      { key: 'dob', label: 'Date of Birth', type: 'date', required: false, builtin: true },
-      { key: 'address', label: 'Address', type: 'text', required: false, builtin: true },
-      { key: 'phone', label: 'Phone', type: 'text', required: false, builtin: true },
-      { key: 'medicalIssues', label: 'Medical Issues', type: 'textarea', required: false, builtin: true },
-      { key: 'nextOfKin', label: 'Next of Kin', type: 'text', required: false, builtin: true },
-      { key: 'nextOfKinPhone', label: 'Next of Kin Phone', type: 'text', required: false, builtin: true },
-      { key: 'isIndigenous', label: 'Is Indigenous', type: 'select', options: ['Yes', 'No', 'Prefer not to say'], required: false, builtin: true },
-      { key: 'isApprentice', label: 'Is Apprentice', type: 'select', options: ['Yes', 'No'], required: false, builtin: true }
-    ],
-    []
-  )
-
   const personalFields = useMemo(() => {
-    const cfg = project?.config?.personalDetails?.fields
-    return Array.isArray(cfg) && cfg.length ? cfg : defaultPersonalFields
-  }, [project, defaultPersonalFields])
+    if (!project) return []
+    const base = Array.isArray(project?.config?.personalDetails?.fields) ? project.config.personalDetails.fields : []
+    const extra = Array.isArray(project?.config?.extraFields) ? project.config.extraFields : []
+    return [...base, ...extra].map((field, idx) => ({
+      ...field,
+      type: field?.type || 'text',
+      __key: deriveFieldKey(field, idx)
+    }))
+  }, [project])
 
   const questions = useMemo(() => project?.config?.questions || [], [project])
   const totalQ = questions.length
   const answeredCount = useMemo(() => answers.filter((a) => a !== undefined && a !== null).length, [answers])
   const canFinish = totalQ > 0 && answeredCount === totalQ
 
-  const validatePersonal = () =>
-    personalFields.every((f) => {
-      if (!f.required) return true
-      if (f.key === 'medicalIssues') {
-        const m = personalValues.medical
-        if (!m) return false
-        if (m.hasCondition === false) return true
-        return typeof m.description === 'string' && m.description.trim().length > 0
-      }
-      const val = personalValues[f.key]
-      return val != null && val !== ''
+  const validatePersonal = () => {
+    if (!personalFields.length) return true
+    return personalFields.every((field) => {
+      if (!field.required) return true
+      const val = personalValues[field.__key]
+      if (field.type === 'boolean') return typeof val === 'boolean'
+      if (val === undefined || val === null) return false
+      if (typeof val === 'string') return val.trim() !== ''
+      return true
     })
+  }
+
+  const isPersonalValid = useMemo(() => validatePersonal(), [personalFields, personalValues])
 
   const nextStep = () => setStep((s) => s + 1)
   const prevStep = () => setStep((s) => Math.max(0, s - 1))
 
-  const selectProject = (id) => {
-    const p = projects.find((x) => x._id === id)
-    setProject(p || null)
+  const selectProject = async (id) => {
+    const fallback = projects.find((x) => x._id === id) || null
     // Reset estado dependiente
     setPersonalValues({})
     setAnswers([])
     setScore(null)
     setPassed(null)
     setSignature(null)
+    if (!id) {
+      setProject(null)
+      return
+    }
+    setProject(fallback)
+    setProjectLoading(true)
+    try {
+      const res = await api.get(`/projects/${id}`)
+      setProject(res.data || fallback)
+    } catch {
+      setProject(fallback)
+    } finally {
+      setProjectLoading(false)
+    }
   }
 
   const finishQuiz = () => {
@@ -420,13 +434,94 @@ export default function InductionWizard() {
     nextStep()
   }
 
+  const handlePersonalChange = (key, value) => {
+    setPersonalValues((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const renderPersonalField = (field) => {
+    const label = field?.label || 'Field'
+    const value = personalValues[field.__key]
+    const commonProps = {
+      fullWidth: true,
+      label,
+      required: !!field?.required,
+      value: value ?? '',
+      onChange: (e) => handlePersonalChange(field.__key, e.target.value),
+      size: 'small'
+    }
+
+    if (field?.type === 'date') {
+      return (
+        <TextField
+          {...commonProps}
+          type="date"
+          InputLabelProps={{ shrink: true }}
+        />
+      )
+    }
+
+    if (field?.type === 'number') {
+      return (
+        <TextField
+          {...commonProps}
+          type="number"
+        />
+      )
+    }
+
+    if (field?.type === 'select' && Array.isArray(field?.options)) {
+      return (
+        <TextField
+          {...commonProps}
+          select
+          value={value ?? ''}
+        >
+          <MenuItem value="" disabled={field.required}>
+            Select...
+          </MenuItem>
+          {field.options.map((opt, idx) => (
+            <MenuItem key={`${field.__key}-opt-${idx}`} value={opt}>
+              {opt}
+            </MenuItem>
+          ))}
+        </TextField>
+      )
+    }
+
+    if (field?.type === 'boolean') {
+      return (
+        <FormControlLabel
+          control={
+            <Switch
+              checked={Boolean(value)}
+              onChange={(e) => handlePersonalChange(field.__key, e.target.checked)}
+            />
+          }
+          label={field.required ? `${label} *` : label}
+        />
+      )
+    }
+
+    if (field?.type === 'textarea') {
+      return (
+        <TextField
+          {...commonProps}
+          multiline
+          minRows={3}
+        />
+      )
+    }
+
+    return <TextField {...commonProps} />
+  }
+
   const submit = async () => {
     try {
       setStatus('submitting')
 
-      const uploadFields = personalFields.filter((f) => ['image', 'camera'].includes(f.type))
+      const uploadFields = personalFields.filter((f) => ['image', 'camera', 'file'].includes(f.type))
       const uploads = uploadFields
-        .map((f) => ({ type: f.type, key: personalValues[f.key] }))
+        .map((f) => ({ type: f.type, key: personalValues[f.__key] }))
         .filter((u) => typeof u.key === 'string' && u.key.length > 0)
 
       const correctCount = Math.round(((score || 0) / 100) * (totalQ || 0))
@@ -497,27 +592,31 @@ export default function InductionWizard() {
           <Typography variant="subtitle1" sx={{ mb: 1 }}>
             Personal Details
           </Typography>
-          <Grid container spacing={2}>
-            {personalFields.map((f) => (
-              <Grid item xs={12} sm={f.type === 'textarea' ? 12 : 6} key={f.key}>
-                <DynamicField
-                  field={f}
-                  value={f.key === 'medicalIssues' ? personalValues.medical : personalValues[f.key]}
-                  onChange={(val) =>
-                    setPersonalValues({
-                      ...personalValues,
-                      ...(f.key === 'medicalIssues' ? { medical: val } : { [f.key]: val })
-                    })
-                  }
-                />
+          <Stack spacing={2}>
+            {projectLoading && <LinearProgress />}
+            {!projectLoading && !personalFields.length && (
+              <Alert severity="info">This project has no personal detail fields configured.</Alert>
+            )}
+            {!!personalFields.length && !projectLoading && (
+              <Grid container spacing={2}>
+                {personalFields.map((field) => (
+                  <Grid item xs={12} sm={field.type === 'textarea' ? 12 : 6} key={field.__key}>
+                    <Stack spacing={0.5}>
+                      {renderPersonalField(field)}
+                      {field?.description && field.type !== 'boolean' && (
+                        <Typography variant="caption" color="text.secondary">{field.description}</Typography>
+                      )}
+                    </Stack>
+                  </Grid>
+                ))}
               </Grid>
-            ))}
-          </Grid>
-          <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-            <Button onClick={prevStep}>Back</Button>
-            <Button variant="contained" onClick={() => (validatePersonal() ? nextStep() : null)} disabled={!validatePersonal()}>
-              Continue
-            </Button>
+            )}
+            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+              <Button onClick={prevStep}>Back</Button>
+              <Button variant="contained" onClick={nextStep} disabled={!isPersonalValid || projectLoading}>
+                Continue
+              </Button>
+            </Stack>
           </Stack>
         </Paper>
       )}
