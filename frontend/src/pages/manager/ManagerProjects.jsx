@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Box,
   Grid,
@@ -19,7 +19,15 @@ import {
   TableRow,
   TableCell,
   TableBody,
-  Button
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Switch,
+  FormControlLabel,
+  IconButton
 } from '@mui/material'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined'
@@ -32,6 +40,8 @@ import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined'
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import { Link as RouterLink } from 'react-router-dom'
 import api from '../../utils/api.js'
 
@@ -63,6 +73,276 @@ const fieldTypeIcon = (type) => {
     default:
       return <TextFieldsOutlinedIcon color="disabled" />
   }
+}
+
+const ManagerFieldEditor = ({ projectId, editable, fields, reloadFields, loading, error }) => {
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogMode, setDialogMode] = useState('create')
+  const [formError, setFormError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [form, setForm] = useState({
+    id: null,
+    label: '',
+    helpText: '',
+    required: true,
+    order: 0,
+    type: 'text',
+    key: '',
+    optionsText: ''
+  })
+
+  const resetForm = () => {
+    setForm({
+      id: null,
+      label: '',
+      helpText: '',
+      required: true,
+      order: fields.length ? Math.max(...fields.map((f) => f?.order ?? 0)) + 1 : 0,
+      type: 'text',
+      key: `field_${Date.now()}`,
+      optionsText: ''
+    })
+    setFormError('')
+  }
+
+  const openCreateDialog = () => {
+    resetForm()
+    setDialogMode('create')
+    setDialogOpen(true)
+  }
+
+  const openEditDialog = (field) => {
+    setForm({
+      id: field._id,
+      label: field.label || '',
+      helpText: field.helpText || '',
+      required: !!field.required,
+      order: field.order ?? 0,
+      type: field.type || 'text',
+      key: field.key || '',
+      optionsText: Array.isArray(field.options) ? field.options.join('\n') : ''
+    })
+    setFormError('')
+    setDialogMode('edit')
+    setDialogOpen(true)
+  }
+
+  const closeDialog = () => {
+    setDialogOpen(false)
+    setFormError('')
+  }
+
+  const closeDeleteDialog = () => {
+    setDeleteTarget(null)
+    setDeleteLoading(false)
+  }
+
+  const handleInputChange = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const parsedOptions = () =>
+    form.type === 'select'
+      ? form.optionsText
+          .split('\n')
+          .map((o) => o.trim())
+          .filter(Boolean)
+      : undefined
+
+  const submitField = async () => {
+    if (!projectId) return
+    if (!form.label.trim()) {
+      setFormError('Label is required')
+      return
+    }
+    setSaving(true)
+    setFormError('')
+    const payload = {
+      projectId,
+      step: 'personal',
+      label: form.label.trim(),
+      helpText: form.helpText?.trim() || undefined,
+      required: !!form.required,
+      order: Number.isFinite(Number(form.order)) ? Number(form.order) : 0,
+      options: parsedOptions(),
+      key: form.key,
+      type: form.type
+    }
+    try {
+      if (dialogMode === 'create') {
+        await api.post(`/projects/${projectId}/fields`, payload)
+      } else {
+        await api.put(`/fields/${form.id}`, payload)
+      }
+      closeDialog()
+      await reloadFields()
+    } catch (e) {
+      const msg = e?.response?.data?.error || e?.response?.data?.message || 'Failed to save field'
+      setFormError(msg)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleteLoading(true)
+    try {
+      await api.delete(`/fields/${deleteTarget._id}`)
+      closeDeleteDialog()
+      await reloadFields()
+    } catch (e) {
+      setDeleteLoading(false)
+    }
+  }
+
+  const renderList = () => (
+    <List sx={{ mt: 2 }}>
+      {fields.map((field) => (
+        <ListItem key={field._id || field.key} divider alignItems="flex-start" sx={{ opacity: field.locked ? 0.6 : 1 }}>
+          <ListItemIcon sx={{ minWidth: 48, mt: 0.5 }}>
+            {fieldTypeIcon(field.type)}
+          </ListItemIcon>
+          <Box sx={{ flexGrow: 1 }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                {field.label}
+              </Typography>
+              {field.required && <Chip size="small" color="error" label="Required" />}
+              {field.locked && <Chip size="small" color="default" label="Locked" />}
+            </Stack>
+            <Typography variant="caption" color="text.secondary">
+              Key: {field.key} • Type: {field.type} • Order: {typeof field.order === 'number' ? field.order : '-'}
+            </Typography>
+            {field.helpText && (
+              <Typography variant="caption" color="text.secondary" display="block">
+                {field.helpText}
+              </Typography>
+            )}
+          </Box>
+          {editable && !field.locked && (
+            <Stack direction="row" spacing={1}>
+              <IconButton size="small" onClick={() => openEditDialog(field)}>
+                <EditOutlinedIcon fontSize="small" />
+              </IconButton>
+              <IconButton size="small" color="error" onClick={() => setDeleteTarget(field)}>
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            </Stack>
+          )}
+        </ListItem>
+      ))}
+    </List>
+  )
+
+  return (
+    <Card sx={cardStyles}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} justifyContent="space-between">
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Project Form</Typography>
+          <Typography variant="caption" color="text.secondary">
+            This form is controlled by Admin / Manager.
+          </Typography>
+        </Box>
+        {editable && (
+          <Button variant="contained" sx={{ textTransform: 'none' }} onClick={openCreateDialog}>
+            Add Field
+          </Button>
+        )}
+      </Stack>
+      {loading && (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+          Loading project fields…
+        </Typography>
+      )}
+      {error && !loading && (
+        <Typography variant="body2" color="error.main" sx={{ mt: 2 }}>
+          {error}
+        </Typography>
+      )}
+      {!loading && !error && !fields.length && (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+          No custom fields defined for this project.
+        </Typography>
+      )}
+      {!!fields.length && renderList()}
+
+      <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>{dialogMode === 'create' ? 'Add Field' : 'Edit Field'}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Label"
+              value={form.label}
+              onChange={(e) => handleInputChange('label', e.target.value)}
+              fullWidth
+              required
+            />
+            <TextField
+              label="Help Text"
+              value={form.helpText}
+              onChange={(e) => handleInputChange('helpText', e.target.value)}
+              fullWidth
+            />
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                label="Order"
+                type="number"
+                value={form.order}
+                onChange={(e) => handleInputChange('order', e.target.value)}
+                fullWidth
+              />
+              <FormControlLabel
+                control={<Switch checked={form.required} onChange={(e) => handleInputChange('required', e.target.checked)} />}
+                label="Required"
+              />
+            </Stack>
+            <TextField label="Field Key" value={form.key} fullWidth disabled helperText="Managed by admin" />
+            <TextField label="Field Type" value={form.type} fullWidth disabled helperText="Managed by admin" />
+            {form.type === 'select' && (
+              <TextField
+                label="Options"
+                value={form.optionsText}
+                onChange={(e) => handleInputChange('optionsText', e.target.value)}
+                fullWidth
+                multiline
+                minRows={3}
+                helperText="One option per line"
+              />
+            )}
+            {formError && (
+              <Typography variant="caption" color="error.main">
+                {formError}
+              </Typography>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDialog}>Cancel</Button>
+          <Button variant="contained" onClick={submitField} disabled={saving}>
+            {dialogMode === 'create' ? 'Create Field' : 'Save Changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onClose={closeDeleteDialog} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete Field</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2">
+            Are you sure you want to remove this field? Workers will no longer be asked for this item.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDeleteDialog}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={confirmDelete} disabled={deleteLoading}>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Card>
+  )
 }
 
 export default function ManagerProjects() {
@@ -167,31 +447,34 @@ export default function ManagerProjects() {
     return () => { active = false }
   }, [selectedProjectId])
 
-  useEffect(() => {
+  const loadProjectFields = useCallback(async () => {
     if (!selectedProjectId) {
       setFields([])
       setFieldsError('')
       return
     }
-    let active = true
-    async function loadFields() {
-      setFieldsLoading(true)
-      setFieldsError('')
-      try {
-        const r = await api.get(`/projects/${selectedProjectId}/fields`)
-        if (active) setFields(Array.isArray(r.data) ? r.data : [])
-      } catch (e) {
-        if (active) {
-          setFieldsError(e?.response?.data?.message || 'Failed to load project fields')
-          setFields([])
-        }
-      } finally {
-        if (active) setFieldsLoading(false)
-      }
+    setFieldsLoading(true)
+    setFieldsError('')
+    try {
+      const r = await api.get(`/projects/${selectedProjectId}/fields`)
+      setFields(Array.isArray(r.data) ? r.data : [])
+    } catch (e) {
+      setFieldsError(e?.response?.data?.message || 'Failed to load project fields')
+      setFields([])
+    } finally {
+      setFieldsLoading(false)
     }
-    loadFields()
-    return () => { active = false }
   }, [selectedProjectId])
+
+  useEffect(() => {
+    let active = true
+    const run = async () => {
+      if (!active) return
+      await loadProjectFields()
+    }
+    run()
+    return () => { active = false }
+  }, [loadProjectFields])
 
   useEffect(() => {
     if (!selectedProjectId) return
@@ -506,57 +789,14 @@ export default function ManagerProjects() {
 
   const projectFormTab = (
     <Box sx={{ mt: 3 }}>
-      <Card sx={cardStyles}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>Project Form</Typography>
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-          This form is controlled by Admin / Manager.
-        </Typography>
-        {fieldsLoading && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            Loading project fields…
-          </Typography>
-        )}
-        {fieldsError && !fieldsLoading && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            {fieldsError}
-          </Typography>
-        )}
-        {!fieldsLoading && !fieldsError && !orderedFields.length && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            No custom fields defined for this project.
-          </Typography>
-        )}
-        {!fieldsLoading && !!orderedFields.length && (
-          <List sx={{ mt: 2 }}>
-            {orderedFields.map((field) => (
-              <ListItem key={field._id || field.key} divider alignItems="flex-start">
-                <ListItemIcon sx={{ minWidth: 48, mt: 0.5 }}>
-                  {fieldTypeIcon(field.type)}
-                </ListItemIcon>
-                <Box sx={{ flexGrow: 1 }}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                      {field.label}
-                    </Typography>
-                    {field.required && <Chip size="small" color="error" label="Required" />}
-                  </Stack>
-                  <Typography variant="caption" color="text.secondary">
-                    {field.type ? field.type.charAt(0).toUpperCase() + field.type.slice(1) : 'Text'}
-                  </Typography>
-                  {field.helpText && (
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      {field.helpText}
-                    </Typography>
-                  )}
-                </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ minWidth: 60, textAlign: 'right' }}>
-                  Order {typeof field.order === 'number' ? field.order : '-'}
-                </Typography>
-              </ListItem>
-            ))}
-          </List>
-        )}
-      </Card>
+      <ManagerFieldEditor
+        projectId={selectedProjectId}
+        editable={Boolean(selectedProject?.editableByManagers !== false)}
+        fields={orderedFields}
+        reloadFields={loadProjectFields}
+        loading={fieldsLoading}
+        error={fieldsError}
+      />
     </Box>
   )
 
@@ -781,5 +1021,6 @@ export default function ManagerProjects() {
     </Box>
   )
 }
+
 
 
