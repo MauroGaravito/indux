@@ -42,6 +42,7 @@ export default function ReviewQueue() {
   const [modalOpen, setModalOpen] = useState(false)
   const [selected, setSelected] = useState(null)
   const [modalLoading, setModalLoading] = useState(false)
+  const isAdmin = user?.role === 'admin'
 
   useEffect(() => {
     if (user?.role) {
@@ -135,13 +136,31 @@ export default function ReviewQueue() {
     if (!id) return
     try {
       await api.post(`/submissions/${id}/decline`, {})
-      notifySuccess('Submission declined')
+      notifySuccess('Submission sent back to worker')
       closeModal()
       loadSubmissions(user?.role)
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Failed to decline submission'
       notifyError(msg)
     }
+  }
+
+  const deleteSubmission = async (id, { confirm = true } = {}) => {
+    if (!id) return
+    if (confirm && !window.confirm('Delete this submission permanently?')) return
+    try {
+      await api.delete(`/submissions/${id}`)
+      notifySuccess('Submission deleted')
+      closeModal()
+      loadSubmissions(user?.role)
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to delete submission'
+      notifyError(msg)
+    }
+  }
+
+  const retrySubmission = async (id) => {
+    await declineSubmission(id)
   }
 
   const renderStatusChip = (status) => (
@@ -198,9 +217,25 @@ export default function ReviewQueue() {
                 <TableCell>{renderStatusChip(submission?.status)}</TableCell>
                 <TableCell>{formatDate(submission?.createdAt)}</TableCell>
                 <TableCell align="right">
-                  <Button variant="outlined" size="small" onClick={() => openModal(submission)}>
-                    Review
-                  </Button>
+                  <Stack direction="row" spacing={1} justifyContent="flex-end" flexWrap="wrap">
+                    <Button variant="outlined" size="small" onClick={() => openModal(submission)}>
+                      Review
+                    </Button>
+                    <Button variant="contained" color="success" size="small" onClick={() => approveSubmission(submission?._id)}>
+                      Approve
+                    </Button>
+                    <Button variant="outlined" color="warning" size="small" onClick={() => declineSubmission(submission?._id)}>
+                      Decline
+                    </Button>
+                    <Button variant="outlined" color="secondary" size="small" onClick={() => retrySubmission(submission?._id)}>
+                      Retry
+                    </Button>
+                    {isAdmin && (
+                      <Button variant="outlined" color="error" size="small" onClick={() => deleteSubmission(submission?._id)}>
+                        Delete
+                      </Button>
+                    )}
+                  </Stack>
                 </TableCell>
               </TableRow>
             )
@@ -234,8 +269,9 @@ export default function ReviewQueue() {
         onClose={closeModal}
         loading={modalLoading}
         data={selected}
-        onApprove={() => approveSubmission(selected?.submission?._id)}
-        onDecline={() => declineSubmission(selected?.submission?._id)}
+        onApprove={() => selected?.submission?._id && approveSubmission(selected?.submission?._id)}
+        onDecline={() => selected?.submission?._id && declineSubmission(selected?.submission?._id)}
+        onDelete={isAdmin ? (() => selected?.submission?._id && deleteSubmission(selected?.submission?._id)) : undefined}
       />
     </Box>
   )

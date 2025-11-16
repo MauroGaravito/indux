@@ -35,7 +35,7 @@ const statusChipColor = (status) => {
 
 const formatDate = (value) => (value ? new Date(value).toLocaleString() : '—')
 
-export default function SubmissionReviewModal({ open, onClose, loading, data, onApprove, onDecline }) {
+export default function SubmissionReviewModal({ open, onClose, loading, data, onApprove, onDecline, onDelete }) {
   const [tab, setTab] = React.useState('details')
   React.useEffect(() => {
     if (!open) setTab('details')
@@ -105,6 +105,13 @@ export default function SubmissionReviewModal({ open, onClose, loading, data, on
               <Chip label={submission.status || 'pending'} color={statusChipColor(submission.status)} />
               <Button color="success" variant="contained" onClick={onApprove} sx={{ textTransform: 'none' }}>Approve</Button>
               <Button color="error" variant="outlined" onClick={onDecline} sx={{ textTransform: 'none' }}>Decline</Button>
+              {onDelete && (
+                <Button color="error" variant="contained" onClick={() => {
+                  if (window.confirm('Delete this submission?')) onDelete()
+                }} sx={{ textTransform: 'none' }}>
+                  Delete
+                </Button>
+              )}
             </Stack>
           )}
         </Stack>
@@ -306,6 +313,15 @@ export default function SubmissionReviewModal({ open, onClose, loading, data, on
         )}
       </DialogContent>
       <DialogActions>
+        <Stack direction="row" spacing={1} sx={{ flexGrow: 1 }}>
+          {isReady && (
+            <Button color="warning" variant="outlined" onClick={() => {
+              if (window.confirm('Send this submission back to the worker?')) onDecline?.()
+            }}>
+              Send Back
+            </Button>
+          )}
+        </Stack>
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
     </Dialog>

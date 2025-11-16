@@ -84,6 +84,18 @@ function DynamicField({ field, value, onChange }) {
     )
   }
 
+  if (field?.type === 'number') {
+    return (
+      <TextField
+        fullWidth
+        type="number"
+        label={field.label}
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    )
+  }
+
   if (field?.type === 'select' && Array.isArray(field.options)) {
     return (
       <TextField
@@ -100,6 +112,20 @@ function DynamicField({ field, value, onChange }) {
           </option>
         ))}
       </TextField>
+    )
+  }
+
+  if (field?.type === 'boolean') {
+    return (
+      <FormControlLabel
+        control={
+          <Switch
+            checked={Boolean(value)}
+            onChange={(e) => onChange(e.target.checked)}
+          />
+        }
+        label={field.label}
+      />
     )
   }
 
@@ -356,6 +382,8 @@ export default function InductionWizard() {
   const [step, setStep] = useState(0)
 
   const [personalValues, setPersonalValues] = useState({})
+  const [mySubmissions, setMySubmissions] = useState([])
+  const [mySubsLoading, setMySubsLoading] = useState(false)
   const [answers, setAnswers] = useState([])
   const [score, setScore] = useState(null)
   const [passed, setPassed] = useState(null)
@@ -367,6 +395,53 @@ export default function InductionWizard() {
   useEffect(() => {
     api.get('/projects').then((r) => setProjects(r.data || [])).catch(() => setProjects([]))
   }, [])
+
+  useEffect(() => {
+    if (user?.role !== 'worker') return
+    let active = true
+    setMySubsLoading(true)
+    api.get('/submissions')
+      .then((res) => {
+        if (!active) return
+        setMySubmissions(Array.isArray(res.data) ? res.data : [])
+      })
+      .catch(() => {
+        if (!active) return
+        setMySubmissions([])
+      })
+      .finally(() => {
+        if (active) setMySubsLoading(false)
+      })
+    return () => { active = false }
+  }, [user?.role])
+
+  useEffect(() => {
+    if (step > 0 && (!project || (currentStatus && currentStatus !== 'declined'))) {
+      setStep(0)
+    }
+  }, [step, project, currentStatus])
+
+  useEffect(() => {
+    if (!project || !personalFields.length) {
+      setPersonalValues({})
+      return
+    }
+    if (currentSubmission?.status === 'declined' && currentSubmission.personal) {
+      const next = {}
+      personalFields.forEach((field) => {
+        const keys = [field.label, field.__key, field.key]
+        for (const key of keys) {
+          if (key && currentSubmission.personal[key] !== undefined) {
+            next[field.__key] = currentSubmission.personal[key]
+            break
+          }
+        }
+      })
+      setPersonalValues(next)
+    } else {
+      setPersonalValues({})
+    }
+  }, [project, personalFields, currentSubmission])
 
   const personalFields = useMemo(() => {
     if (!project) return []
@@ -383,6 +458,36 @@ export default function InductionWizard() {
   const totalQ = questions.length
   const answeredCount = useMemo(() => answers.filter((a) => a !== undefined && a !== null).length, [answers])
   const canFinish = totalQ > 0 && answeredCount === totalQ
+  const currentSubmission = useMemo(() => {
+    if (!project) return null
+    const targetId = project?._id
+    if (!targetId) return null
+    return mySubmissions.find((submission) => {
+      const pid = typeof submission?.projectId === 'string'
+        ? submission.projectId
+        : submission?.projectId?._id
+      return pid && pid === targetId
+    }) || null
+  }, [project, mySubmissions])
+
+  const currentStatus = currentSubmission?.status || null
+  const canStartSubmission = !currentStatus || currentStatus === 'declined'
+  const statusInfo = currentStatus
+    ? {
+        approved: {
+          severity: 'success',
+          message: 'This submission has already been approved. New submissions are blocked.'
+        },
+        pending: {
+          severity: 'info',
+          message: 'Your submission is under review. Please wait for a decision before resubmitting.'
+        },
+        declined: {
+          severity: 'warning',
+          message: 'Your previous submission was declined. Update your details and resubmit.'
+        }
+      }[currentStatus]
+    : null
 
   const validatePersonal = () => {
     if (!personalFields.length) return true
@@ -400,6 +505,10 @@ export default function InductionWizard() {
 
   const nextStep = () => setStep((s) => s + 1)
   const prevStep = () => setStep((s) => Math.max(0, s - 1))
+
+  const handlePersonalChange = (field, value) => {
+    setPersonalValues((prev) => ({ ...prev, [field.__key]: value }))
+  }
 
   const selectProject = async (id) => {
     const fallback = projects.find((x) => x._id === id) || null
@@ -434,85 +543,19 @@ export default function InductionWizard() {
     nextStep()
   }
 
-  const handlePersonalChange = (key, value) => {
-    setPersonalValues((prev) => ({ ...prev, [key]: value }))
+  const handlePersonalChange = (field, value) => {
+    setPersonalValues((prev) => ({ ...prev, [field.__key]: value }))
   }
 
-  const renderPersonalField = (field) => {
-    const label = field?.label || 'Field'
-    const value = personalValues[field.__key]
-    const commonProps = {
-      fullWidth: true,
-      label,
-      required: !!field?.required,
-      value: value ?? '',
-      onChange: (e) => handlePersonalChange(field.__key, e.target.value),
-      size: 'small'
-    }
-
-    if (field?.type === 'date') {
-      return (
-        <TextField
-          {...commonProps}
-          type="date"
-          InputLabelProps={{ shrink: true }}
-        />
-      )
-    }
-
-    if (field?.type === 'number') {
-      return (
-        <TextField
-          {...commonProps}
-          type="number"
-        />
-      )
-    }
-
-    if (field?.type === 'select' && Array.isArray(field?.options)) {
-      return (
-        <TextField
-          {...commonProps}
-          select
-          value={value ?? ''}
-        >
-          <MenuItem value="" disabled={field.required}>
-            Select...
-          </MenuItem>
-          {field.options.map((opt, idx) => (
-            <MenuItem key={`${field.__key}-opt-${idx}`} value={opt}>
-              {opt}
-            </MenuItem>
-          ))}
-        </TextField>
-      )
-    }
-
-    if (field?.type === 'boolean') {
-      return (
-        <FormControlLabel
-          control={
-            <Switch
-              checked={Boolean(value)}
-              onChange={(e) => handlePersonalChange(field.__key, e.target.checked)}
-            />
-          }
-          label={field.required ? `${label} *` : label}
-        />
-      )
-    }
-
-    if (field?.type === 'textarea') {
-      return (
-        <TextField
-          {...commonProps}
-          multiline
-          minRows={3}
-        />
-      )
-    }
-
-    return <TextField {...commonProps} />
+  const buildPersonalPayload = () => {
+    const payload = {}
+    personalFields.forEach((field) => {
+      const val = personalValues[field.__key]
+      if (val !== undefined) {
+        payload[field.label || field.__key] = val
+      }
+    })
+    return payload
   }
 
   const submit = async () => {
@@ -526,9 +569,11 @@ export default function InductionWizard() {
 
       const correctCount = Math.round(((score || 0) / 100) * (totalQ || 0))
 
+      const personalPayload = buildPersonalPayload()
+
       const body = {
         projectId: project?._id,
-        personal: personalValues,
+        personal: personalPayload,
         uploads,
         quiz: { total: totalQ, correct: correctCount, answers },
         signatureDataUrl: signature || undefined
@@ -578,8 +623,14 @@ export default function InductionWizard() {
               </option>
             ))}
           </TextField>
+          {mySubsLoading && <LinearProgress sx={{ mt: 2 }} />}
+          {statusInfo && (
+            <Alert severity={statusInfo.severity} sx={{ mt: 2 }}>
+              {statusInfo.message}
+            </Alert>
+          )}
           <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-            <Button variant="contained" onClick={nextStep} disabled={!project}>
+            <Button variant="contained" onClick={nextStep} disabled={!project || !canStartSubmission || projectLoading}>
               Continue
             </Button>
           </Stack>
@@ -594,22 +645,31 @@ export default function InductionWizard() {
           </Typography>
           <Stack spacing={2}>
             {projectLoading && <LinearProgress />}
+            {currentStatus === 'declined' && (
+              <Alert severity="warning">
+                {statusInfo?.message || 'Your previous submission was declined. Please review and update the information below.'}
+              </Alert>
+            )}
             {!projectLoading && !personalFields.length && (
               <Alert severity="info">This project has no personal detail fields configured.</Alert>
             )}
             {!!personalFields.length && !projectLoading && (
-              <Grid container spacing={2}>
-                {personalFields.map((field) => (
-                  <Grid item xs={12} sm={field.type === 'textarea' ? 12 : 6} key={field.__key}>
-                    <Stack spacing={0.5}>
-                      {renderPersonalField(field)}
-                      {field?.description && field.type !== 'boolean' && (
-                        <Typography variant="caption" color="text.secondary">{field.description}</Typography>
-                      )}
-                    </Stack>
-                  </Grid>
-                ))}
-              </Grid>
+                <Grid container spacing={2}>
+                  {personalFields.map((field) => (
+                    <Grid item xs={12} sm={field.type === 'textarea' ? 12 : 6} key={field.__key}>
+                      <Stack spacing={0.5}>
+                        <DynamicField
+                          field={{ ...field, key: field.__key }}
+                          value={personalValues[field.__key]}
+                          onChange={(val) => handlePersonalChange(field, val)}
+                        />
+                        {field?.description && field.type !== 'boolean' && (
+                          <Typography variant="caption" color="text.secondary">{field.description}</Typography>
+                        )}
+                      </Stack>
+                    </Grid>
+                  ))}
+                </Grid>
             )}
             <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
               <Button onClick={prevStep}>Back</Button>
