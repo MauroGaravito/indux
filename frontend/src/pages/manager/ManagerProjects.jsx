@@ -466,15 +466,10 @@ export default function ManagerProjects() {
     setSelectedUserIds([])
     setAvailableUsersLoading(true)
     try {
-      const [workersRes, managersRes] = await Promise.all([
-        api.get('/users/workers'),
-        api.get('/users/managers')
-      ])
+      const workersRes = await api.get('/users/workers')
       const workers = Array.isArray(workersRes.data) ? workersRes.data : []
-      const managers = Array.isArray(managersRes.data) ? managersRes.data : []
-      const combined = [...workers, ...managers]
       const uniqueById = new Map(
-        combined
+        workers
           .filter(Boolean)
           .map((user) => {
             const id = user?._id || user?.id
