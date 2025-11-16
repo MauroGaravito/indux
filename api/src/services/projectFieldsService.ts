@@ -3,6 +3,8 @@ import { ProjectField } from '../models/ProjectField.js';
 import { Project } from '../models/Project.js';
 import { HttpError } from '../middleware/errorHandler.js';
 import { ProjectFieldCreateSchema, ProjectFieldUpdateSchema } from '../utils/validators.js';
+import type { AuthPayload } from '../middleware/auth.js';
+import { canManagerEditProject } from './projectAccess.js';
 
 function ensureObjectId(id: string, label: string) {
   if (!Types.ObjectId.isValid(id)) {
@@ -17,7 +19,7 @@ export async function listFields(projectId: string) {
   return ProjectField.find({ projectId }).sort({ order: 1, createdAt: 1 }).lean();
 }
 
-export async function createField(payload: unknown) {
+export async function createField(payload: unknown, user: AuthPayload) {
   const parsed = ProjectFieldCreateSchema.safeParse(payload);
   if (!parsed.success) {
     throw new HttpError(400, 'Invalid field payload', parsed.error.flatten());
@@ -26,16 +28,20 @@ export async function createField(payload: unknown) {
   ensureObjectId(projectId, 'project id');
   const exists = await Project.exists({ _id: projectId });
   if (!exists) throw new HttpError(404, 'Project not found');
+  const canEdit = await canManagerEditProject(user, projectId);
+  if (!canEdit) throw new HttpError(403, 'Not allowed to edit fields for this project');
   const dup = await ProjectField.findOne({ projectId, key });
   if (dup) throw new HttpError(409, 'Field key already exists for this project');
   const field = await ProjectField.create(parsed.data);
   return field;
 }
 
-export async function updateField(id: string, payload: unknown) {
+export async function updateField(id: string, payload: unknown, user: AuthPayload) {
   ensureObjectId(id, 'field id');
   const existing = await ProjectField.findById(id);
   if (!existing) throw new HttpError(404, 'Field not found');
+  const canEdit = await canManagerEditProject(user, existing.projectId.toString());
+  if (!canEdit) throw new HttpError(403, 'Not allowed to edit fields for this project');
   const parsed = ProjectFieldUpdateSchema.safeParse({
     ...(payload as Record<string, unknown>),
     projectId: (payload as any)?.projectId || existing.projectId.toString()
@@ -55,9 +61,12 @@ export async function updateField(id: string, payload: unknown) {
   return existing;
 }
 
-export async function deleteField(id: string) {
+export async function deleteField(id: string, user: AuthPayload) {
   ensureObjectId(id, 'field id');
-  const deleted = await ProjectField.findByIdAndDelete(id);
-  if (!deleted) throw new HttpError(404, 'Field not found');
+  const existing = await ProjectField.findById(id);
+  if (!existing) throw new HttpError(404, 'Field not found');
+  const canEdit = await canManagerEditProject(user, existing.projectId.toString());
+  if (!canEdit) throw new HttpError(403, 'Not allowed to edit fields for this project');
+  await ProjectField.findByIdAndDelete(id);
   return { ok: true };
 }

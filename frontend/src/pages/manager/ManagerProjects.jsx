@@ -508,6 +508,9 @@ export default function ManagerProjects() {
     <Box sx={{ mt: 3 }}>
       <Card sx={cardStyles}>
         <Typography variant="h6" sx={{ fontWeight: 600 }}>Project Form</Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+          This form is controlled by Admin / Manager.
+        </Typography>
         {fieldsLoading && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
             Loading project fields…

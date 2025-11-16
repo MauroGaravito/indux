@@ -15,6 +15,7 @@ export interface IProject extends Document {
   steps: IStepConfig[];
   config?: Record<string, any>;
   managers?: mongoose.Types.ObjectId[];
+  editableByManagers?: boolean;
 }
 
 const StepSchema = new Schema<IStepConfig>({
@@ -31,7 +32,8 @@ const ProjectSchema = new Schema<IProject>({
   description: { type: String },
   steps: { type: [StepSchema], default: [] },
   config: { type: Schema.Types.Mixed, default: {} },
-  managers: { type: [Schema.Types.ObjectId], ref: 'User', default: [] }
+  managers: { type: [Schema.Types.ObjectId], ref: 'User', default: [] },
+  editableByManagers: { type: Boolean, default: true }
 }, { timestamps: true });
 
 export const Project = mongoose.model<IProject>('Project', ProjectSchema);
