@@ -353,6 +353,8 @@ const ManagerFieldEditor = ({ projectId, editable, fields, reloadFields, loading
   )
 }
 
+const normalizeProjectId = (value) => (typeof value === 'object' ? value?._id || value?.id || '' : value || '')
+
 export default function ManagerProjects() {
   const [projects, setProjects] = useState([])
   const [loadingProjects, setLoadingProjects] = useState(true)
@@ -432,14 +434,15 @@ export default function ManagerProjects() {
   }, [selectedProjectId, projects])
 
   const reloadTeam = useCallback(async () => {
-    if (!selectedProjectId) {
+    const projectId = normalizeProjectId(selectedProjectId)
+    if (!projectId) {
       setTeam([])
       return
     }
     setTeamLoading(true)
     setTeamError('')
     try {
-      const r = await api.get(`/assignments/project/${selectedProjectId}`)
+      const r = await api.get(`/assignments/project/${projectId}`)
       const list = Array.isArray(r.data) ? r.data : []
       setTeam(list.filter((a) => a.role === 'worker'))
     } catch (e) {
@@ -459,7 +462,8 @@ export default function ManagerProjects() {
   }, [selectedProjectId, reloadTeam])
 
   const openAddWorker = async () => {
-    if (!selectedProjectId) return
+    const projectId = normalizeProjectId(selectedProjectId)
+    if (!projectId) return
     setAddWorkerOpen(true)
     setAvailableUsers([])
     setAvailableUsersError('')
@@ -509,7 +513,8 @@ export default function ManagerProjects() {
   }
 
   const addSelectedWorkers = async () => {
-    if (!selectedProjectId || !selectedUserIds.length) return
+    const projectId = normalizeProjectId(selectedProjectId)
+    if (!projectId || !selectedUserIds.length) return
     setSavingAssignments(true)
     setAvailableUsersError('')
     try {
@@ -518,7 +523,7 @@ export default function ManagerProjects() {
         const userData = userMap.get(userId)
         const payload = {
           user: userId,
-          project: selectedProjectId,
+          project: projectId,
           role: userData?.role === 'manager' ? 'manager' : 'worker'
         }
         await api.post('/assignments', payload)
@@ -543,7 +548,8 @@ export default function ManagerProjects() {
   }
 
   const loadProjectFields = useCallback(async () => {
-    if (!selectedProjectId) {
+    const projectId = normalizeProjectId(selectedProjectId)
+    if (!projectId) {
       setFields([])
       setFieldsError('')
       return
@@ -551,7 +557,7 @@ export default function ManagerProjects() {
     setFieldsLoading(true)
     setFieldsError('')
     try {
-      const r = await api.get(`/projects/${selectedProjectId}/fields`)
+      const r = await api.get(`/projects/${projectId}/fields`)
       setFields(Array.isArray(r.data) ? r.data : [])
     } catch (e) {
       setFieldsError(e?.response?.data?.message || 'Failed to load project fields')
@@ -572,17 +578,18 @@ export default function ManagerProjects() {
   }, [loadProjectFields])
 
   useEffect(() => {
-    if (!selectedProjectId) return
+    const projectId = normalizeProjectId(selectedProjectId)
+    if (!projectId) return
     let active = true
     async function loadSubmissions() {
       setSubmissionsLoading(true)
       setSubmissionsError('')
       try {
-        const r = await api.get('/submissions', { params: { status: 'all', projectId: selectedProjectId } })
+        const r = await api.get('/submissions', { params: { status: 'all', projectId } })
         const list = Array.isArray(r.data) ? r.data : []
         if (active) setSubmissions(list.filter((s) => {
           const pid = typeof s?.projectId === 'string' ? s.projectId : s?.projectId?._id
-          return !selectedProjectId || pid === selectedProjectId
+          return !projectId || pid === projectId
         }))
       } catch (e) {
         if (active) {
@@ -598,7 +605,8 @@ export default function ManagerProjects() {
   }, [selectedProjectId])
 
   useEffect(() => {
-    if (!selectedProjectId) return
+    const projectId = normalizeProjectId(selectedProjectId)
+    if (!projectId) return
     let active = true
     async function loadReviews() {
       setReviewsLoading(true)
@@ -609,7 +617,7 @@ export default function ManagerProjects() {
         if (active) {
           setReviews(list.filter((rev) => {
             const pid = typeof rev?.projectId === 'string' ? rev.projectId : rev?.projectId?._id
-            return pid === selectedProjectId
+            return pid === projectId
           }))
         }
       } catch (e) {
@@ -884,8 +892,8 @@ export default function ManagerProjects() {
 
   const projectFormTab = (
     <Box sx={{ mt: 3 }}>
-      <ManagerFieldEditor
-        projectId={selectedProjectId}
+        <ManagerFieldEditor
+          projectId={normalizeProjectId(selectedProjectId)}
         editable={Boolean(selectedProject?.editableByManagers !== false)}
         fields={orderedFields}
         reloadFields={loadProjectFields}

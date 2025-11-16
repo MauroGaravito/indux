@@ -10,6 +10,8 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
 import SaveIcon from '@mui/icons-material/Save'
 import SendIcon from '@mui/icons-material/Send'
 
+const toProjectId = (value) => (typeof value === 'object' ? value?._id || value?.id || '' : value || '')
+
 export default function AdminConsole() {
   const { user } = useAuthStore()
   const [projects, setProjects] = useState([])
@@ -36,13 +38,15 @@ export default function AdminConsole() {
   }
 
   const saveConfig = async () => {
-    if (!selectedId) return
-    await api.put(`/projects/${selectedId}`, { config })
+    const projectId = toProjectId(selectedId)
+    if (!projectId) return
+    await api.put(`/projects/${projectId}`, { config })
   }
 
   const sendForReview = async () => {
-    if (!selectedId) return
-    await api.post('/reviews/projects', { projectId: selectedId, data: config })
+    const projectId = toProjectId(selectedId)
+    if (!projectId) return
+    await api.post('/reviews/projects', { projectId, data: config })
     alert('Sent for review')
   }
 

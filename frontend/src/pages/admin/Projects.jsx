@@ -93,10 +93,13 @@ export default function Projects() {
     }
   }
 
+  const getSelectedProjectId = () => (typeof selectedId === 'object' ? selectedId?._id || selectedId?.id || '' : selectedId || '')
+
   const saveConfig = async () => {
-    if (!selectedId) return
+    const projectId = getSelectedProjectId()
+    if (!projectId) return
     try {
-      await api.put(`/projects/${selectedId}`, { config })
+      await api.put(`/projects/${projectId}`, { config })
       notifySuccess('Project saved successfully')
       // Saving must not trigger or update any review
       setInitialConfig(config)
@@ -108,11 +111,12 @@ export default function Projects() {
   }
 
   const sendForReview = async () => {
-    if (!selectedId) return
+    const projectId = getSelectedProjectId()
+    if (!projectId) return
     if (hasPendingReview && !hasUnsavedChanges) return
     try {
       // Backend will fetch the latest project config from DB; only send projectId
-      const r = await api.post('/reviews/projects', { projectId: selectedId })
+      const r = await api.post('/reviews/projects', { projectId })
       if (r?.status === 200 || r?.data?.ok) {
         notifySuccess('Existing review updated with latest project changes.')
       } else {
@@ -128,9 +132,10 @@ export default function Projects() {
   }
 
   const confirmDelete = async () => {
-    if (!selectedId) return
+    const projectId = getSelectedProjectId()
+    if (!projectId) return
     try {
-      const r = await api.get(`/submissions?projectId=${selectedId}`)
+      const r = await api.get('/submissions', { params: { projectId } })
       const list = Array.isArray(r?.data) ? r.data : []
       setDeleteSubCount(list.length)
     } catch {
@@ -140,9 +145,10 @@ export default function Projects() {
   }
   const closeDelete = () => { setDeleteOpen(false); setDeleteSubCount(0) }
   const doDelete = async () => {
-    if (!selectedId) return
+    const projectId = getSelectedProjectId()
+    if (!projectId) return
     try {
-      const r = await api.delete(`/projects/${selectedId}`)
+      const r = await api.delete(`/projects/${projectId}`)
       notifySuccess(r?.data?.message || 'Project deleted successfully')
       setProjects(prev => prev.filter(p => p._id !== selectedId))
       setSelectedId('')
