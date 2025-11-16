@@ -298,6 +298,10 @@ function SubmissionOverview({ data, loading }) {
             </Stack>
           </Card>
         )}
+      </Box>
+    </Box>
+  )
+}
 
 
 // Submission viewer for managers/admins
