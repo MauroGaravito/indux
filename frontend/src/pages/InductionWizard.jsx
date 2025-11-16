@@ -392,6 +392,51 @@ export default function InductionWizard() {
   const [status, setStatus] = useState('idle') // idle | submitting | done | error
   const [confirmOpen, setConfirmOpen] = useState(false)
 
+  const personalFields = useMemo(() => {
+    if (!project) return []
+    const base = Array.isArray(project?.config?.personalDetails?.fields) ? project.config.personalDetails.fields : []
+    const extra = Array.isArray(project?.config?.extraFields) ? project.config.extraFields : []
+    return [...base, ...extra].map((field, idx) => ({
+      ...field,
+      type: field?.type || 'text',
+      __key: deriveFieldKey(field, idx)
+    }))
+  }, [project])
+
+  const questions = useMemo(() => project?.config?.questions || [], [project])
+  const totalQ = questions.length
+  const answeredCount = useMemo(() => answers.filter((a) => a !== undefined && a !== null).length, [answers])
+  const canFinish = totalQ > 0 && answeredCount === totalQ
+  const currentSubmission = useMemo(() => {
+    if (!project) return null
+    const targetId = project?._id
+    if (!targetId) return null
+    return mySubmissions.find((submission) => {
+      const pid = typeof submission?.projectId === 'string'
+        ? submission.projectId
+        : submission?.projectId?._id
+      return pid && pid === targetId
+    }) || null
+  }, [project, mySubmissions])
+  const currentStatus = currentSubmission?.status || null
+  const canStartSubmission = !currentStatus || currentStatus === 'declined'
+  const statusInfo = currentStatus
+    ? {
+        approved: {
+          severity: 'success',
+          message: 'This submission has already been approved. New submissions are blocked.'
+        },
+        pending: {
+          severity: 'info',
+          message: 'Your submission is under review. Please wait for a decision before resubmitting.'
+        },
+        declined: {
+          severity: 'warning',
+          message: 'Your previous submission was declined. Update your details and resubmit.'
+        }
+      }[currentStatus]
+    : null
+
   useEffect(() => {
     api.get('/projects').then((r) => setProjects(r.data || [])).catch(() => setProjects([]))
   }, [])
@@ -443,32 +488,6 @@ export default function InductionWizard() {
     }
   }, [project, personalFields, currentSubmission])
 
-  const personalFields = useMemo(() => {
-    if (!project) return []
-    const base = Array.isArray(project?.config?.personalDetails?.fields) ? project.config.personalDetails.fields : []
-    const extra = Array.isArray(project?.config?.extraFields) ? project.config.extraFields : []
-    return [...base, ...extra].map((field, idx) => ({
-      ...field,
-      type: field?.type || 'text',
-      __key: deriveFieldKey(field, idx)
-    }))
-  }, [project])
-
-  const questions = useMemo(() => project?.config?.questions || [], [project])
-  const totalQ = questions.length
-  const answeredCount = useMemo(() => answers.filter((a) => a !== undefined && a !== null).length, [answers])
-  const canFinish = totalQ > 0 && answeredCount === totalQ
-  const currentSubmission = useMemo(() => {
-    if (!project) return null
-    const targetId = project?._id
-    if (!targetId) return null
-    return mySubmissions.find((submission) => {
-      const pid = typeof submission?.projectId === 'string'
-        ? submission.projectId
-        : submission?.projectId?._id
-      return pid && pid === targetId
-    }) || null
-  }, [project, mySubmissions])
 
   const currentStatus = currentSubmission?.status || null
   const canStartSubmission = !currentStatus || currentStatus === 'declined'
@@ -500,6 +519,7 @@ export default function InductionWizard() {
       return true
     })
   }
+  const isPersonalValid = useMemo(() => validatePersonal(), [personalFields, personalValues])
 
   const isPersonalValid = useMemo(() => validatePersonal(), [personalFields, personalValues])
 
