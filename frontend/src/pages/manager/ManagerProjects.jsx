@@ -297,6 +297,213 @@ export default function ManagerProjects() {
     </Card>
   )
 
+  const renderConfigurationTab = () => {
+    const project = selectedProject || {}
+    const steps = Array.isArray(project?.steps) ? [...project.steps].sort((a, b) => (a?.order ?? 0) - (b?.order ?? 0)) : []
+    const config = project?.config || {}
+    const trainingSources = [
+      ...(Array.isArray(config?.slides) ? config.slides : []),
+      ...(Array.isArray(config?.uploads) ? config.uploads : []),
+      ...(Array.isArray(config?.training) ? config.training : [])
+    ]
+    const trainingMaterials = trainingSources.map((item, idx) => ({
+      id: item?._id || item?.id || item?.key || `material-${idx}`,
+      title: item?.title || item?.name || item?.label || `Material ${idx + 1}`,
+      description: item?.description || item?.subtitle || item?.notes || '',
+      meta: item?.file || item?.filename || item?.key || item?.url || ''
+    }))
+    const quizQuestions = Array.isArray(config?.questions) ? config.questions : []
+    const quizStep = steps.find((s) => s.key === 'quiz')
+    const passMark = typeof quizStep?.pass_mark === 'number' ? quizStep.pass_mark : 'N/A'
+    const stepIcon = (key) => {
+      switch (key) {
+        case 'personal': return <AssignmentIndOutlinedIcon color="primary" />
+        case 'uploads': return <AttachFileOutlinedIcon color="secondary" />
+        case 'slides': return <ImageOutlinedIcon color="info" />
+        case 'quiz': return <ListAltOutlinedIcon color="warning" />
+        case 'sign': return <CheckCircleOutlineIcon color="success" />
+        default: return <FolderOutlinedIcon color="action" />
+      }
+    }
+    const questionText = (question, idx) => (
+      question?.questionText || question?.text || question?.question || `Question ${idx + 1}`
+    )
+
+    return (
+      <Box sx={{ mt: 3 }}>
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Card sx={cardStyles}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>Workflow Steps</Typography>
+              {!steps.length && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                  No workflow steps defined for this project.
+                </Typography>
+              )}
+              {!!steps.length && (
+                <List sx={{ mt: 2 }}>
+                  {steps.map((step) => (
+                    <ListItem key={`${step.key}-${step.order ?? '0'}`} divider sx={{ opacity: step?.enabled === false ? 0.5 : 1 }}>
+                      <ListItemIcon sx={{ minWidth: 48 }}>
+                        {stepIcon(step.key)}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                              {step.key ? step.key.charAt(0).toUpperCase() + step.key.slice(1) : 'Step'}
+                            </Typography>
+                            {step?.required && <Chip size="small" color="error" label="Required" />}
+                            {step?.enabled === false && <Chip size="small" color="default" label="Disabled" />}
+                          </Stack>
+                        }
+                        secondary={
+                          <Typography variant="caption" color="text.secondary">
+                            Order: {step?.order ?? '-'} • Version: {step?.version ?? '-'}
+                            {typeof step?.pass_mark === 'number' && <> • Pass Mark: {step.pass_mark}</>}
+                          </Typography>
+                        }
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </Card>
+          </Grid>
+
+          <Grid item xs={12}>
+            <Card sx={cardStyles}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>Personal Details Requirements</Typography>
+              {fieldsLoading && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                  Loading custom fields…
+                </Typography>
+              )}
+              {fieldsError && !fieldsLoading && (
+                <Typography variant="body2" color="error.main" sx={{ mt: 2 }}>
+                  {fieldsError}
+                </Typography>
+              )}
+              {!fieldsLoading && !fieldsError && !orderedFields.length && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                  No custom fields defined for this project.
+                </Typography>
+              )}
+              {!fieldsLoading && !!orderedFields.length && (
+                <List sx={{ mt: 2 }}>
+                  {orderedFields.map((field) => (
+                    <ListItem key={field._id || field.key} divider alignItems="flex-start">
+                      <ListItemIcon sx={{ minWidth: 48, mt: 0.5 }}>
+                        {fieldTypeIcon(field.type)}
+                      </ListItemIcon>
+                      <Box sx={{ flexGrow: 1 }}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                            {field.label}
+                          </Typography>
+                          {field.required && <Chip size="small" color="error" label="Required" />}
+                        </Stack>
+                        <Typography variant="caption" color="text.secondary">
+                          Type: {field.type} • Order: {typeof field.order === 'number' ? field.order : '-'}
+                        </Typography>
+                        {field.helpText && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {field.helpText}
+                          </Typography>
+                        )}
+                      </Box>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </Card>
+          </Grid>
+
+          <Grid item xs={12}>
+            <Card sx={cardStyles}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>Training Materials</Typography>
+              {!trainingMaterials.length && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                  No training materials configured for this project.
+                </Typography>
+              )}
+              {!!trainingMaterials.length && (
+                <List sx={{ mt: 2 }}>
+                  {trainingMaterials.map((item) => (
+                    <ListItem key={item.id} divider alignItems="flex-start">
+                      <ListItemText
+                        primary={<Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{item.title}</Typography>}
+                        secondary={
+                          <>
+                            {item.description && (
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                {item.description}
+                              </Typography>
+                            )}
+                            {item.meta && (
+                              <Typography variant="caption" color="text.secondary">
+                                {item.meta}
+                              </Typography>
+                            )}
+                          </>
+                        }
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </Card>
+          </Grid>
+
+          <Grid item xs={12}>
+            <Card sx={cardStyles}>
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>Quiz Overview</Typography>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 2 }}>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">Total Questions</Typography>
+                  <Typography variant="h6">{quizQuestions.length}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">Pass Mark</Typography>
+                  <Typography variant="h6">{passMark}</Typography>
+                </Box>
+              </Stack>
+              {!quizQuestions.length && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                  No quiz configured for this project.
+                </Typography>
+              )}
+              {!!quizQuestions.length && (
+                <Stack spacing={1.5} sx={{ mt: 2 }}>
+                  {quizQuestions.map((question, idx) => (
+                    <Box
+                      key={`question-${idx}`}
+                      component="details"
+                      sx={{
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 2,
+                        p: 1.5,
+                        backgroundColor: 'grey.50'
+                      }}
+                    >
+                      <Box component="summary" sx={{ cursor: 'pointer', fontWeight: 600 }}>
+                        {`Question ${idx + 1}`}
+                      </Box>
+                      <Typography variant="body2" sx={{ mt: 1 }}>
+                        {questionText(question, idx)}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+            </Card>
+          </Grid>
+        </Grid>
+      </Box>
+    )
+  }
+
   const projectFormTab = (
     <Box sx={{ mt: 3 }}>
       <Card sx={cardStyles}>
@@ -545,12 +752,14 @@ export default function ManagerProjects() {
           <Tab label="Overview" />
           <Tab label="Team" />
           <Tab label="Activity" />
+          <Tab label="Configuration" />
           <Tab label="Project Form" />
         </Tabs>
         <Box hidden={tab !== 0}>{overviewTab}</Box>
         <Box hidden={tab !== 1}>{teamTab}</Box>
         <Box hidden={tab !== 2}>{activityTab}</Box>
-        <Box hidden={tab !== 3}>{projectFormTab}</Box>
+        <Box hidden={tab !== 3}>{renderConfigurationTab()}</Box>
+        <Box hidden={tab !== 4}>{projectFormTab}</Box>
       </Card>
     )
   }
