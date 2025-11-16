@@ -272,7 +272,32 @@ function SubmissionOverview({ data, loading }) {
           </Card>
         )}
 
-        {activeTab === 'signature' and final block ...
+        {activeTab === 'signature' && (
+          <Card sx={cardStyles}>
+            <Stack spacing={2}>
+              {(submission?.signatureDataUrl || submission?.signatureKey) ? (
+                <>
+                  <Typography variant="subtitle2" color="text.secondary">Signature Evidence</Typography>
+                  {submission?.signatureDataUrl ? (
+                    <Box
+                      component="img"
+                      src={submission.signatureDataUrl}
+                      alt="Worker signature"
+                      sx={{ maxWidth: '100%', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}
+                    />
+                  ) : null}
+                  {submission?.signatureKey && (
+                    <Button size="small" variant="outlined" onClick={() => openUpload(submission.signatureKey)}>
+                      Download Signature
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <Typography color="text.secondary">No signature captured.</Typography>
+              )}
+            </Stack>
+          </Card>
+        )}
 
 
 // Submission viewer for managers/admins
