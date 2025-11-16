@@ -436,6 +436,18 @@ export default function InductionWizard() {
         }
       }[currentStatus]
     : null
+  const validatePersonal = () => {
+    if (!personalFields.length) return true
+    return personalFields.every((field) => {
+      if (!field.required) return true
+      const val = personalValues[field.__key]
+      if (field.type === 'boolean') return typeof val === 'boolean'
+      if (val === undefined || val === null) return false
+      if (typeof val === 'string') return val.trim() !== ''
+      return true
+    })
+  }
+  const isPersonalValid = useMemo(() => validatePersonal(), [personalFields, personalValues])
 
   useEffect(() => {
     api.get('/projects').then((r) => setProjects(r.data || [])).catch(() => setProjects([]))
@@ -487,42 +499,6 @@ export default function InductionWizard() {
       setPersonalValues({})
     }
   }, [project, personalFields, currentSubmission])
-
-
-  const currentStatus = currentSubmission?.status || null
-  const canStartSubmission = !currentStatus || currentStatus === 'declined'
-  const statusInfo = currentStatus
-    ? {
-        approved: {
-          severity: 'success',
-          message: 'This submission has already been approved. New submissions are blocked.'
-        },
-        pending: {
-          severity: 'info',
-          message: 'Your submission is under review. Please wait for a decision before resubmitting.'
-        },
-        declined: {
-          severity: 'warning',
-          message: 'Your previous submission was declined. Update your details and resubmit.'
-        }
-      }[currentStatus]
-    : null
-
-  const validatePersonal = () => {
-    if (!personalFields.length) return true
-    return personalFields.every((field) => {
-      if (!field.required) return true
-      const val = personalValues[field.__key]
-      if (field.type === 'boolean') return typeof val === 'boolean'
-      if (val === undefined || val === null) return false
-      if (typeof val === 'string') return val.trim() !== ''
-      return true
-    })
-  }
-  const isPersonalValid = useMemo(() => validatePersonal(), [personalFields, personalValues])
-
-  const isPersonalValid = useMemo(() => validatePersonal(), [personalFields, personalValues])
-
   const nextStep = () => setStep((s) => s + 1)
   const prevStep = () => setStep((s) => Math.max(0, s - 1))
 
