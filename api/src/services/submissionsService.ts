@@ -10,6 +10,20 @@ import { HttpError } from '../middleware/errorHandler.js'
 
 export type Role = 'admin'|'manager'|'worker'
 
+const normalizeId = (value: any): any => {
+  if (!value) return value
+  if (typeof value === 'string') return value
+  if (value instanceof Types.ObjectId) return value.toString()
+  if (typeof value === 'object') {
+    if ('_id' in value) return normalizeId((value as any)._id)
+    if (typeof value.toString === 'function') {
+      const str = value.toString()
+      return str === '[object Object]' ? undefined : str
+    }
+  }
+  return String(value)
+}
+
 export interface ListParams {
   callerRole: Role
   callerId: string
@@ -23,18 +37,19 @@ export async function listSubmissions(params: ListParams) {
   const { callerRole, callerId } = params
   const filter: any = {}
   if (params.status !== 'all') filter.status = params.status
-  if (params.projectId) {
-    if (!Types.ObjectId.isValid(params.projectId)) {
+  const normalizedProjectId = normalizeId(params.projectId)
+  if (normalizedProjectId) {
+    if (!Types.ObjectId.isValid(normalizedProjectId)) {
       throw new HttpError(400, 'Invalid project id')
     }
-    filter.projectId = params.projectId
+    filter.projectId = normalizedProjectId
   }
 
   if (callerRole === 'manager') {
     const managed = await Assignment.find({ user: callerId, role: 'manager' }).lean()
     const ids = managed.map(a => a.project)
-    if (params.projectId) {
-      const allowed = ids.some(p => p?.toString() === params.projectId)
+    if (normalizedProjectId) {
+      const allowed = ids.some(p => normalizeId(p)?.toString() === normalizedProjectId)
       if (!allowed) {
         filter.projectId = { $in: [] }
       }
@@ -54,15 +69,14 @@ export async function listSubmissions(params: ListParams) {
 
   const annotateOrphans = async (entries: any[]) => {
     const ids = Array.from(new Set(entries
-      .map(item => item?.projectId)
-      .filter(Boolean)
-      .map(id => id.toString())))
+      .map(item => normalizeId(item?.projectId))
+      .filter((id): id is string => Boolean(id))))
     const existing = ids.length
       ? await Project.find({ _id: { $in: ids } }).select('_id').lean()
       : []
     const existingSet = new Set(existing.map(doc => doc._id.toString()))
     return entries.map(item => {
-      const pid = item?.projectId ? item.projectId.toString() : undefined
+      const pid = normalizeId(item?.projectId)
       const projectExists = pid ? existingSet.has(pid) : false
       return { ...item, orphaned: !projectExists }
     })
@@ -80,8 +94,10 @@ export async function listSubmissions(params: ListParams) {
 }
 
 export async function createSubmission(workerId: string, body: any) {
-  if (!Types.ObjectId.isValid(body.projectId)) throw new HttpError(400, 'Invalid project id')
-  const assigned = await Assignment.findOne({ user: workerId, project: body.projectId }).lean()
+  const projectId = normalizeId(body.projectId)
+  if (!Types.ObjectId.isValid(projectId)) throw new HttpError(400, 'Invalid project id')
+  body.projectId = projectId
+  const assigned = await Assignment.findOne({ user: workerId, project: projectId }).lean()
   if (!assigned) throw new HttpError(403, 'Not assigned to this project')
   const sub = await Submission.create({ ...body, userId: workerId, status: 'pending' })
   return sub
@@ -89,17 +105,20 @@ export async function createSubmission(workerId: string, body: any) {
 
 async function ensureManagerCanAct(callerRole: Role, callerId: string, projectId: any) {
   if (callerRole !== 'manager') return
-  const allowed = await Assignment.findOne({ user: callerId, project: projectId, role: 'manager' }).lean()
+  const normalized = normalizeId(projectId)
+  if (!normalized) throw new HttpError(400, 'Invalid project id')
+  const allowed = await Assignment.findOne({ user: callerId, project: normalized, role: 'manager' }).lean()
   if (!allowed) throw new HttpError(403, 'Forbidden')
 }
 
 export async function approveSubmission(id: string, callerId: string, callerRole: Role) {
   const sub = await Submission.findById(id)
   if (!sub) throw new HttpError(404, 'Not found')
-  await ensureManagerCanAct(callerRole, callerId, sub.projectId)
+  const projectId = normalizeId(sub.projectId)
+  await ensureManagerCanAct(callerRole, callerId, projectId)
 
   const user = await User.findById(sub.userId)
-  const project = await Project.findById(sub.projectId)
+  const project = await Project.findById(projectId)
   if (!user || !project) throw new HttpError(400, 'Invalid submission context')
 
   await ensureBucket()
@@ -121,7 +140,8 @@ export async function approveSubmission(id: string, callerId: string, callerRole
 export async function declineSubmission(id: string, callerId: string, callerRole: Role, reason: string) {
   const sub = await Submission.findById(id)
   if (!sub) throw new HttpError(404, 'Not found')
-  await ensureManagerCanAct(callerRole, callerId, sub.projectId)
+  const projectId = normalizeId(sub.projectId)
+  await ensureManagerCanAct(callerRole, callerId, projectId)
 
   sub.status = 'declined'
   ;(sub as any).reviewReason = reason || 'Not specified'
@@ -133,8 +153,9 @@ export async function declineSubmission(id: string, callerId: string, callerRole
 export async function deleteSubmission(id: string) {
   const submission = await Submission.findById(id)
   if (!submission) throw new HttpError(404, 'Submission not found')
-  const projectExists = submission.projectId
-    ? await Project.exists({ _id: submission.projectId })
+  const normalizedProjectId = normalizeId(submission.projectId)
+  const projectExists = normalizedProjectId
+    ? await Project.exists({ _id: normalizedProjectId })
     : null
   const isOrphaned = !projectExists
   await Submission.findByIdAndDelete(id)
