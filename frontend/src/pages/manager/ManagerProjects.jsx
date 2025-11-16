@@ -27,7 +27,8 @@ import {
   TextField,
   Switch,
   FormControlLabel,
-  IconButton
+  IconButton,
+  Checkbox
 } from '@mui/material'
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined'
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined'
@@ -363,6 +364,12 @@ export default function ManagerProjects() {
   const [team, setTeam] = useState([])
   const [teamLoading, setTeamLoading] = useState(false)
   const [teamError, setTeamError] = useState('')
+  const [addWorkerOpen, setAddWorkerOpen] = useState(false)
+  const [availableUsers, setAvailableUsers] = useState([])
+  const [availableUsersLoading, setAvailableUsersLoading] = useState(false)
+  const [availableUsersError, setAvailableUsersError] = useState('')
+  const [selectedUserIds, setSelectedUserIds] = useState([])
+  const [savingAssignments, setSavingAssignments] = useState(false)
 
   const [submissions, setSubmissions] = useState([])
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
@@ -424,28 +431,105 @@ export default function ManagerProjects() {
     setSelectedProject(project)
   }, [selectedProjectId, projects])
 
-  useEffect(() => {
-    if (!selectedProjectId) return
-    let active = true
-    async function loadTeam() {
-      setTeamLoading(true)
-      setTeamError('')
-      try {
-        const r = await api.get(`/assignments/project/${selectedProjectId}`)
-        const list = Array.isArray(r.data) ? r.data : []
-        if (active) setTeam(list.filter((a) => a.role === 'worker'))
-      } catch (e) {
-        if (active) {
-          setTeamError(e?.response?.data?.message || 'Failed to load team')
-          setTeam([])
-        }
-      } finally {
-        if (active) setTeamLoading(false)
-      }
+  const reloadTeam = useCallback(async () => {
+    if (!selectedProjectId) {
+      setTeam([])
+      return
     }
-    loadTeam()
-    return () => { active = false }
+    setTeamLoading(true)
+    setTeamError('')
+    try {
+      const r = await api.get(`/assignments/project/${selectedProjectId}`)
+      const list = Array.isArray(r.data) ? r.data : []
+      setTeam(list.filter((a) => a.role === 'worker'))
+    } catch (e) {
+      setTeamError(e?.response?.data?.message || 'Failed to load team')
+      setTeam([])
+    } finally {
+      setTeamLoading(false)
+    }
   }, [selectedProjectId])
+
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setTeam([])
+      return
+    }
+    reloadTeam()
+  }, [selectedProjectId, reloadTeam])
+
+  const openAddWorker = async () => {
+    if (!selectedProjectId) return
+    setAddWorkerOpen(true)
+    setAvailableUsers([])
+    setAvailableUsersError('')
+    setSelectedUserIds([])
+    setAvailableUsersLoading(true)
+    try {
+      const r = await api.get('/users', { params: { role: 'worker,manager' } })
+      const list = Array.isArray(r.data) ? r.data : []
+      const assignedIds = new Set(
+        team.map((member) => {
+          const user = member?.user
+          return typeof user === 'object' ? (user?._id || user?.id) : user
+        })
+      )
+      const filtered = list.filter((user) => {
+        const id = user?._id || user?.id
+        return id && !assignedIds.has(id)
+      })
+      setAvailableUsers(filtered)
+    } catch (e) {
+      setAvailableUsersError(e?.response?.data?.message || 'Failed to load users')
+    } finally {
+      setAvailableUsersLoading(false)
+    }
+  }
+
+  const closeAddWorker = () => {
+    setAddWorkerOpen(false)
+    setAvailableUsers([])
+    setAvailableUsersError('')
+    setSelectedUserIds([])
+  }
+
+  const toggleUserSelection = (id) => {
+    setSelectedUserIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]))
+  }
+
+  const addSelectedWorkers = async () => {
+    if (!selectedProjectId || !selectedUserIds.length) return
+    setSavingAssignments(true)
+    setAvailableUsersError('')
+    try {
+      const userMap = new Map(availableUsers.map((user) => [user?._id || user?.id, user]))
+      for (const userId of selectedUserIds) {
+        const userData = userMap.get(userId)
+        const payload = {
+          user: userId,
+          project: selectedProjectId,
+          role: userData?.role === 'manager' ? 'manager' : 'worker'
+        }
+        await api.post('/assignments', payload)
+      }
+      await reloadTeam()
+      closeAddWorker()
+    } catch (e) {
+      setAvailableUsersError(e?.response?.data?.message || 'Failed to add workers')
+    } finally {
+      setSavingAssignments(false)
+    }
+  }
+
+  const removeTeamMember = async (assignmentId) => {
+    if (!assignmentId) return
+    try {
+      await api.delete(`/assignments/${assignmentId}`)
+      await reloadTeam()
+    } catch (e) {
+      setTeamError(e?.response?.data?.message || 'Failed to remove worker')
+    }
+  }
 
   const loadProjectFields = useCallback(async () => {
     if (!selectedProjectId) {
@@ -882,6 +966,18 @@ export default function ManagerProjects() {
 
   const teamTab = (
     <Box sx={{ mt: 3 }}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={2}
+        justifyContent="space-between"
+        alignItems={{ xs: 'flex-start', sm: 'center' }}
+        sx={{ mb: 2 }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>Team Members</Typography>
+        <Button variant="contained" onClick={openAddWorker} disabled={!selectedProjectId}>
+          Add Worker
+        </Button>
+      </Stack>
       {teamLoading && <Typography variant="body2" color="text.secondary">Loading team...</Typography>}
       {teamError && <Typography variant="body2" color="error.main">{teamError}</Typography>}
       {!teamLoading && !team.length && (
@@ -893,7 +989,9 @@ export default function ManagerProjects() {
             <TableRow>
               <TableCell>Worker</TableCell>
               <TableCell>Email</TableCell>
+              <TableCell>Role</TableCell>
               <TableCell>Assigned At</TableCell>
+              <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -901,7 +999,13 @@ export default function ManagerProjects() {
               <TableRow key={member._id} hover>
                 <TableCell>{member?.user?.name || member.user}</TableCell>
                 <TableCell>{member?.user?.email || '-'}</TableCell>
+                <TableCell sx={{ textTransform: 'capitalize' }}>{member?.role || 'worker'}</TableCell>
                 <TableCell>{member?.createdAt ? new Date(member.createdAt).toLocaleString() : '-'}</TableCell>
+                <TableCell align="right">
+                  <Button color="error" size="small" onClick={() => removeTeamMember(member._id)}>
+                    Remove
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -1008,17 +1112,71 @@ export default function ManagerProjects() {
   }
 
   return (
-    <Box>
-      <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>Projects</Typography>
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={4}>
-          {renderProjectList()}
+    <>
+      <Box>
+        <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>Projects</Typography>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={4}>
+            {renderProjectList()}
+          </Grid>
+          <Grid item xs={12} md={8}>
+            {renderDetails()}
+          </Grid>
         </Grid>
-        <Grid item xs={12} md={8}>
-          {renderDetails()}
-        </Grid>
-      </Grid>
-    </Box>
+      </Box>
+
+      <Dialog open={addWorkerOpen} onClose={closeAddWorker} fullWidth maxWidth="sm">
+        <DialogTitle>Select Workers</DialogTitle>
+        <DialogContent dividers>
+          {availableUsersLoading && (
+            <Typography variant="body2" color="text.secondary">Loading available users...</Typography>
+          )}
+          {!availableUsersLoading && (
+            <Stack spacing={2}>
+              {availableUsersError && (
+                <Typography variant="body2" color="error.main">{availableUsersError}</Typography>
+              )}
+              {!availableUsersError && !availableUsers.length && (
+                <Typography variant="body2" color="text.secondary">
+                  All eligible workers are already assigned to this project.
+                </Typography>
+              )}
+              {!!availableUsers.length && (
+                <List sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                  {availableUsers.map((user) => {
+                    const id = user?._id || user?.id
+                    const checked = selectedUserIds.includes(id)
+                    return (
+                      <ListItem key={id} disablePadding divider>
+                        <ListItemButton onClick={() => toggleUserSelection(id)}>
+                          <ListItemIcon>
+                            <Checkbox edge="start" checked={checked} tabIndex={-1} disableRipple />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={user?.name || user?.email || 'User'}
+                            secondary={user?.email ? `${user.email} • ${user?.role}` : user?.role}
+                          />
+                        </ListItemButton>
+                      </ListItem>
+                    )
+                  })}
+                </List>
+              )}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeAddWorker}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={addSelectedWorkers}
+            disabled={!selectedUserIds.length || savingAssignments || !!availableUsersLoading}
+          >
+            {savingAssignments ? 'Adding...' : 'Add Selected'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   )
 }
 
