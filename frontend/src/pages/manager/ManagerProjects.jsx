@@ -466,18 +466,34 @@ export default function ManagerProjects() {
     setSelectedUserIds([])
     setAvailableUsersLoading(true)
     try {
-      const r = await api.get('/users', { params: { role: 'worker,manager' } })
-      const list = Array.isArray(r.data) ? r.data : []
+      const [workersRes, managersRes] = await Promise.all([
+        api.get('/users/workers'),
+        api.get('/users/managers')
+      ])
+      const workers = Array.isArray(workersRes.data) ? workersRes.data : []
+      const managers = Array.isArray(managersRes.data) ? managersRes.data : []
+      const combined = [...workers, ...managers]
+      const uniqueById = new Map(
+        combined
+          .filter(Boolean)
+          .map((user) => {
+            const id = user?._id || user?.id
+            return id ? [id, user] : null
+          })
+          .filter(Boolean)
+      )
       const assignedIds = new Set(
         team.map((member) => {
           const user = member?.user
           return typeof user === 'object' ? (user?._id || user?.id) : user
         })
       )
-      const filtered = list.filter((user) => {
-        const id = user?._id || user?.id
-        return id && !assignedIds.has(id)
-      })
+      const filtered = Array.from(uniqueById.entries())
+        .map(([, user]) => user)
+        .filter((user) => {
+          const id = user?._id || user?.id
+          return id && !assignedIds.has(id)
+        })
       setAvailableUsers(filtered)
     } catch (e) {
       setAvailableUsersError(e?.response?.data?.message || 'Failed to load users')
