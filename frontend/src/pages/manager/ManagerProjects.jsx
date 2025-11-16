@@ -45,6 +45,13 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import { Link as RouterLink } from 'react-router-dom'
 import api from '../../utils/api.js'
 
+const cardStyles = {
+  borderRadius: 3,
+  p: 3,
+  bgcolor: '#fff',
+  boxShadow: '0 8px 30px rgba(15, 23, 42, 0.03)'
+}
+
 const statusChipColor = (status) => {
   if (!status || status === 'pending') return 'warning'
   if (status === 'approved') return 'success'
@@ -374,13 +381,6 @@ export default function ManagerProjects() {
       return orderA - orderB
     })
   }, [fields])
-
-  const cardStyles = {
-    borderRadius: 3,
-    p: 3,
-    bgcolor: '#fff',
-    boxShadow: '0 8px 30px rgba(15, 23, 42, 0.03)'
-  }
 
   useEffect(() => {
     let active = true
