@@ -409,4 +409,10 @@ function SubmissionViewer({ submission }) {
     </Stack>
   )
 }
+function ReviewQueue() {
+  // Minimal wrapper so Admin/Reviews.jsx continues to work
+  return <SubmissionOverview data={null} loading={false} />
+}
+
+export default ReviewQueue;
 
