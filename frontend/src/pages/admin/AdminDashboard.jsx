@@ -157,7 +157,7 @@ function ActivityTimeline({ submissions, reviews, users }) {
       .slice(0, 5)
       .map((r) => ({
         type: 'review',
-        title: 'Project Review',
+        title: 'Submission Review',
         subtitle: `${r?.projectId?.name || r?.projectId || 'Project'} • Status: ${r?.status || 'pending'}`,
         date: r?.createdAt
       }))
