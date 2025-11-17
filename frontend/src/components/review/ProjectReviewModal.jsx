@@ -49,6 +49,8 @@ export default function ProjectReviewModal({
   const [slidesLightboxOpen, setSlidesLightboxOpen] = React.useState(false)
   const [viewerOpen, setViewerOpen] = React.useState(false)
   const [viewerUrl, setViewerUrl] = React.useState('')
+  const [mapPreviewUrl, setMapPreviewUrl] = React.useState('')
+  const [slidesPreviewUrl, setSlidesPreviewUrl] = React.useState('')
 
   React.useEffect(() => {
     if (!open) {
@@ -79,6 +81,30 @@ export default function ProjectReviewModal({
     }
   }, [mapKey])
 
+  React.useEffect(() => {
+    if (!mapKey) {
+      setMapPreviewUrl('')
+      return
+    }
+    ;(async () => {
+      const url = await openViaPresign(mapKey)
+      setMapPreviewUrl(url || mapStreamUrl)
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapKey])
+
+  React.useEffect(() => {
+    if (!slidesKey) {
+      setSlidesPreviewUrl('')
+      return
+    }
+    ;(async () => {
+      const url = await openViaPresign(slidesKey)
+      setSlidesPreviewUrl(url || slidesStreamUrl)
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slidesKey])
+
   const renderMapPreview = () => {
     if (!mapKey || mapImageError) {
       return (
@@ -95,7 +121,7 @@ export default function ProjectReviewModal({
     return (
       <Box
         component="img"
-        src={mapStreamUrl}
+        src={mapPreviewUrl || mapStreamUrl}
         alt="Project map preview"
         onError={() => setMapImageError(true)}
         onClick={() => setMapLightboxOpen(true)}
@@ -123,10 +149,11 @@ export default function ProjectReviewModal({
     }
   }
 
-  const openInViewer = async (key) => {
+  const openInViewer = async (key, preferredUrl) => {
     const url = await openViaPresign(key)
-    if (!url) return
-    setViewerUrl(url)
+    const finalUrl = url || preferredUrl || buildStreamUrl(key)
+    if (!finalUrl) return
+    setViewerUrl(finalUrl)
     setViewerOpen(true)
   }
 
@@ -202,7 +229,7 @@ export default function ProjectReviewModal({
                   {slidesIsImage && !slidesImageError ? (
                     <Box
                       component="img"
-                      src={slidesStreamUrl}
+                      src={slidesPreviewUrl || slidesStreamUrl}
                       alt="Slides preview"
                       onError={() => setSlidesImageError(true)}
                       onClick={() => setSlidesLightboxOpen(true)}
@@ -230,7 +257,7 @@ export default function ProjectReviewModal({
                     <Button
                       variant="outlined"
                       size="small"
-                      onClick={() => openInViewer(slidesKey)}
+                      onClick={() => openInViewer(slidesKey, slidesPreviewUrl)}
                     >
                       View
                     </Button>
@@ -355,7 +382,7 @@ export default function ProjectReviewModal({
         </Button>
       </DialogActions>
     </Dialog>
-      {mapKey && mapStreamUrl && (
+      {mapKey && (mapPreviewUrl || mapStreamUrl) && (
         <Dialog open={mapLightboxOpen} onClose={() => setMapLightboxOpen(false)} fullScreen>
           <Box
             sx={{
@@ -392,7 +419,7 @@ export default function ProjectReviewModal({
               {!mapImageError ? (
                 <Box
                   component="img"
-                  src={mapStreamUrl}
+                  src={mapPreviewUrl || mapStreamUrl}
                   alt="Project map full view"
                   onError={() => setMapImageError(true)}
                   sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
@@ -404,7 +431,7 @@ export default function ProjectReviewModal({
           </Box>
         </Dialog>
       )}
-      {slidesKey && slidesStreamUrl && slidesIsImage && !slidesImageError && (
+      {slidesKey && (slidesPreviewUrl || slidesStreamUrl) && slidesIsImage && !slidesImageError && (
         <Dialog open={slidesLightboxOpen} onClose={() => setSlidesLightboxOpen(false)} fullScreen>
           <Box
             sx={{
@@ -438,11 +465,11 @@ export default function ProjectReviewModal({
                 p: 3
               }}
             >
-              {!slidesImageError ? (
-                <Box
-                  component="img"
-                  src={slidesStreamUrl}
-                  alt="Slides full view"
+                {!slidesImageError ? (
+                  <Box
+                    component="img"
+                    src={slidesPreviewUrl || slidesStreamUrl}
+                    alt="Slides full view"
                   onError={() => setSlidesImageError(true)}
                   sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                 />
