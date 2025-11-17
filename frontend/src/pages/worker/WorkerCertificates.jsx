@@ -38,7 +38,7 @@ export default function WorkerCertificates() {
       setLoading(true)
       setError('')
       try {
-        const res = await api.get('/submissions')
+        const res = await api.get('/submissions', { params: { status: 'approved' } })
         if (!active) return
         const list = Array.isArray(res.data) ? res.data : []
         setSubmissions(list.filter((s) => s?.status === 'approved'))

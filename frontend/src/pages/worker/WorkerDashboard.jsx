@@ -61,7 +61,7 @@ export default function WorkerDashboard() {
       try {
         const [projectsRes, submissionsRes] = await Promise.all([
           api.get('/projects'),
-          api.get('/submissions')
+          api.get('/submissions', { params: { status: 'all' } })
         ])
         if (!active) return
         const ownedProjects = Array.isArray(projectsRes.data) ? projectsRes.data : []
