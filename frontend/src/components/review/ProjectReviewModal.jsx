@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  IconButton,
   Stack,
   Table,
   TableBody,
@@ -18,6 +19,7 @@ import {
   TextField,
   Typography
 } from '@mui/material'
+import CloseIcon from '@mui/icons-material/Close'
 
 const statusChipColor = (status) => {
   if (status === 'approved') return 'success'
@@ -37,6 +39,8 @@ export default function ProjectReviewModal({
   approveProcessing
 }) {
   const [reason, setReason] = React.useState('')
+  const [mapImageError, setMapImageError] = React.useState(false)
+  const [mapLightboxOpen, setMapLightboxOpen] = React.useState(false)
 
   React.useEffect(() => {
     if (!open) {
@@ -47,11 +51,58 @@ export default function ProjectReviewModal({
   const data = review?.data || {}
   const fields = Array.isArray(data?.fields) ? data.fields : []
   const configSnapshot = data?.config || {}
+  const mapKey = configSnapshot?.projectInfo?.projectMapKey
+  const slidesKey = configSnapshot?.slides?.pptKey
+  const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+  const mapDownloadUrl = mapKey ? `${apiBaseUrl}/uploads/download/${mapKey}` : ''
+  const slidesDownloadUrl = slidesKey ? `${apiBaseUrl}/uploads/download/${slidesKey}` : ''
+  const slidesFilename = slidesKey ? slidesKey.split('/').pop() : ''
+
+  React.useEffect(() => {
+    setMapImageError(false)
+    if (!mapKey) {
+      setMapLightboxOpen(false)
+    }
+  }, [mapKey])
+
+  const renderMapPreview = () => {
+    if (!mapKey || mapImageError) {
+      return (
+        <Typography variant="body2" color="text.secondary">
+          No map available
+        </Typography>
+      )
+    }
+    return (
+      <Stack spacing={1}>
+        <Typography variant="body2" color="text.secondary">
+          {mapKey}
+        </Typography>
+        <Box
+          component="img"
+          src={mapDownloadUrl}
+          alt="Project map preview"
+          onError={() => setMapImageError(true)}
+          onClick={() => setMapLightboxOpen(true)}
+          sx={{
+            width: 150,
+            maxWidth: '100%',
+            borderRadius: 1,
+            border: '1px solid',
+            borderColor: 'divider',
+            cursor: 'pointer',
+            objectFit: 'cover'
+          }}
+        />
+      </Stack>
+    )
+  }
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
-      <DialogTitle sx={{ pb: 0 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+    <>
+      <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg">
+        <DialogTitle sx={{ pb: 0 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 700 }}>Project Review</Typography>
             {review && (
@@ -106,7 +157,7 @@ export default function ProjectReviewModal({
                   </TableRow>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 600 }}>Map Key</TableCell>
-                    <TableCell>{configSnapshot?.projectInfo?.projectMapKey || 'N/A'}</TableCell>
+                    <TableCell>{renderMapPreview()}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -114,18 +165,24 @@ export default function ProjectReviewModal({
 
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Slides</Typography>
-              {configSnapshot?.slides?.pptKey ? (
-                <Chip
-                  component="a"
-                  href={configSnapshot.slides.pptKey}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  label="Open Training Slides"
-                  clickable
-                  color="primary"
-                />
+              {slidesKey ? (
+                <Stack spacing={1} alignItems="flex-start">
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {slidesFilename || slidesKey}
+                  </Typography>
+                  <Button
+                    component="a"
+                    href={slidesDownloadUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="contained"
+                    size="small"
+                  >
+                    Download Slides
+                  </Button>
+                </Stack>
               ) : (
-                <Alert severity="info">No slides configured.</Alert>
+                <Alert severity="info">No training slides uploaded.</Alert>
               )}
             </Box>
 
@@ -227,5 +284,55 @@ export default function ProjectReviewModal({
         </Button>
       </DialogActions>
     </Dialog>
+      {mapKey && mapDownloadUrl && (
+        <Dialog open={mapLightboxOpen} onClose={() => setMapLightboxOpen(false)} fullScreen>
+          <Box
+            sx={{
+              position: 'relative',
+              width: '100%',
+              height: '100%',
+              bgcolor: '#000',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            <IconButton
+              aria-label="Close map preview"
+              onClick={() => setMapLightboxOpen(false)}
+              sx={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                color: '#fff',
+                bgcolor: 'rgba(0,0,0,0.4)'
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                p: 3
+              }}
+            >
+              {!mapImageError ? (
+                <Box
+                  component="img"
+                  src={mapDownloadUrl}
+                  alt="Project map full view"
+                  onError={() => setMapImageError(true)}
+                  sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                />
+              ) : (
+                <Typography color="#fff">No map available</Typography>
+              )}
+            </Box>
+          </Box>
+        </Dialog>
+      )}
+    </>
   )
 }
