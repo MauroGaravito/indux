@@ -54,6 +54,7 @@ export default function ProjectReviewModal({
   const [slidesPreviewUrl, setSlidesPreviewUrl] = React.useState('')
   const [mapMeta, setMapMeta] = React.useState(null)
   const [slidesMeta, setSlidesMeta] = React.useState(null)
+  const [slidesInfo, setSlidesInfo] = React.useState({ previewUrl: '', contentType: '' })
 
   React.useEffect(() => {
     if (!open) {
@@ -74,10 +75,19 @@ export default function ProjectReviewModal({
   const mapStreamUrl = buildStreamUrl(mapKey)
   const slidesStreamUrl = buildStreamUrl(slidesKey)
   const slidesFilename = slidesKey ? slidesKey.split('/').pop() : 'slides'
-  const slidesContentType = (slidesMeta?.contentType || '').toLowerCase()
-  const slidesIsImage = slidesContentType
-    ? slidesContentType.startsWith('image/')
-    : Boolean(slidesThumbKey)
+  const resolvePreviewUrl = async (key) => {
+    if (!key) return ''
+    const fallback = buildStreamUrl(key)
+    try {
+      const { url } = await presignGet(key)
+      return url || fallback
+    } catch {
+      return fallback
+    }
+  }
+
+  const slidesContentType = (slidesInfo?.contentType || '').toLowerCase()
+  const slidesIsImage = slidesContentType.startsWith('image/')
   const slidesIsPdf = slidesContentType === 'application/pdf'
   const slidesIsPpt = slidesContentType === 'application/vnd.ms-powerpoint' ||
     slidesContentType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
@@ -115,18 +125,23 @@ export default function ProjectReviewModal({
     if (!slidesKey) {
       setSlidesPreviewUrl('')
       setSlidesMeta(null)
+      setSlidesInfo({ previewUrl: '', contentType: '' })
       return
     }
     ;(async () => {
       try {
-        const [metaRes, thumbUrl] = await Promise.all([
-          api.get('/uploads/meta', { params: { key: slidesKey } }).catch(() => ({ data: {} })),
-          slidesThumbKey ? openViaPresign(slidesThumbKey) : openViaPresign(slidesKey)
+        const targetKey = slidesThumbKey || slidesKey
+        const [metaRes, resolvedUrl] = await Promise.all([
+          api.get('/uploads/meta', { params: { key: targetKey } }).catch(() => ({ data: {} })),
+          resolvePreviewUrl(targetKey)
         ])
-        setSlidesMeta(metaRes?.data || {})
-        setSlidesPreviewUrl(thumbUrl || buildStreamUrl(slidesThumbKey || slidesKey))
+        const meta = metaRes?.data || {}
+        setSlidesMeta(meta)
+        setSlidesInfo({ previewUrl: resolvedUrl, contentType: meta?.contentType || '' })
+        setSlidesPreviewUrl(resolvedUrl || buildStreamUrl(targetKey))
       } catch {
         setSlidesMeta(null)
+        setSlidesInfo({ previewUrl: '', contentType: '' })
         setSlidesPreviewUrl(buildStreamUrl(slidesThumbKey || slidesKey))
       }
     })()
@@ -179,10 +194,9 @@ export default function ProjectReviewModal({
   }
 
   const openInViewer = async (key, preferredUrl) => {
-    const url = await openViaPresign(key)
-    const finalUrl = url || preferredUrl || buildStreamUrl(key)
-    if (!finalUrl) return
-    setViewerUrl(finalUrl)
+    const url = preferredUrl || (await resolvePreviewUrl(key))
+    if (!url) return
+    setViewerUrl(url)
     setViewerOpen(true)
   }
 
@@ -286,7 +300,7 @@ export default function ProjectReviewModal({
                     <Button
                       variant="outlined"
                       size="small"
-                      onClick={() => openInViewer(slidesKey, buildStreamUrl(slidesKey))}
+                      onClick={() => openInViewer(slidesKey, slidesInfo.previewUrl)}
                     >
                       View
                     </Button>
