@@ -66,16 +66,18 @@ export default function ProjectReviewModal({
   const configSnapshot = data?.config || {}
   // Debug snapshot to verify structure coming from backend
   console.log('DEBUG REVIEW CONFIG:', configSnapshot)
-  const mapKey = configSnapshot?.projectMapKey
-  const slidesKey = configSnapshot?.slides?.pptKey
-  const slidesThumbKey = configSnapshot?.slides?.thumbKey
+  const mapKey = configSnapshot?.projectMapKey || configSnapshot?.projectInfo?.projectMapKey
+  const slidesKey = configSnapshot?.slides?.pptKey || configSnapshot?.pptKey
+  const slidesThumbKey = configSnapshot?.slides?.thumbKey || configSnapshot?.thumbKey
   const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
   const buildStreamUrl = (key) => (key ? `${apiBaseUrl}/uploads/stream?key=${encodeURIComponent(key)}` : '')
   const mapStreamUrl = buildStreamUrl(mapKey)
   const slidesStreamUrl = buildStreamUrl(slidesKey)
   const slidesFilename = slidesKey ? slidesKey.split('/').pop() : 'slides'
   const slidesContentType = (slidesMeta?.contentType || '').toLowerCase()
-  const slidesIsImage = slidesContentType.startsWith('image/')
+  const slidesIsImage = slidesContentType
+    ? slidesContentType.startsWith('image/')
+    : Boolean(slidesThumbKey)
   const slidesIsPdf = slidesContentType === 'application/pdf'
   const slidesIsPpt = slidesContentType === 'application/vnd.ms-powerpoint' ||
     slidesContentType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
@@ -139,7 +141,9 @@ export default function ProjectReviewModal({
         </Typography>
       )
     }
-    const isImage = (mapMeta?.contentType || '').toLowerCase().startsWith('image/')
+    const isImage = mapMeta?.contentType
+      ? (mapMeta.contentType || '').toLowerCase().startsWith('image/')
+      : true // if no metadata, attempt preview
     if (!isImage) {
       return <Typography variant="body2" color="text.secondary">Map file is not previewable</Typography>
     }
@@ -233,11 +237,11 @@ export default function ProjectReviewModal({
                 <TableBody>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
-                    <TableCell>{configSnapshot?.projectName || 'N/A'}</TableCell>
+                    <TableCell>{configSnapshot?.projectName || configSnapshot?.projectInfo?.projectName || review?.projectId?.name || 'N/A'}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 600 }}>Address</TableCell>
-                    <TableCell>{configSnapshot?.projectAddress || 'N/A'}</TableCell>
+                    <TableCell>{configSnapshot?.projectAddress || configSnapshot?.projectInfo?.projectAddress || 'N/A'}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 600 }}>Map</TableCell>
@@ -407,7 +411,7 @@ export default function ProjectReviewModal({
         </Button>
       </DialogActions>
     </Dialog>
-      {mapKey && (mapPreviewUrl || mapStreamUrl) && (mapMeta?.contentType || '').toLowerCase().startsWith('image/') && (
+      {mapKey && (mapPreviewUrl || mapStreamUrl) && (
         <Dialog open={mapLightboxOpen} onClose={() => setMapLightboxOpen(false)} fullScreen>
           <Box
             sx={{
