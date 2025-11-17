@@ -61,7 +61,9 @@ export default function ProjectReviewModal({
   const data = review?.data || {}
   const fields = Array.isArray(data?.fields) ? data.fields : []
   const configSnapshot = data?.config || {}
-  const mapKey = configSnapshot?.projectInfo?.projectMapKey
+  // Debug snapshot to verify structure coming from backend
+  console.log('DEBUG REVIEW CONFIG:', configSnapshot)
+  const mapKey = configSnapshot?.projectMapKey
   const slidesKey = configSnapshot?.slides?.pptKey
   const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
   const buildStreamUrl = (key) => (key ? `${apiBaseUrl}/uploads/stream?key=${encodeURIComponent(key)}` : '')
@@ -208,14 +210,14 @@ export default function ProjectReviewModal({
                 <TableBody>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
-                    <TableCell>{configSnapshot?.projectInfo?.projectName || 'N/A'}</TableCell>
+                    <TableCell>{configSnapshot?.projectName || 'N/A'}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 600 }}>Address</TableCell>
-                    <TableCell>{configSnapshot?.projectInfo?.projectAddress || 'N/A'}</TableCell>
+                    <TableCell>{configSnapshot?.projectAddress || 'N/A'}</TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 600 }}>Map Key</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Map</TableCell>
                     <TableCell>{renderMapPreview()}</TableCell>
                   </TableRow>
                 </TableBody>
