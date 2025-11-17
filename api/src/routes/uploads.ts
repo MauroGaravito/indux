@@ -82,18 +82,12 @@ router.get('/stream', async (req, res) => {
       }
     }
 
-    const ext = (key.split('.').pop() || '').toLowerCase()
-    const ct = ext === 'pdf'
-      ? 'application/pdf'
-      : ext === 'ppt'
-        ? 'application/vnd.ms-powerpoint'
-        : ext === 'pptx'
-          ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-          : 'application/octet-stream'
-    res.setHeader('Content-Type', ct)
-    res.setHeader('Content-Disposition', 'inline')
     await ensureBucket()
     const { minio, bucket } = await import('../services/minio.js')
+    const stat = await minio.statObject(bucket, key)
+    const ct = (stat as any)?.metaData?.['content-type'] || 'application/octet-stream'
+    res.setHeader('Content-Type', ct)
+    res.setHeader('Content-Disposition', 'inline')
     const obj = await minio.getObject(bucket, key)
     obj.on('error', () => { try { res.status(404).end('Not found') } catch {} })
     obj.pipe(res)
