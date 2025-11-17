@@ -20,6 +20,7 @@ import {
   Typography
 } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
+import { presignGet } from '../../utils/upload.js'
 
 const statusChipColor = (status) => {
   if (status === 'approved') return 'success'
@@ -54,8 +55,9 @@ export default function ProjectReviewModal({
   const mapKey = configSnapshot?.projectInfo?.projectMapKey
   const slidesKey = configSnapshot?.slides?.pptKey
   const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
-  const mapDownloadUrl = mapKey ? `${apiBaseUrl}/uploads/download/${mapKey}` : ''
-  const slidesDownloadUrl = slidesKey ? `${apiBaseUrl}/uploads/download/${slidesKey}` : ''
+  const buildStreamUrl = (key) => (key ? `${apiBaseUrl}/uploads/stream?key=${encodeURIComponent(key)}` : '')
+  const mapStreamUrl = buildStreamUrl(mapKey)
+  const slidesStreamUrl = buildStreamUrl(slidesKey)
   const slidesFilename = slidesKey ? slidesKey.split('/').pop() : ''
 
   React.useEffect(() => {
@@ -80,7 +82,7 @@ export default function ProjectReviewModal({
         </Typography>
         <Box
           component="img"
-          src={mapDownloadUrl}
+          src={mapStreamUrl}
           alt="Project map preview"
           onError={() => setMapImageError(true)}
           onClick={() => setMapLightboxOpen(true)}
@@ -96,6 +98,17 @@ export default function ProjectReviewModal({
         />
       </Stack>
     )
+  }
+
+  const openViaPresign = async (key) => {
+    if (!key) return
+    const fallback = buildStreamUrl(key)
+    try {
+      const { url } = await presignGet(key)
+      window.open(url || fallback, '_blank', 'noopener,noreferrer')
+    } catch (_) {
+      window.open(fallback, '_blank', 'noopener,noreferrer')
+    }
   }
 
   return (
@@ -171,12 +184,9 @@ export default function ProjectReviewModal({
                     {slidesFilename || slidesKey}
                   </Typography>
                   <Button
-                    component="a"
-                    href={slidesDownloadUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     variant="contained"
                     size="small"
+                    onClick={() => openViaPresign(slidesKey)}
                   >
                     Download Slides
                   </Button>
@@ -284,7 +294,7 @@ export default function ProjectReviewModal({
         </Button>
       </DialogActions>
     </Dialog>
-      {mapKey && mapDownloadUrl && (
+      {mapKey && mapStreamUrl && (
         <Dialog open={mapLightboxOpen} onClose={() => setMapLightboxOpen(false)} fullScreen>
           <Box
             sx={{
@@ -321,7 +331,7 @@ export default function ProjectReviewModal({
               {!mapImageError ? (
                 <Box
                   component="img"
-                  src={mapDownloadUrl}
+                  src={mapStreamUrl}
                   alt="Project map full view"
                   onError={() => setMapImageError(true)}
                   sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
