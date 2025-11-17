@@ -24,6 +24,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 import SlideshowIcon from '@mui/icons-material/Slideshow'
 import { presignGet } from '../../utils/upload.js'
+import api from '../../utils/api.js'
 
 const statusChipColor = (status) => {
   if (status === 'approved') return 'success'
@@ -51,6 +52,8 @@ export default function ProjectReviewModal({
   const [viewerUrl, setViewerUrl] = React.useState('')
   const [mapPreviewUrl, setMapPreviewUrl] = React.useState('')
   const [slidesPreviewUrl, setSlidesPreviewUrl] = React.useState('')
+  const [mapMeta, setMapMeta] = React.useState(null)
+  const [slidesMeta, setSlidesMeta] = React.useState(null)
 
   React.useEffect(() => {
     if (!open) {
@@ -65,16 +68,17 @@ export default function ProjectReviewModal({
   console.log('DEBUG REVIEW CONFIG:', configSnapshot)
   const mapKey = configSnapshot?.projectMapKey
   const slidesKey = configSnapshot?.slides?.pptKey
+  const slidesThumbKey = configSnapshot?.slides?.thumbKey
   const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
   const buildStreamUrl = (key) => (key ? `${apiBaseUrl}/uploads/stream?key=${encodeURIComponent(key)}` : '')
   const mapStreamUrl = buildStreamUrl(mapKey)
   const slidesStreamUrl = buildStreamUrl(slidesKey)
-  const slidesFilename = slidesKey ? slidesKey.split('/').pop() : ''
-  const getExtension = (key) => (key ? key.split('.').pop()?.toLowerCase() || '' : '')
-  const slidesExt = getExtension(slidesFilename || slidesKey)
-  const slidesIsImage = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'].includes(slidesExt)
-  const slidesIsPdf = slidesExt === 'pdf'
-  const slidesIsPpt = ['ppt', 'pptx', 'key'].includes(slidesExt)
+  const slidesFilename = slidesKey ? slidesKey.split('/').pop() : 'slides'
+  const slidesContentType = (slidesMeta?.contentType || '').toLowerCase()
+  const slidesIsImage = slidesContentType.startsWith('image/')
+  const slidesIsPdf = slidesContentType === 'application/pdf'
+  const slidesIsPpt = slidesContentType === 'application/vnd.ms-powerpoint' ||
+    slidesContentType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
 
   React.useEffect(() => {
     setMapImageError(false)
@@ -86,11 +90,21 @@ export default function ProjectReviewModal({
   React.useEffect(() => {
     if (!mapKey) {
       setMapPreviewUrl('')
+      setMapMeta(null)
       return
     }
     ;(async () => {
-      const url = await openViaPresign(mapKey)
-      setMapPreviewUrl(url || mapStreamUrl)
+      try {
+        const [metaRes, url] = await Promise.all([
+          api.get('/uploads/meta', { params: { key: mapKey } }).catch(() => ({ data: {} })),
+          openViaPresign(mapKey)
+        ])
+        setMapMeta(metaRes?.data || {})
+        setMapPreviewUrl(url || mapStreamUrl)
+      } catch {
+        setMapMeta(null)
+        setMapPreviewUrl(mapStreamUrl)
+      }
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapKey])
@@ -98,14 +112,24 @@ export default function ProjectReviewModal({
   React.useEffect(() => {
     if (!slidesKey) {
       setSlidesPreviewUrl('')
+      setSlidesMeta(null)
       return
     }
     ;(async () => {
-      const url = await openViaPresign(slidesKey)
-      setSlidesPreviewUrl(url || slidesStreamUrl)
+      try {
+        const [metaRes, thumbUrl] = await Promise.all([
+          api.get('/uploads/meta', { params: { key: slidesKey } }).catch(() => ({ data: {} })),
+          slidesThumbKey ? openViaPresign(slidesThumbKey) : openViaPresign(slidesKey)
+        ])
+        setSlidesMeta(metaRes?.data || {})
+        setSlidesPreviewUrl(thumbUrl || buildStreamUrl(slidesThumbKey || slidesKey))
+      } catch {
+        setSlidesMeta(null)
+        setSlidesPreviewUrl(buildStreamUrl(slidesThumbKey || slidesKey))
+      }
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slidesKey])
+  }, [slidesKey, slidesThumbKey])
 
   const renderMapPreview = () => {
     if (!mapKey || mapImageError) {
@@ -115,8 +139,7 @@ export default function ProjectReviewModal({
         </Typography>
       )
     }
-    const ext = getExtension(mapKey)
-    const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'].includes(ext)
+    const isImage = (mapMeta?.contentType || '').toLowerCase().startsWith('image/')
     if (!isImage) {
       return <Typography variant="body2" color="text.secondary">Map file is not previewable</Typography>
     }
@@ -259,7 +282,7 @@ export default function ProjectReviewModal({
                     <Button
                       variant="outlined"
                       size="small"
-                      onClick={() => openInViewer(slidesKey, slidesPreviewUrl)}
+                      onClick={() => openInViewer(slidesKey, buildStreamUrl(slidesKey))}
                     >
                       View
                     </Button>
@@ -384,7 +407,7 @@ export default function ProjectReviewModal({
         </Button>
       </DialogActions>
     </Dialog>
-      {mapKey && (mapPreviewUrl || mapStreamUrl) && (
+      {mapKey && (mapPreviewUrl || mapStreamUrl) && (mapMeta?.contentType || '').toLowerCase().startsWith('image/') && (
         <Dialog open={mapLightboxOpen} onClose={() => setMapLightboxOpen(false)} fullScreen>
           <Box
             sx={{
