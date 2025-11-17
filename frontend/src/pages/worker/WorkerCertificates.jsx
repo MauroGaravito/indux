@@ -16,6 +16,7 @@ import {
 import DownloadIcon from '@mui/icons-material/Download'
 import api from '../../utils/api.js'
 import { useAuthStore } from '../../context/authStore.js'
+import { presignGet } from '../../utils/upload.js'
 
 const cardStyles = {
   borderRadius: 3,
@@ -30,6 +31,7 @@ export default function WorkerCertificates() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [submissions, setSubmissions] = useState([])
+  const [downloading, setDownloading] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -52,8 +54,23 @@ export default function WorkerCertificates() {
     return () => { active = false }
   }, [userId])
 
-  const handleDownload = () => {
-    // TODO: requires backend endpoint to provide downloadable certificate asset
+  const handleDownload = async (key, projectName) => {
+    if (!key) return
+    try {
+      setDownloading(true)
+      const { url } = await presignGet(key)
+      if (!url) return
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${projectName || 'certificate'}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } catch (e) {
+      console.error('Download failed', e)
+    } finally {
+      setDownloading(false)
+    }
   }
 
   return (
@@ -91,7 +108,14 @@ export default function WorkerCertificates() {
                       <TableCell>{submission?.updatedAt ? new Date(submission.updatedAt).toLocaleString() : '-'}</TableCell>
                       <TableCell>
                         {submission?.certificateKey ? (
-                          <Button size="small" variant="outlined" startIcon={<DownloadIcon />} onClick={handleDownload} sx={{ textTransform: 'none' }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<DownloadIcon />}
+                            onClick={() => handleDownload(submission.certificateKey, project)}
+                            disabled={downloading}
+                            sx={{ textTransform: 'none' }}
+                          >
                             Download
                           </Button>
                         ) : (
