@@ -478,7 +478,7 @@ export default function InductionWizard() {
     if (user?.role !== 'worker') return
     let active = true
     setMySubsLoading(true)
-    api.get('/submissions')
+    api.get('/submissions', { params: { status: 'all' } })
       .then((res) => {
         if (!active) return
         setMySubmissions(Array.isArray(res.data) ? res.data : [])
