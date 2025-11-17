@@ -93,7 +93,72 @@ export default function ProjectReviewModal({
             </Box>
 
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Project Fields Snapshot</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Project Info</Typography>
+              <Table size="small">
+                <TableBody>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
+                    <TableCell>{configSnapshot?.projectInfo?.projectName || 'N/A'}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 600 }}>Address</TableCell>
+                    <TableCell>{configSnapshot?.projectInfo?.projectAddress || 'N/A'}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 600 }}>Map Key</TableCell>
+                    <TableCell>{configSnapshot?.projectInfo?.projectMapKey || 'N/A'}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Slides</Typography>
+              {configSnapshot?.slides?.pptKey ? (
+                <Chip
+                  component="a"
+                  href={configSnapshot.slides.pptKey}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  label="Open Training Slides"
+                  clickable
+                  color="primary"
+                />
+              ) : (
+                <Alert severity="info">No slides configured.</Alert>
+              )}
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Questions</Typography>
+              {Array.isArray(configSnapshot?.questions) && configSnapshot.questions.length ? (
+                <Stack spacing={1.5}>
+                  {configSnapshot.questions.map((question, idx) => (
+                    <Box key={`question-${idx}`} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 2 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        {question?.questionText || `Question ${idx + 1}`}
+                      </Typography>
+                      {Array.isArray(question?.answers) && question.answers.length ? (
+                        <Stack component="ul" sx={{ pl: 3, mt: 1 }}>
+                          {question.answers.map((answer, ai) => (
+                            <Typography component="li" key={`answer-${ai}`} variant="body2">
+                              {answer}
+                            </Typography>
+                          ))}
+                        </Stack>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">No answers provided.</Typography>
+                      )}
+                    </Box>
+                  ))}
+                </Stack>
+              ) : (
+                <Alert severity="info">No quiz questions included in this snapshot.</Alert>
+              )}
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Personal Fields</Typography>
               {fields.length ? (
                 <Table size="small">
                   <TableHead>
@@ -101,7 +166,8 @@ export default function ProjectReviewModal({
                       <TableCell>Label</TableCell>
                       <TableCell>Type</TableCell>
                       <TableCell>Required</TableCell>
-                      <TableCell>Order</TableCell>
+                      <TableCell>Help Text</TableCell>
+                      <TableCell>Options</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -110,34 +176,18 @@ export default function ProjectReviewModal({
                         <TableCell>{field.label || field.key}</TableCell>
                         <TableCell>{field.type}</TableCell>
                         <TableCell>{field.required ? 'Yes' : 'No'}</TableCell>
-                        <TableCell>{field.order ?? '-'}</TableCell>
+                        <TableCell>{field.helpText || '-'}</TableCell>
+                        <TableCell>
+                          {Array.isArray(field.options) && field.options.length
+                            ? field.options.join(', ')
+                            : '-'}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               ) : (
                 <Alert severity="info">No field metadata provided in this snapshot.</Alert>
-              )}
-            </Box>
-
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Configuration Snapshot</Typography>
-              {Object.keys(configSnapshot).length ? (
-                <Box
-                  component="pre"
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    bgcolor: 'grey.50',
-                    overflow: 'auto'
-                  }}
-                >
-                  {JSON.stringify(configSnapshot, null, 2)}
-                </Box>
-              ) : (
-                <Alert severity="info">No additional configuration captured.</Alert>
               )}
             </Box>
 
