@@ -71,7 +71,17 @@ export default function ProjectReviewModal({
   const slidesKey = configSnapshot?.slides?.pptKey || configSnapshot?.pptKey
   const slidesThumbKey = configSnapshot?.slides?.thumbKey || configSnapshot?.thumbKey
   const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
-  const buildStreamUrl = (key) => (key ? `${apiBaseUrl}/uploads/stream?key=${encodeURIComponent(key)}` : '')
+  const getToken = () => {
+    const header = api.defaults.headers.common['Authorization']
+    if (!header) return ''
+    return header.replace('Bearer ', '')
+  }
+  const buildStreamUrl = (key) => {
+    if (!key) return ''
+    const token = getToken()
+    const qs = `key=${encodeURIComponent(key)}${token ? `&token=${encodeURIComponent(token)}` : ''}`
+    return `${apiBaseUrl}/uploads/stream?${qs}`
+  }
   const mapStreamUrl = buildStreamUrl(mapKey)
   const slidesStreamUrl = buildStreamUrl(slidesKey)
   const slidesFilename = slidesKey ? slidesKey.split('/').pop() : 'slides'
@@ -123,10 +133,10 @@ export default function ProjectReviewModal({
           openViaPresign(mapKey)
         ])
         setMapMeta(metaRes?.data || {})
-        setMapPreviewUrl(url || appendToken(mapStreamUrl))
+        setMapPreviewUrl(url || mapStreamUrl)
       } catch {
         setMapMeta(null)
-        setMapPreviewUrl(appendToken(mapStreamUrl))
+        setMapPreviewUrl(mapStreamUrl)
       }
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -149,11 +159,11 @@ export default function ProjectReviewModal({
         const meta = metaRes?.data || {}
         setSlidesMeta(meta)
         setSlidesInfo({ previewUrl: resolvedUrl, contentType: meta?.contentType || '' })
-        setSlidesPreviewUrl(resolvedUrl || appendToken(buildStreamUrl(targetKey)))
+        setSlidesPreviewUrl(resolvedUrl || buildStreamUrl(targetKey))
       } catch {
         setSlidesMeta(null)
         setSlidesInfo({ previewUrl: '', contentType: '' })
-        setSlidesPreviewUrl(appendToken(buildStreamUrl(slidesThumbKey || slidesKey)))
+        setSlidesPreviewUrl(buildStreamUrl(slidesThumbKey || slidesKey))
       }
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -195,7 +205,7 @@ export default function ProjectReviewModal({
 
   const openViaPresign = async (key) => {
     if (!key) return
-    const fallback = appendToken(buildStreamUrl(key))
+    const fallback = buildStreamUrl(key)
     try {
       const { url } = await presignGet(key)
       return url || fallback
