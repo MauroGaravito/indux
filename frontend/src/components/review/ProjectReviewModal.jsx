@@ -42,6 +42,8 @@ export default function ProjectReviewModal({
   const [reason, setReason] = React.useState('')
   const [mapImageError, setMapImageError] = React.useState(false)
   const [mapLightboxOpen, setMapLightboxOpen] = React.useState(false)
+  const [slidesImageError, setSlidesImageError] = React.useState(false)
+  const [slidesLightboxOpen, setSlidesLightboxOpen] = React.useState(false)
 
   React.useEffect(() => {
     if (!open) {
@@ -59,6 +61,11 @@ export default function ProjectReviewModal({
   const mapStreamUrl = buildStreamUrl(mapKey)
   const slidesStreamUrl = buildStreamUrl(slidesKey)
   const slidesFilename = slidesKey ? slidesKey.split('/').pop() : ''
+  const slidesIsImage = (() => {
+    if (!slidesKey) return false
+    const ext = (slidesFilename || slidesKey).split('.').pop()?.toLowerCase() || ''
+    return ['png','jpg','jpeg','webp','gif','bmp'].includes(ext)
+  })()
 
   React.useEffect(() => {
     setMapImageError(false)
@@ -183,13 +190,41 @@ export default function ProjectReviewModal({
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     {slidesFilename || slidesKey}
                   </Typography>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    onClick={() => openViaPresign(slidesKey)}
-                  >
-                    Download Slides
-                  </Button>
+                  {slidesIsImage && !slidesImageError && (
+                    <Box
+                      component="img"
+                      src={slidesStreamUrl}
+                      alt="Slides preview"
+                      onError={() => setSlidesImageError(true)}
+                      onClick={() => setSlidesLightboxOpen(true)}
+                      sx={{
+                        width: 200,
+                        maxWidth: '100%',
+                        borderRadius: 1,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        cursor: 'pointer',
+                        objectFit: 'cover'
+                      }}
+                    />
+                  )}
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => openViaPresign(slidesKey)}
+                    >
+                      View
+                    </Button>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={() => openViaPresign(slidesKey)}
+                    >
+                      Download Slides
+                    </Button>
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary">{slidesFilename}</Typography>
                 </Stack>
               ) : (
                 <Alert severity="info">No training slides uploaded.</Alert>
@@ -338,6 +373,55 @@ export default function ProjectReviewModal({
                 />
               ) : (
                 <Typography color="#fff">No map available</Typography>
+              )}
+            </Box>
+          </Box>
+        </Dialog>
+      )}
+      {slidesKey && slidesStreamUrl && slidesIsImage && (
+        <Dialog open={slidesLightboxOpen} onClose={() => setSlidesLightboxOpen(false)} fullScreen>
+          <Box
+            sx={{
+              position: 'relative',
+              width: '100%',
+              height: '100%',
+              bgcolor: '#000',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            <IconButton
+              aria-label="Close slides preview"
+              onClick={() => setSlidesLightboxOpen(false)}
+              sx={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                color: '#fff',
+                bgcolor: 'rgba(0,0,0,0.4)'
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                p: 3
+              }}
+            >
+              {!slidesImageError ? (
+                <Box
+                  component="img"
+                  src={slidesStreamUrl}
+                  alt="Slides full view"
+                  onError={() => setSlidesImageError(true)}
+                  sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                />
+              ) : (
+                <Typography color="#fff">No preview available</Typography>
               )}
             </Box>
           </Box>
