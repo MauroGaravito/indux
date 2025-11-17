@@ -32,9 +32,8 @@ export async function getMeta(req: Request, res: Response, next: NextFunction) {
       throw new HttpError(400, 'Could not fetch object metadata')
     })
 
-    const meta = stat?.metaData || {}
-    const contentType = stat?.contentType
-      || meta['content-type']
+    const meta = (stat as any)?.metaData || {}
+    const contentType = meta['content-type']
       || meta['Content-Type']
       || meta['contentType']
       || meta['content_type']
