@@ -75,9 +75,20 @@ export default function ProjectReviewModal({
   const mapStreamUrl = buildStreamUrl(mapKey)
   const slidesStreamUrl = buildStreamUrl(slidesKey)
   const slidesFilename = slidesKey ? slidesKey.split('/').pop() : 'slides'
+  const getAccessToken = () =>
+    localStorage.getItem('token') ||
+    localStorage.getItem('accessToken') ||
+    sessionStorage.getItem('token') ||
+    sessionStorage.getItem('accessToken')
+  const appendToken = (url) => {
+    const t = getAccessToken()
+    if (!t || !url) return url
+    const sep = url.includes('?') ? '&' : '?'
+    return `${url}${sep}token=${encodeURIComponent(t)}`
+  }
   const resolvePreviewUrl = async (key) => {
     if (!key) return ''
-    const fallback = buildStreamUrl(key)
+    const fallback = appendToken(buildStreamUrl(key))
     try {
       const { url } = await presignGet(key)
       return url || fallback
@@ -112,10 +123,10 @@ export default function ProjectReviewModal({
           openViaPresign(mapKey)
         ])
         setMapMeta(metaRes?.data || {})
-        setMapPreviewUrl(url || mapStreamUrl)
+        setMapPreviewUrl(url || appendToken(mapStreamUrl))
       } catch {
         setMapMeta(null)
-        setMapPreviewUrl(mapStreamUrl)
+        setMapPreviewUrl(appendToken(mapStreamUrl))
       }
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,11 +149,11 @@ export default function ProjectReviewModal({
         const meta = metaRes?.data || {}
         setSlidesMeta(meta)
         setSlidesInfo({ previewUrl: resolvedUrl, contentType: meta?.contentType || '' })
-        setSlidesPreviewUrl(resolvedUrl || buildStreamUrl(targetKey))
+        setSlidesPreviewUrl(resolvedUrl || appendToken(buildStreamUrl(targetKey)))
       } catch {
         setSlidesMeta(null)
         setSlidesInfo({ previewUrl: '', contentType: '' })
-        setSlidesPreviewUrl(buildStreamUrl(slidesThumbKey || slidesKey))
+        setSlidesPreviewUrl(appendToken(buildStreamUrl(slidesThumbKey || slidesKey)))
       }
     })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -184,7 +195,7 @@ export default function ProjectReviewModal({
 
   const openViaPresign = async (key) => {
     if (!key) return
-    const fallback = buildStreamUrl(key)
+    const fallback = appendToken(buildStreamUrl(key))
     try {
       const { url } = await presignGet(key)
       return url || fallback
