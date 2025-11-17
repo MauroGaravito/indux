@@ -23,10 +23,13 @@ function writeAuth(patch) {
   } catch (_) {}
 }
 
-// Hydrate once on module load
+// Hydrate token on module load so first requests carry Authorization
 try {
   const saved = readAuth()
-  if (saved?.accessToken) accessToken = saved.accessToken
+  if (saved?.accessToken) {
+    accessToken = saved.accessToken
+    instance.defaults.headers.common.Authorization = `Bearer ${accessToken}`
+  }
 } catch (_) {}
 
 instance.interceptors.request.use((config) => {
@@ -79,6 +82,7 @@ instance.interceptors.response.use(
       }
       // update in-memory and storage, then retry
       accessToken = newAccess
+      instance.defaults.headers.common.Authorization = `Bearer ${newAccess}`
       writeAuth({ accessToken: newAccess })
       config.headers.Authorization = `Bearer ${newAccess}`
       return instance(config)
@@ -90,10 +94,20 @@ instance.interceptors.response.use(
 )
 
 export default Object.assign(instance, {
-  setToken: (token) => { accessToken = token },
+  setToken: (token) => {
+    accessToken = token
+    if (token) {
+      instance.defaults.headers.common.Authorization = `Bearer ${token}`
+    } else {
+      delete instance.defaults.headers.common.Authorization
+    }
+  },
   // Hydrate token from storage at app start if present
   hydrateFromStorage: () => {
     const saved = readAuth()
-    if (saved?.accessToken) accessToken = saved.accessToken
+    if (saved?.accessToken) {
+      accessToken = saved.accessToken
+      instance.defaults.headers.common.Authorization = `Bearer ${accessToken}`
+    }
   }
 })
