@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import jwt from 'jsonwebtoken';
 import { requireAuth } from '../middleware/auth.js';
 import { presignPutUrl, presignGetUrl, ensureBucket } from '../services/minio.js';
 import * as uploadsController from '../controllers/uploadsController.js';
@@ -6,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { Project } from '../models/Project.js';
 import { Assignment } from '../models/Assignment.js';
+import { User } from '../models/User.js';
 
 const router = Router();
 
@@ -39,14 +41,27 @@ router.post('/presign-get', requireAuth, async (req, res) => {
   }
 });
 
-// Stream object via API (same-origin fallback to avoid PUBLIC_S3_ENDPOINT/CORS issues)
-router.get('/stream', requireAuth, async (req, res) => {
+// Stream object via API (allows query token for img/iframe usage)
+router.get('/stream', async (req, res) => {
   try {
-    const key = String((req.query as any)?.key || '');
-    if (!key) return res.status(400).json({ error: 'Missing key' });
+    // Accept bearer header or ?token= for auth, mirroring presign-get intent
+    let token = ''
+    const header = req.headers.authorization
+    if (header && header.startsWith('Bearer ')) token = header.slice('Bearer '.length)
+    if (!token && typeof (req.query as any)?.token === 'string') token = String((req.query as any).token)
+    if (!token) return res.status(401).json({ error: 'Unauthorized' })
+    const payload: any = jwt.verify(token, process.env.JWT_ACCESS_SECRET as string)
+    const user = await User.findById(payload.sub).lean()
+    if (!user || user.disabled || user.status !== 'approved' || !user.emailVerified) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+    ;(req as any).user = { sub: String(user._id), role: user.role }
+
+    const key = String((req.query as any)?.key || '')
+    if (!key) return res.status(400).json({ error: 'Missing key' })
 
     // Authorization: admin/manager always allowed; worker only if assigned to project owning the key
-    const role = req.user!.role;
+    const role = (req as any).user!.role
     if (role === 'worker' || role === 'manager') {
       const project = await Project.findOne({
         $or: [
@@ -54,19 +69,19 @@ router.get('/stream', requireAuth, async (req, res) => {
           { 'config.slides.pptKey': key },
           { 'config.slides.thumbKey': key }
         ]
-      }).select('_id').lean();
-      if (!project) return res.status(404).json({ error: 'Asset not found' });
+      }).select('_id').lean()
+      if (!project) return res.status(404).json({ error: 'Asset not found' })
       if (role === 'worker') {
         const assignment = await Assignment.findOne({
-          user: req.user!.sub,
+          user: (req as any).user!.sub,
           project: project._id,
           role: 'worker',
           $or: [{ endedAt: { $exists: false } }, { endedAt: null }]
-        }).lean();
-        if (!assignment) return res.status(403).json({ error: 'Forbidden' });
+        }).lean()
+        if (!assignment) return res.status(403).json({ error: 'Forbidden' })
       }
     }
-    // admins bypass checks
+
     const ext = (key.split('.').pop() || '').toLowerCase()
     const ct = ext === 'pdf'
       ? 'application/pdf'
