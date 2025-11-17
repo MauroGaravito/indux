@@ -391,17 +391,27 @@ export default function InductionWizard() {
 
   const [status, setStatus] = useState('idle') // idle | submitting | done | error
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [projectFields, setProjectFields] = useState([])
+  const [fieldsLoading, setFieldsLoading] = useState(false)
+  const [fieldsError, setFieldsError] = useState('')
+  const [submissionLock, setSubmissionLock] = useState('')
+  const [submissionError, setSubmissionError] = useState('')
 
   const personalFields = useMemo(() => {
-    if (!project) return []
-    const base = Array.isArray(project?.config?.personalDetails?.fields) ? project.config.personalDetails.fields : []
-    const extra = Array.isArray(project?.config?.extraFields) ? project.config.extraFields : []
-    return [...base, ...extra].map((field, idx) => ({
-      ...field,
-      type: field?.type || 'text',
-      __key: deriveFieldKey(field, idx)
-    }))
-  }, [project])
+    if (!projectFields?.length) return []
+    return [...projectFields]
+      .sort((a, b) => {
+        const orderA = Number.isFinite(a?.order) ? a.order : 0
+        const orderB = Number.isFinite(b?.order) ? b.order : 0
+        if (orderA !== orderB) return orderA - orderB
+        return (a.createdAt || '').localeCompare(b.createdAt || '')
+      })
+      .map((field, idx) => ({
+        ...field,
+        type: field?.type || 'text',
+        __key: field?.key || deriveFieldKey(field, idx)
+      }))
+  }, [projectFields])
 
   const questions = useMemo(() => project?.config?.questions || [], [project])
   const totalQ = questions.length
@@ -419,7 +429,8 @@ export default function InductionWizard() {
     }) || null
   }, [project, mySubmissions])
   const currentStatus = currentSubmission?.status || null
-  const canStartSubmission = !currentStatus || currentStatus === 'declined'
+  const isProjectApproved = project?.reviewStatus === 'approved'
+  const canStartSubmission = Boolean(isProjectApproved && (!currentStatus || currentStatus === 'declined') && !submissionLock)
   const statusInfo = currentStatus
     ? {
         approved: {
@@ -436,6 +447,16 @@ export default function InductionWizard() {
         }
       }[currentStatus]
     : null
+  const reviewStatusInfo = project && !isProjectApproved
+    ? {
+        severity: project.reviewStatus === 'declined' ? 'warning' : 'info',
+        message: `This project is currently ${project.reviewStatus}. You cannot start the induction until it is approved.`
+      }
+    : null
+  const lockInfo = submissionLock
+    ? { severity: 'warning', message: submissionLock }
+    : null
+  const projectAlerts = [statusInfo, reviewStatusInfo, lockInfo].filter(Boolean)
   const validatePersonal = () => {
     if (!personalFields.length) return true
     return personalFields.every((field) => {
@@ -473,10 +494,10 @@ export default function InductionWizard() {
   }, [user?.role])
 
   useEffect(() => {
-    if (step > 0 && (!project || (currentStatus && currentStatus !== 'declined'))) {
+    if (step > 0 && (!project || !isProjectApproved || submissionLock || (currentStatus && currentStatus !== 'declined'))) {
       setStep(0)
     }
-  }, [step, project, currentStatus])
+  }, [step, project, currentStatus, isProjectApproved, submissionLock])
 
   useEffect(() => {
     if (!project || !personalFields.length) {
@@ -486,7 +507,7 @@ export default function InductionWizard() {
     if (currentSubmission?.status === 'declined' && currentSubmission.personal) {
       const next = {}
       personalFields.forEach((field) => {
-        const keys = [field.label, field.__key, field.key]
+        const keys = [field.key, field.label, field.__key]
         for (const key of keys) {
           if (key && currentSubmission.personal[key] !== undefined) {
             next[field.__key] = currentSubmission.personal[key]
@@ -506,6 +527,32 @@ export default function InductionWizard() {
     setPersonalValues((prev) => ({ ...prev, [field.__key]: value }))
   }
 
+  const loadProjectFields = async (projectId, inlineFields = []) => {
+    if (!projectId) {
+      setProjectFields([])
+      setFieldsError('')
+      return
+    }
+    if (Array.isArray(inlineFields) && inlineFields.length) {
+      setProjectFields(inlineFields)
+      setFieldsError('')
+      return
+    }
+    setFieldsLoading(true)
+    setFieldsError('')
+    try {
+      const res = await api.get(`/projects/${projectId}/fields`)
+      const list = Array.isArray(res.data) ? res.data : []
+      setProjectFields(list)
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to load project fields'
+      setFieldsError(msg)
+      setProjectFields([])
+    } finally {
+      setFieldsLoading(false)
+    }
+  }
+
   const selectProject = async (id) => {
     const fallback = projects.find((x) => x._id === id) || null
     // Reset estado dependiente
@@ -514,6 +561,10 @@ export default function InductionWizard() {
     setScore(null)
     setPassed(null)
     setSignature(null)
+    setSubmissionLock('')
+    setSubmissionError('')
+    setFieldsError('')
+    setProjectFields([])
     if (!id) {
       setProject(null)
       return
@@ -522,9 +573,13 @@ export default function InductionWizard() {
     setProjectLoading(true)
     try {
       const res = await api.get(`/projects/${id}`)
-      setProject(res.data || fallback)
-    } catch {
+      const projectData = res.data || fallback
+      setProject(projectData)
+      const inlineFields = Array.isArray(projectData?.fields) ? projectData.fields : []
+      await loadProjectFields(id, inlineFields)
+    } catch (err) {
       setProject(fallback)
+      await loadProjectFields(id)
     } finally {
       setProjectLoading(false)
     }
@@ -544,7 +599,8 @@ export default function InductionWizard() {
     personalFields.forEach((field) => {
       const val = personalValues[field.__key]
       if (val !== undefined) {
-        payload[field.label || field.__key] = val
+        const key = field.key || field.label || field.__key
+        payload[key] = val
       }
     })
     return payload
@@ -553,6 +609,8 @@ export default function InductionWizard() {
   const submit = async () => {
     try {
       setStatus('submitting')
+      setSubmissionError('')
+      setSubmissionLock('')
 
       const uploadFields = personalFields.filter((f) => ['image', 'camera', 'file'].includes(f.type))
       const uploads = uploadFields
@@ -576,8 +634,17 @@ export default function InductionWizard() {
 
       // ✅ Redirigir y refrescar para limpiar el estado
       navigate(0)
-      
     } catch (e) {
+      const message = e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Failed to submit induction.'
+      if (e?.response?.status === 409) {
+        setSubmissionLock('This induction has already been approved. You cannot submit another response for this project.')
+        setSubmissionError('')
+      } else if (e?.response?.status === 403) {
+        setSubmissionLock(message)
+        setSubmissionError('')
+      } else {
+        setSubmissionError(message)
+      }
       setStatus('error')
     }
   }
@@ -616,13 +683,23 @@ export default function InductionWizard() {
             ))}
           </TextField>
           {mySubsLoading && <LinearProgress sx={{ mt: 2 }} />}
-          {statusInfo && (
-            <Alert severity={statusInfo.severity} sx={{ mt: 2 }}>
-              {statusInfo.message}
+          {projectAlerts.map((alert, idx) => (
+            <Alert key={idx} severity={alert.severity} sx={{ mt: 2 }}>
+              {alert.message}
             </Alert>
-          )}
+          ))}
           <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-            <Button variant="contained" onClick={nextStep} disabled={!project || !canStartSubmission || projectLoading}>
+            <Button
+              variant="contained"
+              onClick={nextStep}
+              disabled={
+                !project ||
+                !canStartSubmission ||
+                projectLoading ||
+                fieldsLoading ||
+                Boolean(fieldsError)
+              }
+            >
               Continue
             </Button>
           </Stack>
@@ -636,36 +713,39 @@ export default function InductionWizard() {
             Personal Details
           </Typography>
           <Stack spacing={2}>
-            {projectLoading && <LinearProgress />}
+            {(projectLoading || fieldsLoading) && <LinearProgress />}
             {currentStatus === 'declined' && (
               <Alert severity="warning">
                 {statusInfo?.message || 'Your previous submission was declined. Please review and update the information below.'}
               </Alert>
             )}
-            {!projectLoading && !personalFields.length && (
+            {fieldsError && (
+              <Alert severity="error">{fieldsError}</Alert>
+            )}
+            {!projectLoading && !fieldsLoading && !personalFields.length && !fieldsError && (
               <Alert severity="info">This project has no personal detail fields configured.</Alert>
             )}
-            {!!personalFields.length && !projectLoading && (
-                <Grid container spacing={2}>
-                  {personalFields.map((field) => (
-                    <Grid item xs={12} sm={field.type === 'textarea' ? 12 : 6} key={field.__key}>
-                      <Stack spacing={0.5}>
-                        <DynamicField
-                          field={{ ...field, key: field.__key }}
-                          value={personalValues[field.__key]}
-                          onChange={(val) => handlePersonalChange(field, val)}
-                        />
-                        {field?.description && field.type !== 'boolean' && (
-                          <Typography variant="caption" color="text.secondary">{field.description}</Typography>
-                        )}
-                      </Stack>
-                    </Grid>
-                  ))}
-                </Grid>
+            {!!personalFields.length && !projectLoading && !fieldsLoading && (
+              <Grid container spacing={2}>
+                {personalFields.map((field) => (
+                  <Grid item xs={12} sm={field.type === 'textarea' ? 12 : 6} key={field.__key}>
+                    <Stack spacing={0.5}>
+                      <DynamicField
+                        field={{ ...field, key: field.__key }}
+                        value={personalValues[field.__key]}
+                        onChange={(val) => handlePersonalChange(field, val)}
+                      />
+                      {field?.helpText && field.type !== 'boolean' && (
+                        <Typography variant="caption" color="text.secondary">{field.helpText}</Typography>
+                      )}
+                    </Stack>
+                  </Grid>
+                ))}
+              </Grid>
             )}
             <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
               <Button onClick={prevStep}>Back</Button>
-              <Button variant="contained" onClick={nextStep} disabled={!isPersonalValid || projectLoading}>
+              <Button variant="contained" onClick={nextStep} disabled={!isPersonalValid || projectLoading || fieldsLoading}>
                 Continue
               </Button>
             </Stack>
@@ -780,7 +860,7 @@ export default function InductionWizard() {
           )}
           {status === 'error' && (
             <Alert severity="error" sx={{ mt: 2 }}>
-              Error submitting. Try again.
+              {submissionError || 'Error submitting. Try again.'}
             </Alert>
           )}
 

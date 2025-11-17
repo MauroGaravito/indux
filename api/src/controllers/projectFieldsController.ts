@@ -3,7 +3,7 @@ import * as svc from '../services/projectFieldsService.js';
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
-    const fields = await svc.listFields(req.params.projectId);
+    const fields = await svc.listFields(req.params.projectId, req.user);
     res.json(fields);
   } catch (err) { next(err); }
 }

@@ -46,36 +46,17 @@ export default function ReviewQueue() {
 
   useEffect(() => {
     if (user?.role) {
-      loadSubmissions(user.role)
+      loadSubmissions()
     }
   }, [user?.role])
 
-  const loadSubmissions = async (role) => {
-    if (!role) return
+  const loadSubmissions = async () => {
+    if (!user?.role) return
     setLoading(true)
     setError('')
     try {
-      const params = {}
-      if (role === 'manager') params.scope = 'manager'
-
-      const res = await api.get('/submissions', { params })
+      const res = await api.get('/submissions')
       let data = Array.isArray(res.data) ? res.data : (Array.isArray(res.data?.items) ? res.data.items : [])
-
-      if (role === 'manager' && !params.scope) {
-        const managerId = user?._id || user?.id
-        data = data.filter((submission) => {
-          const project = submission?.projectId
-          if (project && Array.isArray(project?.managers)) {
-            return project.managers.some((mgr) => {
-              if (!mgr) return false
-              const mgrId = typeof mgr === 'object' ? (mgr?._id || mgr?.id) : mgr
-              return mgrId === managerId
-            })
-          }
-          return true
-        })
-      }
-
       setItems(data)
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Failed to load submissions'
@@ -92,20 +73,11 @@ export default function ReviewQueue() {
     setModalLoading(true)
     setSelected(null)
     try {
-      const projectId = typeof submission?.projectId === 'object'
-        ? submission?.projectId?._id
-        : submission?.projectId
-
-      let projectData = null
-      let fields = []
-      if (projectId) {
-        const projectRes = await api.get(`/projects/${projectId}`)
-        projectData = projectRes.data
-        const personalFields = projectData?.config?.personalDetails?.fields
-        fields = Array.isArray(personalFields) ? personalFields : []
-      }
-
-      setSelected({ submission, project: projectData, fields })
+      const detailRes = await api.get(`/submissions/${submission?._id || submission?.id}`)
+      const submissionData = detailRes.data || submission
+      const projectData = typeof submissionData?.projectId === 'object' ? submissionData.projectId : null
+      const fields = Array.isArray(submissionData?.fields) ? submissionData.fields : []
+      setSelected({ submission: submissionData, project: projectData, fields })
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Failed to load submission detail'
       notifyError(msg)
@@ -125,7 +97,7 @@ export default function ReviewQueue() {
       await api.post(`/submissions/${id}/approve`)
       notifySuccess('Submission approved')
       closeModal()
-      loadSubmissions(user?.role)
+      loadSubmissions()
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Failed to approve submission'
       notifyError(msg)
@@ -138,7 +110,7 @@ export default function ReviewQueue() {
       await api.post(`/submissions/${id}/decline`, {})
       notifySuccess('Submission sent back to worker')
       closeModal()
-      loadSubmissions(user?.role)
+      loadSubmissions()
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Failed to decline submission'
       notifyError(msg)
@@ -152,7 +124,7 @@ export default function ReviewQueue() {
       await api.delete(`/submissions/${id}`)
       notifySuccess('Submission deleted')
       closeModal()
-      loadSubmissions(user?.role)
+      loadSubmissions()
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Failed to delete submission'
       notifyError(msg)

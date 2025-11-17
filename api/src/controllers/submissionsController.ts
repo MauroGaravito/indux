@@ -40,6 +40,13 @@ export async function list(req: Request, res: Response, next: NextFunction) {
   } catch (err) { next(err) }
 }
 
+export async function getOne(req: Request, res: Response, next: NextFunction) {
+  try {
+    const sub = await svc.getSubmissionById(req.params.id, req.user!.role, req.user!.sub)
+    res.json(sub)
+  } catch (err) { next(err) }
+}
+
 export async function approve(req: Request, res: Response, next: NextFunction) {
   try {
     const out = await svc.approveSubmission(req.params.id, req.user!.sub, req.user!.role)

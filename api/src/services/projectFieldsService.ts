@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { ProjectField } from '../models/ProjectField.js';
 import { Project } from '../models/Project.js';
+import { Assignment } from '../models/Assignment.js';
 import { HttpError } from '../middleware/errorHandler.js';
 import { ProjectFieldCreateSchema, ProjectFieldUpdateSchema } from '../utils/validators.js';
 import type { AuthPayload } from '../middleware/auth.js';
@@ -12,11 +13,55 @@ function ensureObjectId(id: string, label: string) {
   }
 }
 
-export async function listFields(projectId: string) {
+const ACTIVE_ASSIGNMENT_CLAUSE = [{ endedAt: { $exists: false } }, { endedAt: null }];
+
+function serializeField(field: any) {
+  return {
+    _id: String(field._id),
+    key: field.key,
+    label: field.label,
+    type: field.type,
+    required: field.required,
+    order: field.order,
+    helpText: field.helpText,
+    options: field.options
+  };
+}
+
+async function ensureFieldAccess(user: AuthPayload | undefined, projectId: string) {
+  if (!user) throw new HttpError(401, 'Unauthorized');
+  const project = await Project.findById(projectId).select('reviewStatus').lean();
+  if (!project) throw new HttpError(404, 'Project not found');
+  if (user.role === 'admin') return project;
+  if (user.role === 'manager') {
+    const assignment = await Assignment.findOne({
+      user: user.sub,
+      project: projectId,
+      role: 'manager',
+      $or: ACTIVE_ASSIGNMENT_CLAUSE
+    }).lean();
+    if (!assignment) throw new HttpError(403, 'Forbidden');
+    return project;
+  }
+  if (user.role === 'worker') {
+    if (project.reviewStatus !== 'approved') throw new HttpError(403, 'Project not available');
+    const assignment = await Assignment.findOne({
+      user: user.sub,
+      project: projectId,
+      role: 'worker',
+      $or: ACTIVE_ASSIGNMENT_CLAUSE
+    }).lean();
+    if (!assignment) throw new HttpError(403, 'Forbidden');
+    return project;
+  }
+  throw new HttpError(403, 'Forbidden');
+}
+
+export async function listFields(projectId: string, user?: AuthPayload) {
   ensureObjectId(projectId, 'project id');
-  const exists = await Project.exists({ _id: projectId });
-  if (!exists) throw new HttpError(404, 'Project not found');
-  return ProjectField.find({ projectId }).sort({ order: 1, createdAt: 1 }).lean();
+  await ensureFieldAccess(user, projectId);
+  const fields = await ProjectField.find({ projectId }).sort({ order: 1, createdAt: 1 }).lean();
+  return fields.map(serializeField);
 }
 
 export async function createField(payload: unknown, user: AuthPayload) {

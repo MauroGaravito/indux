@@ -51,12 +51,18 @@ export default function AdminDashboard() {
   const [usersLoading, setUsersLoading] = React.useState(true)
 
   React.useEffect(() => {
+    const normalizeList = (res) => {
+      if (!res) return []
+      if (Array.isArray(res.data)) return res.data
+      if (Array.isArray(res.data?.items)) return res.data.items
+      return []
+    }
     let mounted = true
     async function fetchProjects() {
       setProjectsLoading(true); setProjectsError('')
       try {
         const res = await api.get('/projects')
-        if (mounted) setProjects(res.data || [])
+        if (mounted) setProjects(normalizeList(res))
       } catch (e) {
         if (mounted) setProjectsError(e?.response?.data?.message || 'Failed to load projects')
       } finally { if (mounted) setProjectsLoading(false) }
@@ -64,8 +70,8 @@ export default function AdminDashboard() {
     async function fetchSubmissions() {
       setSubmissionsLoading(true); setSubmissionsError('')
       try {
-        const res = await api.get('/submissions')
-        if (mounted) setSubmissions(res.data || [])
+        const res = await api.get('/submissions', { params: { status: 'all' } })
+        if (mounted) setSubmissions(normalizeList(res))
       } catch (e) {
         if (mounted) setSubmissionsError(e?.response?.data?.message || 'Failed to load submissions')
       } finally { if (mounted) setSubmissionsLoading(false) }
@@ -74,7 +80,7 @@ export default function AdminDashboard() {
       setReviewsLoading(true); setReviewsError('')
       try {
         const res = await api.get('/reviews/projects')
-        if (mounted) setReviews(res.data || [])
+        if (mounted) setReviews(normalizeList(res))
       } catch (e) {
         if (mounted) setReviewsError(e?.response?.data?.message || 'Failed to load reviews')
       } finally { if (mounted) setReviewsLoading(false) }
@@ -83,7 +89,7 @@ export default function AdminDashboard() {
       setUsersLoading(true); setUsersError('')
       try {
         const res = await api.get('/users')
-        if (mounted) setUsers(res.data || [])
+        if (mounted) setUsers(normalizeList(res))
       } catch (e) {
         if (mounted) setUsersError(e?.response?.data?.message || 'Failed to load users')
       } finally { if (mounted) setUsersLoading(false) }
@@ -96,13 +102,15 @@ export default function AdminDashboard() {
   }, [])
 
   React.useEffect(() => {
+    const approvedProjects = projects.filter((p) => p.reviewStatus === 'approved')
     const completedCount = submissions.filter((s) => s?.status === 'approved').length
     const pendingSubmissions = submissions.filter((s) => s?.status === 'pending').length
     const pendingProjectReviews = reviews.filter((r) => r?.status === 'pending').length
+    const pendingProjectStates = projects.filter((p) => p.reviewStatus === 'pending').length
     setStats({
-      projects: projects.length,
+      projects: approvedProjects.length,
       completed: completedCount,
-      pendingReviews: pendingSubmissions + pendingProjectReviews,
+      pendingReviews: pendingSubmissions + pendingProjectReviews + pendingProjectStates,
       users: users.length
     })
   }, [projects, submissions, reviews, users])
@@ -114,7 +122,7 @@ export default function AdminDashboard() {
       <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>Overview</Typography>
       {overallLoading && <LinearProgress sx={{ mb: 2 }} />}
       <Grid container spacing={2}>
-        <Grid item xs={12} sm={6} md={3}><Stat label="Projects" value={overallLoading ? '...' : String(stats.projects)} /></Grid>
+        <Grid item xs={12} sm={6} md={3}><Stat label="Approved Projects" value={overallLoading ? '...' : String(stats.projects)} /></Grid>
         <Grid item xs={12} sm={6} md={3}><Stat label="Inductions Completed" value={overallLoading ? '...' : String(stats.completed)} /></Grid>
         <Grid item xs={12} sm={6} md={3}><Stat label="Pending Reviews" value={overallLoading ? '...' : String(stats.pendingReviews)} /></Grid>
         <Grid item xs={12} sm={6} md={3}><Stat label="Users" value={overallLoading ? '...' : String(stats.users)} /></Grid>
@@ -134,6 +142,9 @@ export default function AdminDashboard() {
           </Grid>
           <Grid item xs={12}>
             <SystemStatusCard projects={projects} submissions={submissions} reviews={reviews} users={users} />
+          </Grid>
+          <Grid item xs={12}>
+            <ProjectsStatusCard projects={projects} loading={projectsLoading} error={projectsError} />
           </Grid>
         </Grid>
       </Card>
@@ -309,5 +320,38 @@ function StatusStat({ icon, label, value }) {
       </Stack>
     </Box>
   )
+}
+
+function ProjectsStatusCard({ projects, loading, error }) {
+  return (
+    <Card sx={cardStyles}>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Projects Overview</Typography>
+      {loading && <LinearProgress sx={{ mb: 2 }} />}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {!loading && !error && !projects.length && (
+        <Typography variant="body2" color="text.secondary">No projects available.</Typography>
+      )}
+      {!loading && !error && !!projects.length && (
+        <Stack spacing={1.5}>
+          {projects.slice(0, 6).map((project) => (
+            <Stack key={project._id} direction="row" spacing={2} alignItems="center" sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 1.5 }}>
+              <Box sx={{ flexGrow: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{project.name}</Typography>
+                <Typography variant="body2" color="text.secondary">{project.description || 'No description provided.'}</Typography>
+              </Box>
+              <Chip label={project.reviewStatus || 'draft'} color={chipColor(project.reviewStatus)} />
+            </Stack>
+          ))}
+        </Stack>
+      )}
+    </Card>
+  )
+}
+
+const chipColor = (status) => {
+  if (status === 'approved') return 'success'
+  if (status === 'pending') return 'warning'
+  if (status === 'declined') return 'error'
+  return 'default'
 }
 

@@ -9,6 +9,8 @@ export interface IStepConfig {
   pass_mark?: number;
 }
 
+export type ReviewStatus = 'draft' | 'pending' | 'approved' | 'declined';
+
 export interface IProject extends Document {
   name: string;
   description?: string;
@@ -16,6 +18,9 @@ export interface IProject extends Document {
   config?: Record<string, any>;
   managers?: mongoose.Types.ObjectId[];
   editableByManagers?: boolean;
+  reviewStatus: ReviewStatus;
+  reviewedAt?: Date;
+  reviewedBy?: mongoose.Types.ObjectId;
 }
 
 const StepSchema = new Schema<IStepConfig>({
@@ -33,7 +38,10 @@ const ProjectSchema = new Schema<IProject>({
   steps: { type: [StepSchema], default: [] },
   config: { type: Schema.Types.Mixed, default: {} },
   managers: { type: [Schema.Types.ObjectId], ref: 'User', default: [] },
-  editableByManagers: { type: Boolean, default: true }
+  editableByManagers: { type: Boolean, default: true },
+  reviewStatus: { type: String, enum: ['draft','pending','approved','declined'], default: 'draft', index: true },
+  reviewedAt: { type: Date },
+  reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, { timestamps: true });
 
 export const Project = mongoose.model<IProject>('Project', ProjectSchema);

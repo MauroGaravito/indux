@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Box, Grid, Card, CardContent, Typography, Button, Stack, TextField, MenuItem, Tabs, Tab, List, ListItemButton, ListItemIcon, ListItemText, CardHeader, Dialog } from '@mui/material'
+import { Box, Grid, Card, CardContent, Typography, Button, Stack, TextField, MenuItem, Tabs, Tab, List, ListItemButton, ListItemIcon, ListItemText, CardHeader, Dialog, Chip } from '@mui/material'
 import api from '../../utils/api.js'
 import AsyncButton from '../../components/common/AsyncButton.jsx'
 import ProjectInfoSection from '../../components/forms/admin/ProjectInfoSection.jsx'
@@ -19,13 +19,20 @@ import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
 import { useAuthStore } from '../../context/authStore.js'
 import { notifyError, notifySuccess } from '../../context/notificationStore.js'
 
+const emptyConfig = { projectInfo: {}, slides: {}, questions: [] }
+const sanitizeConfig = (cfg = {}) => ({
+  projectInfo: cfg?.projectInfo || {},
+  slides: cfg?.slides || {},
+  questions: Array.isArray(cfg?.questions) ? cfg.questions : []
+})
+
 export default function Projects() {
   const [projects, setProjects] = useState([])
   const [selectedId, setSelectedId] = useState('')
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [createManagerId, setCreateManagerId] = useState('')
-  const [config, setConfig] = useState({ projectInfo: {}, personalDetails: {}, slides: {}, questions: [] })
+  const [config, setConfig] = useState(emptyConfig)
   const [tab, setTab] = useState(0)
   const [assignments, setAssignments] = useState([])
   const [users, setUsers] = useState([])
@@ -38,8 +45,9 @@ export default function Projects() {
   const isAdmin = user?.role === 'admin'
   const [managers, setManagers] = useState([])
   const [hasPendingReview, setHasPendingReview] = useState(false)
-  const [initialConfig, setInitialConfig] = useState({ projectInfo: {}, personalDetails: {}, slides: {}, questions: [] })
+  const [initialConfig, setInitialConfig] = useState(emptyConfig)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [selectedProjectDetail, setSelectedProjectDetail] = useState(null)
 
   const load = async () => {
     const r = await api.get('/projects')
@@ -68,29 +76,47 @@ export default function Projects() {
     await load()
   }
 
+  const resetSelection = () => {
+    setConfig(emptyConfig)
+    setInitialConfig(emptyConfig)
+    setAssignments([])
+    setManagers([])
+    setHasPendingReview(false)
+    setSelectedProjectDetail(null)
+  }
+
+  const loadProjectDetail = async (id) => {
+    try {
+      const detailRes = await api.get(`/projects/${id}`)
+      const detail = detailRes.data || {}
+      setSelectedProjectDetail(detail)
+      const nextCfg = sanitizeConfig(detail?.config || {})
+      setConfig(nextCfg)
+      setInitialConfig(nextCfg)
+      setManagers(detail?.managers || [])
+      setHasPendingReview(detail?.reviewStatus === 'pending')
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.message || 'Failed to load project details'
+      notifyError(msg)
+      resetSelection()
+      return
+    }
+    try {
+      const r = await api.get(`/assignments/project/${id}`)
+      setAssignments(r.data || [])
+    } catch {
+      setAssignments([])
+    }
+  }
+
   const onSelect = (id) => {
     setSelectedId(id)
-    const p = projects.find(x => x._id === id)
-    const nextCfg = p?.config || { projectInfo: {}, personalDetails: {}, slides: {}, questions: [] }
-    setConfig(nextCfg)
-    setInitialConfig(nextCfg)
     setHasUnsavedChanges(false)
-    // load assignments for this project
-    if (id) {
-      api.get(`/assignments/project/${id}`).then(r => setAssignments(r.data || [])).catch(()=> setAssignments([]))
-      // also fetch managers via project detail endpoint
-      api.get(`/projects/${id}`).then(r => setManagers(r.data?.managers || [])).catch(()=> setManagers([]))
-      // check pending reviews for this project
-      api.get('/reviews/projects').then(r => {
-        const list = r.data || []
-        const pending = list.some((rev) => String(rev?.projectId?._id || rev.projectId) === String(id))
-        setHasPendingReview(pending)
-      }).catch(()=> setHasPendingReview(false))
-    } else {
-      setAssignments([])
-      setManagers([])
-      setHasPendingReview(false)
+    if (!id) {
+      resetSelection()
+      return
     }
+    loadProjectDetail(id)
   }
 
   const getSelectedProjectId = () => (typeof selectedId === 'object' ? selectedId?._id || selectedId?.id || '' : selectedId || '')
@@ -103,6 +129,7 @@ export default function Projects() {
       notifySuccess('Project saved successfully')
       // Saving must not trigger or update any review
       setInitialConfig(config)
+      setSelectedProjectDetail((prev) => (prev ? { ...prev, config } : prev))
       setHasUnsavedChanges(false)
     } catch (e) {
       const msg = e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Failed to save project'
@@ -123,6 +150,7 @@ export default function Projects() {
         notifySuccess('Review sent successfully.')
       }
       setHasPendingReview(true)
+      setSelectedProjectDetail((prev) => (prev ? { ...prev, reviewStatus: 'pending' } : prev))
       setInitialConfig(config)
       setHasUnsavedChanges(false)
     } catch (e) {
@@ -136,7 +164,9 @@ export default function Projects() {
     if (!projectId) return
     try {
       const r = await api.get('/submissions', { params: { projectId } })
-      const list = Array.isArray(r?.data) ? r.data : []
+      const list = Array.isArray(r?.data)
+        ? r.data
+        : (Array.isArray(r?.data?.items) ? r.data.items : [])
       setDeleteSubCount(list.length)
     } catch {
       setDeleteSubCount(0)
@@ -152,7 +182,7 @@ export default function Projects() {
       notifySuccess(r?.data?.message || 'Project deleted successfully')
       setProjects(prev => prev.filter(p => p._id !== selectedId))
       setSelectedId('')
-      setConfig({ projectInfo: {}, personalDetails: {}, slides: {}, questions: [] })
+      setConfig(emptyConfig)
       setAssignments([])
     } catch (e) {
       const msg = e?.response?.data?.message || e?.response?.data?.error || 'Failed to delete project'
@@ -179,17 +209,11 @@ export default function Projects() {
     const role = isAdmin ? 'manager' : 'worker'
     await api.post('/assignments', { user: assignUserId, project: selectedId, role })
     setAssignUserId(''); setAssignRole('worker'); setAssignOpen(false)
-    const r = await api.get(`/assignments/project/${selectedId}`)
-    setAssignments(r.data || [])
-    // refresh managers list in case a manager was assigned
-    try { const pr = await api.get(`/projects/${selectedId}`); setManagers(pr.data?.managers || []) } catch { setManagers([]) }
+    await loadProjectDetail(selectedId)
   }
   const removeAssignment = async (id) => {
     await api.delete(`/assignments/${id}`)
-    const r = await api.get(`/assignments/project/${selectedId}`)
-    setAssignments(r.data || [])
-    // refresh managers if a manager assignment was removed
-    try { const pr = await api.get(`/projects/${selectedId}`); setManagers(pr.data?.managers || []) } catch { setManagers([]) }
+    await loadProjectDetail(selectedId)
   }
 
   const accent = '#1976d2'
@@ -213,6 +237,13 @@ export default function Projects() {
       setHasUnsavedChanges(true)
     }
   }, [config, initialConfig])
+
+  const currentProjectSummary = selectedProjectDetail || projects.find((p) => p._id === selectedId) || null
+  const reviewStatus = currentProjectSummary?.reviewStatus || 'draft'
+  const reviewStatusLabel = reviewStatus.charAt(0).toUpperCase() + reviewStatus.slice(1)
+  const reviewStatusColorMap = { draft: 'default', pending: 'warning', approved: 'success', declined: 'error' }
+  const reviewChipColor = reviewStatusColorMap[reviewStatus] || 'default'
+  const isPendingReview = reviewStatus === 'pending'
 
   return (
     <>
@@ -308,7 +339,12 @@ export default function Projects() {
           <Card elevation={0} sx={cardStyles}>
             <Stack spacing={3}>
               <Stack direction={{ xs:'column', md:'row' }} spacing={2} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between">
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>Edit Project</Typography>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>Edit Project</Typography>
+                  {selectedId && (
+                    <Chip label={`Status: ${reviewStatusLabel}`} color={reviewChipColor} variant="outlined" />
+                  )}
+                </Stack>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: { xs: 'flex-start', md: 'flex-end' }, width: { xs: '100%', md: 'auto' } }}>
                   <AsyncButton startIcon={<SaveIcon />} variant="contained" color="primary" size="large" onClick={saveConfig} disabled={!selectedId || !hasUnsavedChanges} sx={{ textTransform: 'none' }}>Save</AsyncButton>
                   <AsyncButton
@@ -317,11 +353,11 @@ export default function Projects() {
                     color="primary"
                     size="large"
                     onClick={sendForReview}
-                    disabled={!selectedId || (hasPendingReview && !hasUnsavedChanges)}
+                    disabled={!selectedId || (isPendingReview && !hasUnsavedChanges)}
                     sx={{ textTransform: 'none' }}
-                    title={(hasPendingReview && !hasUnsavedChanges) ? 'This project is already pending review.' : ''}
+                    title={(isPendingReview && !hasUnsavedChanges) ? 'This project is already pending review.' : ''}
                   >
-                    {hasPendingReview && hasUnsavedChanges ? 'Resend Updated Version' : 'Send For Review'}
+                    {isPendingReview && hasUnsavedChanges ? 'Resend Updated Version' : 'Send For Review'}
                   </AsyncButton>
                   {isAdmin && !!selectedId && (
                     <Button startIcon={<DeleteForeverIcon />} color="error" variant="outlined" onClick={confirmDelete} sx={{ textTransform: 'none' }}>
@@ -334,7 +370,7 @@ export default function Projects() {
                 <>
                   <Tabs value={tab} onChange={(_,v)=> setTab(v)} sx={{ borderBottom: '1px solid', borderColor: 'grey.200', '& .MuiTabs-indicator': { backgroundColor: accent } }}>
                     <Tab icon={<InfoIcon />} iconPosition="start" label="Project Info" sx={{ '&.Mui-selected': { color: accent } }} />
-                    <Tab icon={<PersonIcon />} iconPosition="start" label="Personal Details" sx={{ '&.Mui-selected': { color: accent } }} />
+                    <Tab icon={<PersonIcon />} iconPosition="start" label="Fields" sx={{ '&.Mui-selected': { color: accent } }} />
                     <Tab icon={<SlideshowIcon />} iconPosition="start" label="Slides" sx={{ '&.Mui-selected': { color: accent } }} />
                     <Tab icon={<QuizIcon />} iconPosition="start" label="Questions" sx={{ '&.Mui-selected': { color: accent } }} />
                     <Tab icon={<GroupIcon />} iconPosition="start" label="Assigned Users" sx={{ '&.Mui-selected': { color: accent } }} />

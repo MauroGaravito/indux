@@ -107,20 +107,22 @@ export default function ManagerDashboard() {
   }, [])
 
   const stats = useMemo(() => {
+    const approvedProjects = projects.filter((p) => p.reviewStatus === 'approved')
     const workersFromSubmissions = new Set(submissions.map((s) => {
       const user = s?.userId || s?.user
       if (typeof user === 'string') return user
       return user?._id || user?.email || user?.name
     }))
     return {
-      projects: projects.length,
-      pendingReviews: pendingSubs.length + reviews.filter((r) => r.status === 'pending').length,
+      projects: approvedProjects.length,
+      pendingReviews: reviews.filter((r) => r.status === 'pending').length + projects.filter((p) => p.reviewStatus === 'pending').length,
       completedInductions: approvedSubs.length,
       activeWorkers: workersFromSubmissions.size
     }
-  }, [projects, pendingSubs, reviews, approvedSubs, submissions])
+  }, [projects, reviews, approvedSubs, submissions])
 
   const latestSubmissions = useMemo(() => submissions.slice(0, 5), [submissions])
+  const projectSummary = useMemo(() => projects.slice(0, 5), [projects])
 
   return (
     <Box>
@@ -161,10 +163,9 @@ export default function ManagerDashboard() {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Latest activity across your assigned projects.
             </Typography>
-            {!latestSubmissions.length && (
+            {!latestSubmissions.length ? (
               <Typography variant="body2" color="text.secondary">No submissions yet.</Typography>
-            )}
-            {!!latestSubmissions.length && (
+            ) : (
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -202,10 +203,9 @@ export default function ManagerDashboard() {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Track project configuration reviews awaiting your attention.
             </Typography>
-            {!reviews.length && (
+            {!reviews.length ? (
               <Typography variant="body2" color="text.secondary">No reviews for your projects.</Typography>
-            )}
-            {!!reviews.length && (
+            ) : (
               <Stack spacing={1.5}>
                 {reviews.slice(0, 5).map((review) => (
                   <Card key={review._id} sx={{ borderRadius: 2, p: 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
@@ -224,8 +224,43 @@ export default function ManagerDashboard() {
             )}
           </Card>
         </Grid>
+        <Grid item xs={12}>
+          <Card sx={cardStyles}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>My Projects</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Review status for the projects you manage.
+            </Typography>
+            {!projectSummary.length ? (
+              <Typography variant="body2" color="text.secondary">No projects assigned.</Typography>
+            ) : (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Project</TableCell>
+                    <TableCell>Description</TableCell>
+                    <TableCell>Status</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {projectSummary.map((proj) => (
+                    <TableRow key={proj._id}>
+                      <TableCell>{proj.name}</TableCell>
+                      <TableCell>{proj.description || 'No description provided.'}</TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          label={proj.reviewStatus || 'draft'}
+                          color={statusChipColor(proj.reviewStatus)}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
+        </Grid>
       </Grid>
     </Box>
   )
 }
-

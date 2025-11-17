@@ -45,6 +45,18 @@ export default function SubmissionReviewModal({ open, onClose, loading, data, on
   const submission = isReady ? data.submission : null
   const project = isReady ? (data.project || submission?.projectId || {}) : {}
   const fields = Array.isArray(data?.fields) ? data.fields : []
+  const orderedFields = fields
+    .slice()
+    .sort((a, b) => {
+      const orderA = Number.isFinite(a?.order) ? a.order : 0
+      const orderB = Number.isFinite(b?.order) ? b.order : 0
+      if (orderA !== orderB) return orderA - orderB
+      return (a.createdAt || '').localeCompare(b.createdAt || '')
+    })
+    .map((field, idx) => ({
+      ...field,
+      __key: field.key || field._id || `field-${idx}`
+    }))
   const config = (project && project.config) || {}
   const personal = submission?.personal && typeof submission.personal === 'object' ? submission.personal : {}
   const uploads = Array.isArray(submission?.uploads) ? submission.uploads : []
@@ -78,6 +90,14 @@ export default function SubmissionReviewModal({ open, onClose, loading, data, on
       const { url } = await presignGet(key)
       if (url) window.open(url, '_blank', 'noopener,noreferrer')
     } catch (_) {}
+  }
+
+  const resolvePersonalValue = (field) => {
+    const keys = [field.key, field.label, field.__key].filter(Boolean)
+    for (const key of keys) {
+      if (key && personal[key] !== undefined) return personal[key]
+    }
+    return undefined
   }
 
   const renderPersonalValue = (field, value) => {
@@ -183,7 +203,7 @@ export default function SubmissionReviewModal({ open, onClose, loading, data, on
               {tab === 'details' && (
                 <Card variant="outlined">
                   <CardContent>
-                    {fields.length ? (
+                    {orderedFields.length ? (
                       <Table size="small">
                         <TableHead>
                           <TableRow>
@@ -193,10 +213,10 @@ export default function SubmissionReviewModal({ open, onClose, loading, data, on
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {fields.map((field) => (
+                          {orderedFields.map((field) => (
                             <TableRow key={field._id || field.key}>
                               <TableCell>{field.label || field.key}</TableCell>
-                              <TableCell>{renderPersonalValue(field, personal[field.key])}</TableCell>
+                              <TableCell>{renderPersonalValue(field, resolvePersonalValue(field))}</TableCell>
                               <TableCell align="right">{field.required ? 'Yes' : 'No'}</TableCell>
                             </TableRow>
                           ))}

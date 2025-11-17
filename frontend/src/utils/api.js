@@ -36,16 +36,33 @@ instance.interceptors.request.use((config) => {
 
 // Auto-refresh access token on 401 using refreshToken from localStorage
 let refreshing = null
+const redirectToLogin = () => {
+  accessToken = null
+  try { localStorage.removeItem(STORAGE_KEY) } catch (_) {}
+  if (window.location.pathname === '/login') {
+    window.alert('Session expired. Please log in again.')
+  } else {
+    window.location.href = '/login'
+  }
+}
+
 instance.interceptors.response.use(
   (resp) => resp,
   async (error) => {
     const { response, config } = error || {}
+    if (response?.status === 403) {
+      window.alert('You are not allowed to access this resource.')
+      return Promise.reject(error)
+    }
     if (!response || response.status !== 401 || config?._retry) {
       return Promise.reject(error)
     }
     const saved = readAuth()
     const refreshToken = saved?.refreshToken
-    if (!refreshToken) return Promise.reject(error)
+    if (!refreshToken) {
+      redirectToLogin()
+      return Promise.reject(error)
+    }
 
     try {
       config._retry = true
@@ -56,13 +73,17 @@ instance.interceptors.response.use(
           .finally(() => { refreshing = null })
       }
       const newAccess = await refreshing
-      if (!newAccess) return Promise.reject(error)
+      if (!newAccess) {
+        redirectToLogin()
+        return Promise.reject(error)
+      }
       // update in-memory and storage, then retry
       accessToken = newAccess
       writeAuth({ accessToken: newAccess })
       config.headers.Authorization = `Bearer ${newAccess}`
       return instance(config)
     } catch (e) {
+      redirectToLogin()
       return Promise.reject(error)
     }
   }

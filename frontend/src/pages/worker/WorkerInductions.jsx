@@ -93,6 +93,8 @@ export default function WorkerInductions() {
         <Grid container spacing={2}>
           {projects.map((project) => {
             const status = inductionStatus.get(project._id) || 'not started'
+            const reviewStatus = project?.reviewStatus || 'draft'
+            const isApproved = reviewStatus === 'approved'
             const icon = status === 'approved' ? <DoneAllIcon color="success" /> : status === 'pending' ? <PlayCircleOutlineIcon color="warning" /> : <SchoolOutlinedIcon color="primary" />
             return (
               <Grid item xs={12} md={6} key={project._id}>
@@ -106,20 +108,25 @@ export default function WorkerInductions() {
                       </Box>
                     </Stack>
                     <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                      {statusChip(status)}
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        {statusChip(status)}
+                        <Chip size="small" label={`Review: ${reviewStatus}`} />
+                      </Stack>
                       <Button
                         variant="outlined"
                         size="small"
                         component={RouterLink}
                         to="/wizard"
                         sx={{ textTransform: 'none' }}
+                        disabled={!isApproved}
                       >
-                        {status === 'approved' ? 'Review' : 'Open Wizard'}
+                        {isApproved ? (status === 'approved' ? 'Review' : 'Open Wizard') : 'Unavailable'}
                       </Button>
                     </Stack>
                     <Typography variant="caption" color="text.secondary">
-                      {/* TODO: requires backend endpoint to show due dates or additional metadata */}
-                      Ensure you complete this induction before arriving onsite.
+                      {isApproved
+                        ? 'Ensure you complete this induction before arriving onsite.'
+                        : 'This project is not yet available for induction.'}
                     </Typography>
                   </Stack>
                 </Card>

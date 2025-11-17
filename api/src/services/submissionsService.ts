@@ -3,6 +3,7 @@ import { Assignment } from '../models/Assignment.js'
 import { Submission } from '../models/Submission.js'
 import { User } from '../models/User.js'
 import { Project } from '../models/Project.js'
+import { ProjectField } from '../models/ProjectField.js'
 import { ensureBucket } from '../services/minio.js'
 import { generateCertificate } from '../services/pdf.js'
 import { sendMail } from '../services/mailer.js'
@@ -24,6 +25,19 @@ const normalizeId = (value: any): any => {
   return String(value)
 }
 
+const ACTIVE_ASSIGNMENT_CLAUSE = [{ endedAt: { $exists: false } }, { endedAt: null }]
+
+const serializeField = (field: any) => ({
+  _id: String(field._id),
+  key: field.key,
+  label: field.label,
+  type: field.type,
+  required: field.required,
+  order: field.order,
+  helpText: field.helpText,
+  options: field.options
+})
+
 export interface ListParams {
   callerRole: Role
   callerId: string
@@ -38,34 +52,52 @@ export async function listSubmissions(params: ListParams) {
   const filter: any = {}
   if (params.status !== 'all') filter.status = params.status
   const normalizedProjectId = normalizeId(params.projectId)
-  if (normalizedProjectId) {
-    if (!Types.ObjectId.isValid(normalizedProjectId)) {
-      throw new HttpError(400, 'Invalid project id')
-    }
-    filter.projectId = normalizedProjectId
+  if (normalizedProjectId && !Types.ObjectId.isValid(normalizedProjectId)) {
+    throw new HttpError(400, 'Invalid project id')
   }
 
-  if (callerRole === 'manager') {
-    const managed = await Assignment.find({ user: callerId, role: 'manager' }).lean()
-    const ids = managed.map(a => a.project)
+  const page = params.page && params.page > 0 ? params.page : undefined
+  const pageSize = params.pageSize && params.pageSize > 0 ? params.pageSize : undefined
+  const emptyResult = () => {
+    if (page && pageSize) return { items: [], total: 0, page, pageSize }
+    return { items: [] }
+  }
+
+  if (callerRole === 'worker') {
+    filter.userId = callerId
+    const assignments = await Assignment.find({ user: callerId, role: 'worker', $or: ACTIVE_ASSIGNMENT_CLAUSE }).lean()
+    if (!assignments.length) return emptyResult()
+    const projectIds = assignments.map(a => a.project)
+    const approved = await Project.find({ _id: { $in: projectIds }, reviewStatus: 'approved' }).select('_id').lean()
+    const allowedDocs = approved.map(doc => doc._id)
+    const allowedStrings = allowedDocs.map(id => id.toString())
+    if (!allowedDocs.length) return emptyResult()
     if (normalizedProjectId) {
-      const allowed = ids.some(p => normalizeId(p)?.toString() === normalizedProjectId)
-      if (!allowed) {
-        filter.projectId = { $in: [] }
-      }
+      if (!allowedStrings.includes(normalizedProjectId)) throw new HttpError(403, 'Forbidden')
+      filter.projectId = new Types.ObjectId(normalizedProjectId)
     } else {
-      filter.projectId = { $in: ids }
+      filter.projectId = { $in: allowedDocs }
     }
+  } else if (callerRole === 'manager') {
+    const managed = await Assignment.find({ user: callerId, role: 'manager', $or: ACTIVE_ASSIGNMENT_CLAUSE }).lean()
+    const managedDocs = managed.map(a => new Types.ObjectId(a.project))
+    const managedStrings = managedDocs.map(id => id.toString())
+    if (!managedDocs.length) return emptyResult()
+    if (normalizedProjectId) {
+      if (!managedStrings.includes(normalizedProjectId)) throw new HttpError(403, 'Forbidden')
+      filter.projectId = new Types.ObjectId(normalizedProjectId)
+    } else {
+      filter.projectId = { $in: managedDocs }
+    }
+  } else if (normalizedProjectId) {
+    filter.projectId = new Types.ObjectId(normalizedProjectId)
   }
 
   const q = Submission.find(filter)
     .populate('userId', 'name email')
-    .populate('projectId', 'name')
+    .populate('projectId', 'name reviewStatus')
     .populate('reviewedBy', 'name')
     .sort({ createdAt: -1 })
-
-  const page = params.page && params.page > 0 ? params.page : undefined
-  const pageSize = params.pageSize && params.pageSize > 0 ? params.pageSize : undefined
 
   const annotateOrphans = async (entries: any[]) => {
     const ids = Array.from(new Set(entries
@@ -97,9 +129,37 @@ export async function createSubmission(workerId: string, body: any) {
   const projectId = normalizeId(body.projectId)
   if (!Types.ObjectId.isValid(projectId)) throw new HttpError(400, 'Invalid project id')
   body.projectId = projectId
-  const assigned = await Assignment.findOne({ user: workerId, project: projectId }).lean()
-  if (!assigned) throw new HttpError(403, 'Not assigned to this project')
-  const sub = await Submission.create({ ...body, userId: workerId, status: 'pending' })
+  const assignment = await Assignment.findOne({ user: workerId, project: projectId, role: 'worker', $or: ACTIVE_ASSIGNMENT_CLAUSE }).lean()
+  if (!assignment) throw new HttpError(403, 'Not assigned to this project')
+  const project = await Project.findById(projectId).select('reviewStatus')
+  if (!project) throw new HttpError(404, 'Project not found')
+  if (project.reviewStatus !== 'approved') throw new HttpError(403, 'Project not available')
+
+  const existing = await Submission.findOne({ projectId, userId: workerId }).sort({ createdAt: -1 })
+  if (existing && existing.status === 'approved') {
+    throw new HttpError(409, 'Submission already approved')
+  }
+
+  const payload = {
+    projectId,
+    userId: workerId,
+    personal: body.personal,
+    uploads: body.uploads,
+    quiz: body.quiz,
+    signatureDataUrl: body.signatureDataUrl,
+    status: 'pending',
+    reviewedBy: undefined,
+    reviewReason: undefined,
+    certificateKey: undefined
+  }
+
+  if (existing) {
+    existing.set(payload)
+    await existing.save()
+    return existing
+  }
+
+  const sub = await Submission.create(payload)
   return sub
 }
 
@@ -107,7 +167,7 @@ async function ensureManagerCanAct(callerRole: Role, callerId: string, projectId
   if (callerRole !== 'manager') return
   const normalized = normalizeId(projectId)
   if (!normalized) throw new HttpError(400, 'Invalid project id')
-  const allowed = await Assignment.findOne({ user: callerId, project: normalized, role: 'manager' }).lean()
+  const allowed = await Assignment.findOne({ user: callerId, project: normalized, role: 'manager', $or: ACTIVE_ASSIGNMENT_CLAUSE }).lean()
   if (!allowed) throw new HttpError(403, 'Forbidden')
 }
 
@@ -160,4 +220,26 @@ export async function deleteSubmission(id: string) {
   const isOrphaned = !projectExists
   await Submission.findByIdAndDelete(id)
   return { ok: true, orphaned: isOrphaned, message: 'Submission deleted' }
+}
+
+export async function getSubmissionById(id: string, callerRole: Role, callerId: string) {
+  if (!Types.ObjectId.isValid(id)) throw new HttpError(400, 'Invalid submission id')
+  const submission = await Submission.findById(id)
+    .populate('userId', 'name email')
+    .populate('projectId', 'name reviewStatus')
+    .populate('reviewedBy', 'name')
+  if (!submission) throw new HttpError(404, 'Submission not found')
+  const projectId = normalizeId(submission.projectId)
+  if (!projectId || !Types.ObjectId.isValid(projectId)) throw new HttpError(400, 'Invalid project reference')
+  if (callerRole === 'manager') {
+    await ensureManagerCanAct(callerRole, callerId, projectId)
+  } else if (callerRole === 'worker') {
+    if (normalizeId(submission.userId) !== callerId) throw new HttpError(403, 'Forbidden')
+    const project = await Project.findById(projectId).select('reviewStatus')
+    if (!project || project.reviewStatus !== 'approved') throw new HttpError(403, 'Project not available')
+  }
+  const fields = await ProjectField.find({ projectId }).sort({ order: 1, createdAt: 1 }).lean()
+  const out = submission.toObject()
+  ;(out as any).fields = fields.map(serializeField)
+  return out
 }

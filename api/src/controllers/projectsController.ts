@@ -32,7 +32,7 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 
 export async function getOne(req: Request, res: Response, next: NextFunction) {
   try {
-    const p = await svc.getProject(req.params.id)
+    const p = await svc.getProject(req.params.id, req.user!.role, req.user!.sub)
     res.json(p)
   } catch (err) { next(err) }
 }
