@@ -1,6 +1,7 @@
 import React from 'react'
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Chip,
@@ -20,6 +21,8 @@ import {
   Typography
 } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
+import SlideshowIcon from '@mui/icons-material/Slideshow'
 import { presignGet } from '../../utils/upload.js'
 
 const statusChipColor = (status) => {
@@ -44,6 +47,8 @@ export default function ProjectReviewModal({
   const [mapLightboxOpen, setMapLightboxOpen] = React.useState(false)
   const [slidesImageError, setSlidesImageError] = React.useState(false)
   const [slidesLightboxOpen, setSlidesLightboxOpen] = React.useState(false)
+  const [viewerOpen, setViewerOpen] = React.useState(false)
+  const [viewerUrl, setViewerUrl] = React.useState('')
 
   React.useEffect(() => {
     if (!open) {
@@ -61,11 +66,11 @@ export default function ProjectReviewModal({
   const mapStreamUrl = buildStreamUrl(mapKey)
   const slidesStreamUrl = buildStreamUrl(slidesKey)
   const slidesFilename = slidesKey ? slidesKey.split('/').pop() : ''
-  const slidesIsImage = (() => {
-    if (!slidesKey) return false
-    const ext = (slidesFilename || slidesKey).split('.').pop()?.toLowerCase() || ''
-    return ['png','jpg','jpeg','webp','gif','bmp'].includes(ext)
-  })()
+  const getExtension = (key) => (key ? key.split('.').pop()?.toLowerCase() || '' : '')
+  const slidesExt = getExtension(slidesFilename || slidesKey)
+  const slidesIsImage = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'].includes(slidesExt)
+  const slidesIsPdf = slidesExt === 'pdf'
+  const slidesIsPpt = ['ppt', 'pptx', 'key'].includes(slidesExt)
 
   React.useEffect(() => {
     setMapImageError(false)
@@ -82,28 +87,28 @@ export default function ProjectReviewModal({
         </Typography>
       )
     }
+    const ext = getExtension(mapKey)
+    const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'].includes(ext)
+    if (!isImage) {
+      return <Typography variant="body2" color="text.secondary">Map file is not previewable</Typography>
+    }
     return (
-      <Stack spacing={1}>
-        <Typography variant="body2" color="text.secondary">
-          {mapKey}
-        </Typography>
-        <Box
-          component="img"
-          src={mapStreamUrl}
-          alt="Project map preview"
-          onError={() => setMapImageError(true)}
-          onClick={() => setMapLightboxOpen(true)}
-          sx={{
-            width: 150,
-            maxWidth: '100%',
-            borderRadius: 1,
-            border: '1px solid',
-            borderColor: 'divider',
-            cursor: 'pointer',
-            objectFit: 'cover'
-          }}
-        />
-      </Stack>
+      <Box
+        component="img"
+        src={mapStreamUrl}
+        alt="Project map preview"
+        onError={() => setMapImageError(true)}
+        onClick={() => setMapLightboxOpen(true)}
+        sx={{
+          width: 150,
+          maxWidth: '100%',
+          borderRadius: 1,
+          border: '1px solid',
+          borderColor: 'divider',
+          cursor: 'pointer',
+          objectFit: 'cover'
+        }}
+      />
     )
   }
 
@@ -112,10 +117,17 @@ export default function ProjectReviewModal({
     const fallback = buildStreamUrl(key)
     try {
       const { url } = await presignGet(key)
-      window.open(url || fallback, '_blank', 'noopener,noreferrer')
+      return url || fallback
     } catch (_) {
-      window.open(fallback, '_blank', 'noopener,noreferrer')
+      return fallback
     }
+  }
+
+  const openInViewer = async (key) => {
+    const url = await openViaPresign(key)
+    if (!url) return
+    setViewerUrl(url)
+    setViewerOpen(true)
   }
 
   return (
@@ -187,10 +199,7 @@ export default function ProjectReviewModal({
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Slides</Typography>
               {slidesKey ? (
                 <Stack spacing={1} alignItems="flex-start">
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {slidesFilename || slidesKey}
-                  </Typography>
-                  {slidesIsImage && !slidesImageError && (
+                  {slidesIsImage && !slidesImageError ? (
                     <Box
                       component="img"
                       src={slidesStreamUrl}
@@ -198,7 +207,7 @@ export default function ProjectReviewModal({
                       onError={() => setSlidesImageError(true)}
                       onClick={() => setSlidesLightboxOpen(true)}
                       sx={{
-                        width: 200,
+                        width: 150,
                         maxWidth: '100%',
                         borderRadius: 1,
                         border: '1px solid',
@@ -207,24 +216,41 @@ export default function ProjectReviewModal({
                         objectFit: 'cover'
                       }}
                     />
+                  ) : (
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Avatar sx={{ bgcolor: 'grey.100', color: 'text.secondary' }}>
+                        {slidesIsPdf ? <PictureAsPdfIcon /> : <SlideshowIcon />}
+                      </Avatar>
+                      <Typography variant="body2" color="text.secondary">
+                        {slidesFilename || 'Slides'}
+                      </Typography>
+                    </Stack>
                   )}
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Button
                       variant="outlined"
                       size="small"
-                      onClick={() => openViaPresign(slidesKey)}
+                      onClick={() => openInViewer(slidesKey)}
                     >
                       View
                     </Button>
                     <Button
                       variant="contained"
                       size="small"
-                      onClick={() => openViaPresign(slidesKey)}
+                      onClick={async () => {
+                        const url = await openViaPresign(slidesKey)
+                        if (!url) return
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = slidesFilename || 'slides'
+                        document.body.appendChild(a)
+                        a.click()
+                        document.body.removeChild(a)
+                      }}
                     >
-                      Download Slides
+                      Download
                     </Button>
                   </Stack>
-                  <Typography variant="body2" color="text.secondary">{slidesFilename}</Typography>
                 </Stack>
               ) : (
                 <Alert severity="info">No training slides uploaded.</Alert>
@@ -378,7 +404,7 @@ export default function ProjectReviewModal({
           </Box>
         </Dialog>
       )}
-      {slidesKey && slidesStreamUrl && slidesIsImage && (
+      {slidesKey && slidesStreamUrl && slidesIsImage && !slidesImageError && (
         <Dialog open={slidesLightboxOpen} onClose={() => setSlidesLightboxOpen(false)} fullScreen>
           <Box
             sx={{
@@ -427,6 +453,29 @@ export default function ProjectReviewModal({
           </Box>
         </Dialog>
       )}
+      <Dialog open={viewerOpen} onClose={() => setViewerOpen(false)} fullWidth maxWidth="lg">
+        <DialogTitle sx={{ pb: 1 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Preview</Typography>
+            <IconButton onClick={() => setViewerOpen(false)} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Stack>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 0 }}>
+          {viewerUrl ? (
+            <iframe
+              src={viewerUrl}
+              title="preview"
+              style={{ width: '100%', height: '80vh', border: 0 }}
+            />
+          ) : (
+            <Box sx={{ p: 2 }}>
+              <Typography color="text.secondary">No preview available.</Typography>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

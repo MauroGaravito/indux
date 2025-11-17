@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { presignPutUrl, presignGetUrl, ensureBucket } from '../services/minio.js';
+import * as uploadsController from '../controllers/uploadsController.js';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 
@@ -22,7 +23,6 @@ router.post('/presign', requireAuth, async (req, res) => {
   res.json({ key, url });
 });
 
-export default router;
 // Presign GET for existing object keys
 router.post('/presign-get', requireAuth, async (req, res) => {
   const schema = z.object({ key: z.string().min(1) });
@@ -61,3 +61,8 @@ router.get('/stream', requireAuth, async (req, res) => {
     res.status(400).json({ error: 'Stream failed' })
   }
 })
+
+// Object metadata
+router.get('/meta', requireAuth, uploadsController.getMeta);
+
+export default router;
