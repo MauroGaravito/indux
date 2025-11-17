@@ -4,6 +4,8 @@ import { presignPutUrl, presignGetUrl, ensureBucket } from '../services/minio.js
 import * as uploadsController from '../controllers/uploadsController.js';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
+import { Project } from '../models/Project.js';
+import { Assignment } from '../models/Assignment.js';
 
 const router = Router();
 
@@ -40,8 +42,31 @@ router.post('/presign-get', requireAuth, async (req, res) => {
 // Stream object via API (same-origin fallback to avoid PUBLIC_S3_ENDPOINT/CORS issues)
 router.get('/stream', requireAuth, async (req, res) => {
   try {
-    const key = String((req.query as any)?.key || '')
-    if (!key) return res.status(400).json({ error: 'Missing key' })
+    const key = String((req.query as any)?.key || '');
+    if (!key) return res.status(400).json({ error: 'Missing key' });
+
+    // Authorization: admin/manager always allowed; worker only if assigned to project owning the key
+    const role = req.user!.role;
+    if (role === 'worker' || role === 'manager') {
+      const project = await Project.findOne({
+        $or: [
+          { 'config.projectMapKey': key },
+          { 'config.slides.pptKey': key },
+          { 'config.slides.thumbKey': key }
+        ]
+      }).select('_id').lean();
+      if (!project) return res.status(404).json({ error: 'Asset not found' });
+      if (role === 'worker') {
+        const assignment = await Assignment.findOne({
+          user: req.user!.sub,
+          project: project._id,
+          role: 'worker',
+          $or: [{ endedAt: { $exists: false } }, { endedAt: null }]
+        }).lean();
+        if (!assignment) return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
+    // admins bypass checks
     const ext = (key.split('.').pop() || '').toLowerCase()
     const ct = ext === 'pdf'
       ? 'application/pdf'
