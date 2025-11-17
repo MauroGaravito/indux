@@ -66,6 +66,7 @@ router.get('/stream', async (req, res) => {
       const project = await Project.findOne({
         $or: [
           { 'config.projectMapKey': key },
+          { 'config.projectInfo.projectMapKey': key },
           { 'config.slides.pptKey': key },
           { 'config.slides.thumbKey': key }
         ]
