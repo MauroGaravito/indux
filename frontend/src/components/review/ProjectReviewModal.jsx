@@ -85,20 +85,9 @@ export default function ProjectReviewModal({
   const mapStreamUrl = buildStreamUrl(mapKey)
   const slidesStreamUrl = buildStreamUrl(slidesKey)
   const slidesFilename = slidesKey ? slidesKey.split('/').pop() : 'slides'
-  const getAccessToken = () =>
-    localStorage.getItem('token') ||
-    localStorage.getItem('accessToken') ||
-    sessionStorage.getItem('token') ||
-    sessionStorage.getItem('accessToken')
-  const appendToken = (url) => {
-    const t = getAccessToken()
-    if (!t || !url) return url
-    const sep = url.includes('?') ? '&' : '?'
-    return `${url}${sep}token=${encodeURIComponent(t)}`
-  }
   const resolvePreviewUrl = async (key) => {
     if (!key) return ''
-    const fallback = appendToken(buildStreamUrl(key))
+    const fallback = buildStreamUrl(key)
     try {
       const { url } = await presignGet(key)
       return url || fallback
@@ -112,6 +101,15 @@ export default function ProjectReviewModal({
   const slidesIsPdf = slidesContentType === 'application/pdf'
   const slidesIsPpt = slidesContentType === 'application/vnd.ms-powerpoint' ||
     slidesContentType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  const fetchBlobUrl = async (targetUrl, contentType) => {
+    const res = await fetch(targetUrl)
+    if (!res.ok) throw new Error('Fetch failed')
+    let blob = await res.blob()
+    if (contentType && blob.type !== contentType) {
+      blob = new Blob([blob], { type: contentType })
+    }
+    return URL.createObjectURL(blob)
+  }
 
   React.useEffect(() => {
     setMapImageError(false)
@@ -217,8 +215,18 @@ export default function ProjectReviewModal({
   const openInViewer = async (key, preferredUrl) => {
     const url = preferredUrl || (await resolvePreviewUrl(key))
     if (!url) return
-    setViewerUrl(url)
-    setViewerOpen(true)
+    const contentType = slidesInfo?.contentType || slidesMeta?.contentType || ''
+    try {
+      const blobUrl = await fetchBlobUrl(url, contentType)
+      setViewerUrl(blobUrl)
+      setViewerOpen(true)
+      return
+    } catch (_) {}
+    try {
+      const blobUrl = await fetchBlobUrl(buildStreamUrl(key), contentType)
+      setViewerUrl(blobUrl)
+      setViewerOpen(true)
+    } catch (_) {}
   }
 
   return (
