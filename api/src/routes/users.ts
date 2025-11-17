@@ -80,10 +80,11 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
       // Persist the hash in 'password' (used by login)
       patch.password = await bcrypt.hash(patch.password, 10);
     }
-    const updated = await User.findByIdAndUpdate(req.params.id, patch, { new: true }).select('-password');
+    const updated = await User.findByIdAndUpdate(req.params.id, patch, { new: true, runValidators: true }).select('-password');
     if (!updated) return res.status(404).json({ error: 'User not found' });
     res.json(updated);
   } catch (e: any) {
+    if (e?.code === 11000) return res.status(409).json({ error: 'Email already exists' });
     return res.status(500).json({ error: e?.message || 'Failed to update user' });
   }
 });

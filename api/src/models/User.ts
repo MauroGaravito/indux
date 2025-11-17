@@ -12,6 +12,10 @@ export interface IUser extends Document {
   emailVerified: boolean;
   emailVerifiedAt?: Date;
   lastLoginAt?: Date;
+  phone?: string;
+  jobTitle?: string;
+  avatarUrl?: string;
+  notes?: string;
 }
 
 const UserSchema = new Schema<IUser>(
@@ -25,6 +29,10 @@ const UserSchema = new Schema<IUser>(
     emailVerified: { type: Boolean, default: true },
     emailVerifiedAt: { type: Date },
     lastLoginAt: { type: Date },
+    phone: { type: String },
+    jobTitle: { type: String },
+    avatarUrl: { type: String },
+    notes: { type: String },
   },
   { timestamps: true }
 );

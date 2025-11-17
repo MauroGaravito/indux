@@ -56,14 +56,23 @@ export const UserCreateSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
   role: z.enum(['admin','manager','worker']),
-  password: z.string().min(6)
+  password: z.string().min(6),
+  phone: z.string().optional(),
+  jobTitle: z.string().optional(),
+  avatarUrl: z.string().optional(),
+  notes: z.string().optional()
 });
 
 export const UserUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   role: z.enum(['admin','manager','worker']).optional(),
   password: z.string().min(6).optional(),
-  disabled: z.boolean().optional()
+  disabled: z.boolean().optional(),
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
+  jobTitle: z.string().optional(),
+  avatarUrl: z.string().optional(),
+  notes: z.string().optional()
 });
 
 export const UserStatusPatchSchema = z.object({

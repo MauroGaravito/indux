@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Card, CardContent, Typography, Table, TableHead, TableBody, TableRow, TableCell, Stack, TextField, MenuItem, Button, Chip, Dialog, CardHeader } from '@mui/material'
+import { Card, CardContent, Typography, Table, TableHead, TableBody, TableRow, TableCell, Stack, TextField, MenuItem, Button, Chip, Dialog, CardHeader, DialogTitle, DialogContent, DialogActions } from '@mui/material'
 import api from '../../utils/api.js'
 
 export default function Users() {
@@ -11,6 +11,17 @@ export default function Users() {
   const [projects, setProjects] = useState([])
   const [projectId, setProjectId] = useState('')
   const [roleInProject, setRoleInProject] = useState('worker')
+  const [editOpen, setEditOpen] = useState(false)
+  const [editUser, setEditUser] = useState(null)
+  const [editForm, setEditForm] = useState({
+    name: '',
+    email: '',
+    role: 'worker',
+    phone: '',
+    jobTitle: '',
+    avatarUrl: '',
+    notes: ''
+  })
 
   const load = async () => { const r = await api.get('/users', { params: { status: filter || undefined } }); setRows(r.data || []) }
   useEffect(()=> { load() }, [])
@@ -49,6 +60,36 @@ export default function Users() {
     await api.post('/assignments', { user: assignUser._id, project: projectId, role: roleInProject })
     setAssignOpen(false)
   }
+  const openEdit = (u) => {
+    setEditUser(u)
+    setEditForm({
+      name: u?.name || '',
+      email: u?.email || '',
+      role: u?.role || 'worker',
+      phone: u?.phone || '',
+      jobTitle: u?.jobTitle || '',
+      avatarUrl: u?.avatarUrl || '',
+      notes: u?.notes || ''
+    })
+    setEditOpen(true)
+  }
+  const saveEdit = async () => {
+    if (!editUser) return
+    if (!editForm.name || !editForm.email) return
+    const payload = {
+      name: editForm.name,
+      email: editForm.email,
+      role: editForm.role,
+      phone: editForm.phone || undefined,
+      jobTitle: editForm.jobTitle || undefined,
+      avatarUrl: editForm.avatarUrl || undefined,
+      notes: editForm.notes || undefined
+    }
+    await api.put(`/users/${editUser._id}`, payload)
+    setEditOpen(false)
+    setEditUser(null)
+    await load()
+  }
 
   return (
     <>
@@ -79,19 +120,20 @@ export default function Users() {
                   <TableCell>{r.email}</TableCell>
                   <TableCell>{r.name}</TableCell>
                   <TableCell sx={{ textTransform: 'capitalize' }}>{r.role}</TableCell>
-                  <TableCell>
-                    {r.status === 'pending' && <Chip size="small" color="warning" label="Pending"/>}
-                    {r.status === 'approved' && <Chip size="small" color="success" label="Approved"/>}
-                    {r.status === 'disabled' && <Chip size="small" color="default" label="Disabled"/>}
-                    {r.emailVerified === false && <Chip size="small" color="warning" label="Email Unverified" sx={{ ml: 1 }}/>}                
-                  </TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      {r.status === 'pending' && <Button size="small" variant="outlined" onClick={()=> setStatus(r, 'approved')}>Approve</Button>}
-                      {r.status !== 'disabled' && <Button size="small" variant="outlined" color="warning" onClick={()=> setStatus(r, 'disabled')}>Disable</Button>}
-                      {r.status === 'approved' && <Button size="small" variant="outlined" onClick={()=> openAssign(r)}>Assign Projects</Button>}
-                      <Button size="small" color="error" variant="outlined" onClick={()=> removeUser(r)}>Delete</Button>
-                    </Stack>
+                <TableCell>
+                  {r.status === 'pending' && <Chip size="small" color="warning" label="Pending"/>}
+                  {r.status === 'approved' && <Chip size="small" color="success" label="Approved"/>}
+                  {r.status === 'disabled' && <Chip size="small" color="default" label="Disabled"/>}
+                  {r.emailVerified === false && <Chip size="small" color="warning" label="Email Unverified" sx={{ ml: 1 }}/>}                
+                </TableCell>
+                <TableCell align="right">
+                  <Stack direction="row" spacing={1} justifyContent="flex-end">
+                    <Button size="small" variant="outlined" onClick={()=> openEdit(r)}>Edit</Button>
+                    {r.status === 'pending' && <Button size="small" variant="outlined" onClick={()=> setStatus(r, 'approved')}>Approve</Button>}
+                    {r.status !== 'disabled' && <Button size="small" variant="outlined" color="warning" onClick={()=> setStatus(r, 'disabled')}>Disable</Button>}
+                    {r.status === 'approved' && <Button size="small" variant="outlined" onClick={()=> openAssign(r)}>Assign Projects</Button>}
+                    <Button size="small" color="error" variant="outlined" onClick={()=> removeUser(r)}>Delete</Button>
+                  </Stack>
                   </TableCell>
                 </TableRow>
               ))}
@@ -131,6 +173,29 @@ export default function Users() {
           <Button onClick={()=> setAssignOpen(false)}>Cancel</Button>
           <Button variant="contained" disabled={!projectId} onClick={doAssign}>Assign</Button>
         </Stack>
+      </Dialog>
+
+      <Dialog open={editOpen} onClose={()=> setEditOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit User</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField label="Name" value={editForm.name} onChange={(e)=> setEditForm({ ...editForm, name: e.target.value })} />
+            <TextField label="Email" value={editForm.email} onChange={(e)=> setEditForm({ ...editForm, email: e.target.value })} />
+            <TextField select label="Role" value={editForm.role} onChange={(e)=> setEditForm({ ...editForm, role: e.target.value })}>
+              <MenuItem value="admin">Admin</MenuItem>
+              <MenuItem value="manager">Manager</MenuItem>
+              <MenuItem value="worker">Worker</MenuItem>
+            </TextField>
+            <TextField label="Phone" value={editForm.phone} onChange={(e)=> setEditForm({ ...editForm, phone: e.target.value })} />
+            <TextField label="Job Title" value={editForm.jobTitle} onChange={(e)=> setEditForm({ ...editForm, jobTitle: e.target.value })} />
+            <TextField label="Avatar URL" value={editForm.avatarUrl} onChange={(e)=> setEditForm({ ...editForm, avatarUrl: e.target.value })} />
+            <TextField label="Notes" value={editForm.notes} multiline minRows={2} onChange={(e)=> setEditForm({ ...editForm, notes: e.target.value })} />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={()=> setEditOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={saveEdit} disabled={!editForm.name || !editForm.email}>Save</Button>
+        </DialogActions>
       </Dialog>
     </>
   )
