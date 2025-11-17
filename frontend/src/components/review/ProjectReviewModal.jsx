@@ -213,6 +213,16 @@ export default function ProjectReviewModal({
   }
 
   const openInViewer = async (key, preferredUrl) => {
+    // For PowerPoint files, prefer Office Web Viewer to avoid forced downloads
+    if (slidesIsPpt) {
+      const viewUrl = preferredUrl || (await resolvePreviewUrl(key)) || buildStreamUrl(key)
+      if (viewUrl) {
+        setViewerUrl(`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(viewUrl)}`)
+        setViewerOpen(true)
+        return
+      }
+    }
+
     const url = preferredUrl || (await resolvePreviewUrl(key))
     if (!url) return
     const contentType = slidesInfo?.contentType || slidesMeta?.contentType || ''
