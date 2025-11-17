@@ -110,15 +110,6 @@ export default function ProjectReviewModal({
     }
     return URL.createObjectURL(blob)
   }
-  const fetchBlobUrl = async (targetUrl, contentType) => {
-    const res = await fetch(targetUrl)
-    if (!res.ok) throw new Error('Fetch failed')
-    let blob = await res.blob()
-    if (contentType && blob.type !== contentType) {
-      blob = new Blob([blob], { type: contentType })
-    }
-    return URL.createObjectURL(blob)
-  }
 
   React.useEffect(() => {
     setMapImageError(false)
