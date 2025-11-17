@@ -41,6 +41,7 @@ import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined'
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
 import { Link as RouterLink } from 'react-router-dom'
 import api from '../../utils/api.js'
+import ProjectFieldsEditor from '../../components/admin/ProjectFieldsEditor.jsx'
 
 const cardStyles = {
   borderRadius: 3,
