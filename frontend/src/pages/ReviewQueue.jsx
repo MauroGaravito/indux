@@ -16,6 +16,7 @@ import {
 import api from '../utils/api.js'
 import { notifyError, notifySuccess } from '../context/notificationStore.js'
 import SubmissionReviewModal from '../components/review/SubmissionReviewModal.jsx'
+import ProjectReviewModal from '../components/review/ProjectReviewModal.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 
 const cardStyles = {
@@ -42,11 +43,18 @@ export default function ReviewQueue() {
   const [modalOpen, setModalOpen] = useState(false)
   const [selected, setSelected] = useState(null)
   const [modalLoading, setModalLoading] = useState(false)
+  const [reviews, setReviews] = useState([])
+  const [reviewsLoading, setReviewsLoading] = useState(true)
+  const [reviewsError, setReviewsError] = useState('')
+  const [reviewModalOpen, setReviewModalOpen] = useState(false)
+  const [selectedReview, setSelectedReview] = useState(null)
+  const [reviewActionLoading, setReviewActionLoading] = useState(false)
   const isAdmin = user?.role === 'admin'
 
   useEffect(() => {
     if (user?.role) {
       loadSubmissions()
+      loadProjectReviews()
     }
   }, [user?.role])
 
@@ -64,6 +72,22 @@ export default function ReviewQueue() {
       notifyError(msg)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadProjectReviews = async () => {
+    setReviewsLoading(true)
+    setReviewsError('')
+    try {
+      const res = await api.get('/reviews/projects')
+      const data = Array.isArray(res.data) ? res.data : (Array.isArray(res.data?.items) ? res.data.items : [])
+      setReviews(data)
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to load project reviews'
+      setReviewsError(msg)
+      notifyError(msg)
+    } finally {
+      setReviewsLoading(false)
     }
   }
 
@@ -91,6 +115,17 @@ export default function ReviewQueue() {
     setModalOpen(false)
   }
 
+  const openReviewModal = (review) => {
+    if (!review) return
+    setSelectedReview(review)
+    setReviewModalOpen(true)
+  }
+
+  const closeReviewModal = () => {
+    setReviewModalOpen(false)
+    setSelectedReview(null)
+  }
+
   const approveSubmission = async (id) => {
     if (!id) return
     try {
@@ -98,6 +133,7 @@ export default function ReviewQueue() {
       notifySuccess('Submission approved')
       closeModal()
       loadSubmissions()
+      loadProjectReviews()
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Failed to approve submission'
       notifyError(msg)
@@ -111,6 +147,7 @@ export default function ReviewQueue() {
       notifySuccess('Submission sent back to worker')
       closeModal()
       loadSubmissions()
+      loadProjectReviews()
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Failed to decline submission'
       notifyError(msg)
@@ -125,6 +162,7 @@ export default function ReviewQueue() {
       notifySuccess('Submission deleted')
       closeModal()
       loadSubmissions()
+      loadProjectReviews()
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Failed to delete submission'
       notifyError(msg)
@@ -133,6 +171,40 @@ export default function ReviewQueue() {
 
   const retrySubmission = async (id) => {
     await declineSubmission(id)
+  }
+
+  const approveReview = async () => {
+    if (!selectedReview?._id) return
+    setReviewActionLoading(true)
+    try {
+      await api.post(`/reviews/projects/${selectedReview._id}/approve`)
+      notifySuccess('Project review approved')
+      closeReviewModal()
+      loadProjectReviews()
+      loadSubmissions()
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to approve project review'
+      notifyError(msg)
+    } finally {
+      setReviewActionLoading(false)
+    }
+  }
+
+  const declineReview = async (reason) => {
+    if (!selectedReview?._id) return
+    setReviewActionLoading(true)
+    try {
+      await api.post(`/reviews/projects/${selectedReview._id}/decline`, { reason })
+      notifySuccess('Project review declined')
+      closeReviewModal()
+      loadProjectReviews()
+      loadSubmissions()
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to decline project review'
+      notifyError(msg)
+    } finally {
+      setReviewActionLoading(false)
+    }
   }
 
   const renderStatusChip = (status) => (
@@ -229,6 +301,51 @@ export default function ReviewQueue() {
 
         <Card sx={cardStyles}>
           <Stack spacing={2}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Project Reviews</Typography>
+            {reviewsError && <Alert severity="error">{reviewsError}</Alert>}
+            {reviewsLoading && (
+              <Box sx={{ py: 2 }}>
+                <Typography color="text.secondary">Loading project reviews…</Typography>
+              </Box>
+            )}
+            {!reviewsLoading && !reviews.length && !reviewsError && (
+              <Box sx={{ py: 2 }}>
+                <Typography color="text.secondary">No project reviews found.</Typography>
+              </Box>
+            )}
+            {!reviewsLoading && !!reviews.length && (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Project</TableCell>
+                    <TableCell>Requested</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell align="right">Action</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {reviews.map((review) => (
+                    <TableRow key={review._id}>
+                      <TableCell>{review?.projectId?.name || review?.projectId || 'Project'}</TableCell>
+                      <TableCell>{review?.createdAt ? new Date(review.createdAt).toLocaleString() : 'N/A'}</TableCell>
+                      <TableCell>
+                        <Chip size="small" label={review?.status || 'pending'} color={statusChipColor(review?.status)} />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button variant="outlined" size="small" onClick={() => openReviewModal(review)}>
+                          Open Review
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Stack>
+        </Card>
+
+        <Card sx={cardStyles}>
+          <Stack spacing={2}>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>Submissions</Typography>
             {error && <Alert severity="error">{error}</Alert>}
             {renderTable()}
@@ -244,6 +361,17 @@ export default function ReviewQueue() {
         onApprove={() => selected?.submission?._id && approveSubmission(selected?.submission?._id)}
         onDecline={() => selected?.submission?._id && declineSubmission(selected?.submission?._id)}
         onDelete={isAdmin ? (() => selected?.submission?._id && deleteSubmission(selected?.submission?._id)) : undefined}
+      />
+
+      <ProjectReviewModal
+        open={reviewModalOpen}
+        onClose={closeReviewModal}
+        review={selectedReview}
+        loading={reviewsLoading}
+        onApprove={approveReview}
+        onDecline={declineReview}
+        approveProcessing={reviewActionLoading}
+        declineProcessing={reviewActionLoading}
       />
     </Box>
   )

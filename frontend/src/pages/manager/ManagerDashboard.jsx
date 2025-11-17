@@ -208,7 +208,12 @@ export default function ManagerDashboard() {
             ) : (
               <Stack spacing={1.5}>
                 {reviews.slice(0, 5).map((review) => (
-                  <Card key={review._id} sx={{ borderRadius: 2, p: 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none' }}>
+                  <Card
+                    key={review._id}
+                    component={RouterLink}
+                    to="/manager/review"
+                    sx={{ borderRadius: 2, p: 2, border: '1px solid', borderColor: 'divider', boxShadow: 'none', textDecoration: 'none' }}
+                  >
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                       <Box>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>{review?.projectId?.name || review?.projectId || 'Project'}</Typography>
