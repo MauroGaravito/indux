@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import {
   Card,
   CardHeader,
@@ -18,20 +18,51 @@ import PersonIcon from '@mui/icons-material/Person'
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
 import DeleteIcon from '@mui/icons-material/Delete'
 
+// Helper to generate a camelCase key from a label
+const toCamelKey = (label) => {
+  if (!label) return ''
+  const clean = label
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9 ]/g, ' ')
+    .trim()
+  if (!clean) return ''
+  const parts = clean.split(/\s+/)
+  const [first, ...rest] = parts
+  return [first.toLowerCase(), ...rest.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())].join('')
+}
+
+const makeUniqueKey = (base, existingKeys) => {
+  if (!base) return ''
+  if (!existingKeys.includes(base)) return base
+  let counter = 2
+  let candidate = `${base}${counter}`
+  while (existingKeys.includes(candidate)) {
+    counter += 1
+    candidate = `${base}${counter}`
+  }
+  return candidate
+}
+
 export default function PersonalDetailsSection({ fields, onChange }) {
   const list = Array.isArray(fields) ? fields : []
   const theme = useTheme()
   const accent = theme.palette.primary.main
+
+  const existingKeys = (excludeIdx) =>
+    list
+      .filter((_, i) => i !== excludeIdx)
+      .map((f) => f.key)
+      .filter(Boolean)
 
   const setField = (idx, patch) => {
     onChange(list.map((f, i) => (i === idx ? { ...f, ...patch } : f)))
   }
 
   const addField = () => {
-    const nextKey = `field_${list.length + 1}`
     onChange([
       ...list,
-      { key: nextKey, label: 'New Field', type: 'text', required: false, order: list.length + 1, step: 'personal' }
+      { key: '', label: '', type: 'text', required: false, order: list.length + 1, step: 'personal' }
     ])
   }
 
@@ -42,7 +73,7 @@ export default function PersonalDetailsSection({ fields, onChange }) {
       <CardHeader
         avatar={<PersonIcon sx={{ color: accent }} />}
         title={<Typography variant="h6" sx={{ fontWeight: 600 }}>Fields (Induction Module)</Typography>}
-        subheader={<Typography variant="body2" color="text.secondary">Key/label/type stored in InductionModuleField.</Typography>}
+        subheader={<Typography variant="body2" color="text.secondary">Key is auto-generated; user edits label/type/step.</Typography>}
         sx={{ pb: 0 }}
       />
       <CardContent>
@@ -54,12 +85,24 @@ export default function PersonalDetailsSection({ fields, onChange }) {
           {list.map((f, idx) => (
             <Paper key={f.key || idx} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
               <Grid container spacing={2} alignItems="center">
-                <Grid item xs={12} md={3}>
-                  <TextField fullWidth label="Key" value={f.key || ''} onChange={(e) => setField(idx, { key: e.target.value })} />
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    label="Label"
+                    value={f.label || ''}
+                    onChange={(e) => {
+                      const nextLabel = e.target.value
+                      if (!f.key) {
+                        const base = toCamelKey(nextLabel)
+                        const unique = makeUniqueKey(base, existingKeys(idx))
+                        setField(idx, { label: nextLabel, key: unique })
+                      } else {
+                        setField(idx, { label: nextLabel })
+                      }
+                    }}
+                  />
                 </Grid>
-                <Grid item xs={12} md={3}>
-                  <TextField fullWidth label="Label" value={f.label || ''} onChange={(e) => setField(idx, { label: e.target.value })} />
-                </Grid>
+
                 <Grid item xs={12} md={2}>
                   <TextField
                     fullWidth
@@ -78,6 +121,7 @@ export default function PersonalDetailsSection({ fields, onChange }) {
                     <option value="boolean">Boolean</option>
                   </TextField>
                 </Grid>
+
                 <Grid item xs={12} md={2}>
                   <TextField
                     fullWidth
@@ -87,6 +131,7 @@ export default function PersonalDetailsSection({ fields, onChange }) {
                     helperText="Grouping/step key"
                   />
                 </Grid>
+
                 <Grid item xs={12} md={1}>
                   <TextField
                     type="number"
@@ -96,13 +141,15 @@ export default function PersonalDetailsSection({ fields, onChange }) {
                     onChange={(e) => setField(idx, { order: Number(e.target.value) })}
                   />
                 </Grid>
+
                 <Grid item xs={12} md={1}>
                   <FormControlLabel
                     control={<Checkbox checked={!!f.required} onChange={(e) => setField(idx, { required: e.target.checked })} />}
                     label="Required"
                   />
                 </Grid>
-                <Grid item xs={12}>
+
+                <Grid item xs={12} md={2}>
                   <TextField
                     fullWidth
                     label="Options (comma separated)"
@@ -111,6 +158,7 @@ export default function PersonalDetailsSection({ fields, onChange }) {
                     disabled={f.type !== 'select'}
                   />
                 </Grid>
+
                 <Grid item xs={12} md={1}>
                   <IconButton color="error" onClick={() => removeField(idx)}>
                     <DeleteIcon />
