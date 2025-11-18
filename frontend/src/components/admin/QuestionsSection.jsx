@@ -13,13 +13,15 @@ import {
   Radio,
   Paper
 } from "@mui/material"
+import { useTheme } from "@mui/material/styles"
 import QuizIcon from "@mui/icons-material/Quiz"
 import DeleteIcon from "@mui/icons-material/Delete"
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline"
 
 export default function QuestionsSection({ questions, onChange, settings, onSettingsChange }) {
   const list = Array.isArray(questions) ? questions : []
-  const accent = '#1976d2'
+  const theme = useTheme()
+  const accent = theme.palette.primary.main
 
   const setQ = (idx, patch) => {
     onChange(list.map((q, i) => (i === idx ? { ...q, ...patch } : q)))

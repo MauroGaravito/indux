@@ -10,6 +10,7 @@ import {
   Chip,
   Box
 } from "@mui/material"
+import { useTheme } from "@mui/material/styles"
 import SlideshowIcon from "@mui/icons-material/Slideshow"
 import CloudUploadIcon from "@mui/icons-material/CloudUpload"
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline"
@@ -19,7 +20,8 @@ import { uploadFile, presignGet } from "../../utils/upload.js"
 // Slides are stored as an array in module.config.slides
 // We edit the first item (primary deck) for simplicity
 export default function SlidesSection({ slides, onChange }) {
-  const accent = "#1976d2"
+  const theme = useTheme()
+  const accent = theme.palette.primary.main
   const primary = useMemo(() => (Array.isArray(slides) && slides.length ? slides[0] : null), [slides])
   const [progress, setProgress] = useState(null)
   const [thumbUrl, setThumbUrl] = useState("")

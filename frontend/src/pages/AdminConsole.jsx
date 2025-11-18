@@ -10,6 +10,7 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
 import SaveIcon from '@mui/icons-material/Save'
 import SendIcon from '@mui/icons-material/Send'
 import AsyncButton from '../components/AsyncButton.jsx'
+import { useTheme } from '@mui/material/styles'
 
 const defaultConfig = {
   steps: ['personal', 'uploads', 'slides', 'quiz', 'sign'],
@@ -20,6 +21,7 @@ const defaultConfig = {
 
 export default function AdminConsole() {
   const { user } = useAuthStore()
+  const theme = useTheme()
   const [projects, setProjects] = useState([])
   const [selectedId, setSelectedId] = useState('')
   const [projectForm, setProjectForm] = useState({ name: '', description: '', address: '', status: 'draft' })
@@ -28,7 +30,7 @@ export default function AdminConsole() {
   const [fields, setFields] = useState([])
   const [newProject, setNewProject] = useState({ name: '', description: '' })
 
-  const accent = '#1976d2'
+  const accent = theme.palette.primary.main
   const normalizeConfig = (cfg) => ({
     steps: Array.isArray(cfg?.steps) ? cfg.steps : defaultConfig.steps,
     slides: Array.isArray(cfg?.slides) ? cfg.slides : [],

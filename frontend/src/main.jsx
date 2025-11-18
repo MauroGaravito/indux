@@ -53,7 +53,6 @@ function Nav({ brand }) {
 function App({ brand }) {
   return (
     <BrowserRouter>
-      <CssBaseline />
       <Nav brand={brand} />
       <Container maxWidth={false} disableGutters sx={{ mt: 2, px: { xs: 2, md: 3 } }}>
         <Routes>
@@ -93,6 +92,7 @@ function ThemedRoot() {
 
   return (
     <ThemeProvider theme={theme}>
+      <CssBaseline />
       <App brand={brandConfig} />
     </ThemeProvider>
   )

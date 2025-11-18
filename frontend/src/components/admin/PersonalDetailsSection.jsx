@@ -13,13 +13,15 @@ import {
   Paper,
   Grid
 } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import PersonIcon from '@mui/icons-material/Person'
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
 import DeleteIcon from '@mui/icons-material/Delete'
 
 export default function PersonalDetailsSection({ fields, onChange }) {
   const list = Array.isArray(fields) ? fields : []
-  const accent = '#1976d2'
+  const theme = useTheme()
+  const accent = theme.palette.primary.main
 
   const setField = (idx, patch) => {
     onChange(list.map((f, i) => (i === idx ? { ...f, ...patch } : f)))

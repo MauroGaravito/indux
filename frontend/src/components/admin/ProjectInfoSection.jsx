@@ -8,12 +8,14 @@ import {
   Typography,
   MenuItem
 } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import BusinessIcon from '@mui/icons-material/Business'
 
 export default function ProjectInfoSection({ value, onChange }) {
   const v = value || {}
   const set = (k, val) => onChange({ ...v, [k]: val })
-  const accent = '#1976d2'
+  const theme = useTheme()
+  const accent = theme.palette.primary.main
 
   return (
     <Card elevation={1} sx={{ borderRadius: 2, bgcolor: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>

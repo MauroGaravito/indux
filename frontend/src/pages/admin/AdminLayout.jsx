@@ -4,6 +4,7 @@ import {
   AppBar, Toolbar, Typography, IconButton, Drawer, List, ListItemButton,
   ListItemIcon, ListItemText, Box, CssBaseline, Divider, Button, useMediaQuery
 } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import FolderIcon from '@mui/icons-material/Folder'
 import RateReviewIcon from '@mui/icons-material/RateReview'
@@ -13,11 +14,11 @@ import MenuIcon from '@mui/icons-material/Menu'
 import { useAuthStore } from '../../store/auth.js'
 
 const drawerWidth = 240
-const brand = { primary: '#0046FF', secondary: '#0B132B', bg: '#F9FAFB' }
 
 export default function AdminLayout() {
   const { user, logout } = useAuthStore()
   const isMobile = useMediaQuery('(max-width:900px)')
+  const theme = useTheme()
   const [open, setOpen] = useState(!isMobile)
   const navigate = useNavigate()
 
@@ -31,7 +32,7 @@ export default function AdminLayout() {
 
   const DrawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Toolbar sx={{ fontWeight: 800, color: brand.secondary }}>Indux Admin</Toolbar>
+      <Toolbar sx={{ fontWeight: 800, color: theme.palette.text.primary }}>Indux Admin</Toolbar>
       <Divider />
       <List>
         {items.map((i) => (
@@ -50,9 +51,9 @@ export default function AdminLayout() {
   )
 
   return (
-    <Box sx={{ display: 'flex', background: brand.bg, minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', background: theme.palette.background.default, minHeight: '100vh' }}>
       <CssBaseline />
-      <AppBar position="fixed" sx={{ ml: { md: `${drawerWidth}px` }, bgcolor: brand.primary }}>
+      <AppBar position="fixed" color="primary" sx={{ ml: { md: `${drawerWidth}px` } }}>
         <Toolbar>
           <IconButton color="inherit" edge="start" onClick={() => setOpen(!open)} sx={{ mr: 2, display: { md: 'none' } }}>
             <MenuIcon />

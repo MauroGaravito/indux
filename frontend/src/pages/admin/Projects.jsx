@@ -34,6 +34,7 @@ import InfoIcon from '@mui/icons-material/Info'
 import PersonIcon from '@mui/icons-material/Person'
 import SlideshowIcon from '@mui/icons-material/Slideshow'
 import QuizIcon from '@mui/icons-material/Quiz'
+import { useTheme } from '@mui/material/styles'
 
 const defaultConfig = {
   steps: ['personal', 'uploads', 'slides', 'quiz', 'sign'],
@@ -43,6 +44,7 @@ const defaultConfig = {
 }
 
 export default function Projects() {
+  const theme = useTheme()
   const [projects, setProjects] = useState([])
   const [selectedId, setSelectedId] = useState('')
   const [projectForm, setProjectForm] = useState({ name: '', description: '', address: '', status: 'draft' })
@@ -57,7 +59,7 @@ export default function Projects() {
   const [assignRole, setAssignRole] = useState('worker')
   const [newProject, setNewProject] = useState({ name: '', description: '' })
 
-  const accent = '#1976d2'
+  const accent = theme.palette.primary.main
 
   const normalizeConfig = (cfg) => ({
     steps: Array.isArray(cfg?.steps) ? cfg.steps : defaultConfig.steps,
