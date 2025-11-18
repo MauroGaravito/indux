@@ -10,7 +10,7 @@ import Landing from './pages/Landing.jsx'
 import InductionWizard from './pages/InductionWizard.jsx'
 import ReviewQueue from './pages/ReviewQueue.jsx'
 import SlidesViewer from './pages/SlidesViewer.jsx'
-import AdminLayout from './pages/admin/AdminLayout.jsx'
+import DashboardLayout from './layouts/DashboardLayout.jsx'
 import AdminDashboard from './pages/admin/AdminDashboard.jsx'
 import AdminProjects from './pages/admin/Projects.jsx'
 import AdminReviews from './pages/admin/Reviews.jsx'
@@ -28,7 +28,13 @@ function Nav({ brand }) {
       <Toolbar>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexGrow: 1 }}>
           {logoUrl ? (
-            <Box component="img" src={logoUrl} alt={brandName} sx={{ height: 28, width: 'auto', borderRadius: 0.5, bgcolor: 'rgba(255,255,255,0.12)' }} />
+            <Box
+              component="img"
+              src={logoUrl}
+              alt={brandName}
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
+              sx={{ height: 28, width: 'auto', borderRadius: 0.5, bgcolor: 'rgba(255,255,255,0.12)' }}
+            />
           ) : null}
           <Typography variant="h6" sx={{ fontWeight: 700 }}>{brandName}</Typography>
         </Box>
@@ -57,11 +63,11 @@ function App({ brand }) {
       <Container maxWidth={false} disableGutters sx={{ mt: 2, px: { xs: 2, md: 3 } }}>
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/wizard" element={<InductionWizard />} />
+          <Route path="/wizard" element={<AuthGuard><WithLayout><InductionWizard /></WithLayout></AuthGuard>} />
           <Route path="/login" element={<Login />} />
-          <Route path="/review" element={<ReviewQueue />} />
+          <Route path="/review" element={<AuthGuard><WithLayout><ReviewQueue /></WithLayout></AuthGuard>} />
           <Route path="/slides-viewer" element={<SlidesViewer />} />
-          <Route path="/admin" element={<AdminGuard><AdminLayout /></AdminGuard>}>
+          <Route path="/admin" element={<AdminGuard><DashboardLayout /></AdminGuard>}>
             <Route index element={<AdminDashboard />} />
             <Route path="projects" element={<AdminProjects />} />
             <Route path="reviews" element={<AdminReviews />} />
@@ -81,6 +87,14 @@ function AdminGuard({ children }) {
   if (user.role !== 'admin') return <Navigate to="/" replace />
   return children
 }
+
+function AuthGuard({ children }) {
+  const { user } = useAuthStore()
+  if (!user) return <Navigate to="/login" replace />
+  return children
+}
+
+const WithLayout = ({ children }) => <DashboardLayout>{children}</DashboardLayout>
 
 function ThemedRoot() {
   const { brandConfig } = useBrandConfig()

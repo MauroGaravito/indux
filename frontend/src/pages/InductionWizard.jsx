@@ -126,8 +126,9 @@ export default function InductionWizard() {
   const moduleApproved = module?.reviewStatus === 'approved'
 
   useEffect(() => {
+    if (!user) return
     api.get('/projects').then((r) => setProjects(r.data || [])).catch(() => setProjects([]))
-  }, [])
+  }, [user])
 
   const personalFields = useMemo(() => {
     return Array.isArray(fields) ? [...fields].sort((a, b) => (a.order || 0) - (b.order || 0)) : []
