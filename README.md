@@ -143,3 +143,4 @@ Assignment (user ↔ project, manager|worker)
 - ✅ Legacy project-based induction endpoints removed.
 
 Future modules (risk, tasks, materials, etc.) can follow the same pattern: parent Project + module collection + module-specific fields/reviews/submissions.
+Test
