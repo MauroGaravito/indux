@@ -1,413 +1,145 @@
-﻿# Indux - Induction Tool (Monorepo)
+﻿# Indux – Safety Induction Platform (Modular)
 
-Indux es una herramienta de induccion de seguridad para construccion (single-tenant).
-Incluye:
-- API Node/Express en TypeScript
-- Frontend React + Vite
-- MongoDB y almacenamiento S3-compatible (MinIO)
-- Orquestado con Docker Compose; el mismo `docker-compose.yml` sirve para produccion con Caddy/Dokploy.
+Indux is a single-tenant safety-induction platform built with a clean separation between the parent **Project** entity and a pluggable **InductionModule**. Backend is Node.js/Express + TypeScript + MongoDB; frontend is React + Vite + MUI + Zustand. Storage uses MinIO (S3 compatible). Docker Compose orchestrates the stack locally and in production.
 
 ---
 
-## Actualizaciones recientes (2025-11-08)
+## Stack Overview
 
-- Review (Manager/Admin)
-  - Modal “View” de submissions ahora renderiza datos con MUI: datos personales en grid, resumen del quiz, firma (imagen) y lista de uploads. También muestra el cuestionario con la respuesta seleccionada y la correcta.
-  - Nueva pestaña “All Submissions” con tabla (Worker, Project, Status, Submitted At, Reviewed By) y acción “View”, filtros por estado y recuentos.
-- Dashboard (Admin)
-  - "Overview" ahora usa datos en vivo: Projects, Inductions Completed, Pending Reviews (submissions + project reviews), Users.
-- Wizard (Worker)
-  - El formulario de "Personal Details" se alimenta de la configuración de Admin (`project.config.personalDetails.fields`). Si no hay configuración guardada, se muestran campos por defecto (Name, DOB, Address, Phone, etc.). Los selects usan `native: true` para compatibilidad.
-  - Cámara integrada: bloque visual con video en vivo (`autoPlay`, `playsInline`, `muted`), captura a `canvas`, vista previa, y botones Capture / Retake / Accept / Cancel. No se sube nada hasta "Accept". Manejo de limpieza del stream y fix del error `srcObject` nulo.
-  - Slides: visor embebido centrado y escalado automáticamente (PDF directo; PPT/PPTX vía Office Online). Temporizador de 5 segundos por slide que bloquea “Next/Continue” hasta cumplirse. El botón “Open Original” permanece disponible.
-  - Submit: diálogo de confirmación (Cancel/Confirm) para evitar doble clic, indicador de carga en “Confirm”, mensaje de éxito y redirección automática al dashboard del worker.
-- Backend
-  - `GET /submissions` acepta `?status=pending|approved|declined|all` (default `pending`) y devuelve `userId.name`, `projectId.name` y `reviewedBy.name` (populate).
-  - `Submission.quiz` soporta `answers` (índices seleccionados) y el wizard las envía.
-- Compatibilidad
-  - Submissions antiguas sin `quiz.answers` siguen funcionando; el UI muestra “No stored answer” si falta.
-- Compose
-  - Docker Compose v2 ignora `version:`; puedes removerlo del `docker-compose.yml` para evitar warnings.
+| Layer       | Technology / Notes                                                                 |
+|-------------|-------------------------------------------------------------------------------------|
+| API         | Node.js (18+) + Express + TypeScript, Mongoose ODM, JWT auth                        |
+| Frontend    | React 18 + Vite, Material UI 5, Zustand state, Axios API client                     |
+| Persistence | MongoDB                                                                             |
+| Storage     | MinIO (S3 compatible) for uploads, slide decks, certificates                        |
+| Auth        | JWT access/refresh tokens with automatic refresh + global 401/403 handling          |
+| Deploy      | Docker Compose (local), Caddy/Dokploy (production reverse proxy)                    |
 
-## Produccion
-
-- App: https://indux.downundersolutions.com/
-- API (via Caddy): https://indux-api.downundersolutions.com/
-
-Despliegue recomendado: Dokploy + Caddy (o cualquier reverse proxy) con Docker Compose.
-En Dokploy, importa este repositorio como aplicación Docker Compose y configura las variables descritas abajo.
-
----
-
-## Arquitectura y servicios
-
-- `api`: Express (puerto 8080)
-- `frontend`: build de Vite servido con Nginx (puerto 80)
-- `mongo`: MongoDB 7 (puerto 27017)
-- `minio`: MinIO + consola (9000/9001)
-- Red externa: `shared_caddy_net` (debe existir previamente y la usa Caddy para hacer proxy a `api` y `frontend`).
-
-Crear la red si no existe:
 ```
-docker network create shared_caddy_net
+/api        -> Express API (Project + module architecture)
+/frontend   -> React app
+/docs       -> Architecture notes
+docker-compose.yml -> API + Frontend + Mongo + MinIO + Caddy
 ```
 
 ---
 
-## Variables de entorno
+## Architecture: Project (parent) + InductionModule (module)
 
-Usa `.env` localmente (ver `.env.example`). En produccion, configuralas en Dokploy/Caddy.
-
-Claves principales:
+**Project** (parent, clean)
 ```
-NODE_ENV=production
-PORT=8080
-MONGO_URI=mongodb://mongo:27017/indux
-
-# JWT
-JWT_ACCESS_SECRET=...
-JWT_REFRESH_SECRET=...
-ACCESS_TOKEN_TTL=15m
-REFRESH_TOKEN_TTL=7d
-
-# MinIO / S3 (interno)
-S3_ENDPOINT=http://minio:9000
-S3_REGION=us-east-1
-S3_BUCKET=indux
-S3_ACCESS_KEY=...
-S3_SECRET_KEY=...
-S3_USE_SSL=false
-
-# MinIO / S3 (publico para firmar URLs)
-# MUY IMPORTANTE para que los uploads desde el navegador funcionen
-PUBLIC_S3_ENDPOINT=http://localhost:9000   # en local
-# ej. en prod: https://s3.downundersolutions.com
-
-# SMTP
-SMTP_HOST=...
-SMTP_PORT=587
-SMTP_USER=...
-SMTP_PASS=...
-MAIL_FROM=Indux <no-reply@indux.local>
-
-# CORS frontend (lista separada por comas)
-FRONTEND_URL=http://localhost:5173
-
-# Frontend (solo build del frontend)
-VITE_API_URL=https://indux-api.downundersolutions.com
-
-# Seed inicial (solo primer despliegue)
-SEED=true
+{ _id, name, description, address?, managers[], status: draft|active|archived, createdBy, createdAt, updatedAt }
 ```
 
-Notas:
-- `PUBLIC_S3_ENDPOINT` ahora es soportado por `api/src/services/minio.ts` y se usa para firmar URLs presignadas accesibles desde el navegador. Si no lo defines, se firma contra el endpoint interno y los uploads pueden fallar desde el browser.
-- `VITE_API_URL` lo consume el frontend en build/preview/dev (ver `frontend/src/utils/api.js`). En Dokploy, pasa `VITE_API_URL` como ARG/ENV al construir el contenedor del frontend (por ejemplo `https://indux-api.downundersolutions.com`).
-- `SEED=true` solo para el primer despliegue: crea usuarios de demo si no existen. Luego cambia a `SEED=false` y vuelve a desplegar para desactivar el sembrado automático.
-
----
-
-## Despliegue en Dokploy (pasos sugeridos)
-
-1) Red de Docker compartida (si usas Caddy externo)
+**InductionModule** (child, type: "induction")
 ```
-docker network create shared_caddy_net
-```
-Conecta Caddy a esa red (`docker network connect shared_caddy_net caddy`).
-
-2) Importa la app Docker Compose en Dokploy
-- Usa este repo y el `docker-compose.yml` del proyecto.
-- Asegúrate de que la red `shared_caddy_net` exista y esté marcada como externa en Dokploy.
-
-3) Variables/Secrets mínimos
-- API:
-  - `NODE_ENV=production`
-  - `PORT=8080`
-  - `MONGO_URI=mongodb://mongo:27017/indux`
-  - `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` (valores seguros)
-  - `FRONTEND_URL` (orígenes permitidos, separa por comas; ej. `https://indux.downundersolutions.com`)
-  - `S3_*` y `PUBLIC_S3_ENDPOINT` (dominio público del MinIO/S3)
-  - `SEED=true` solo en el primer despliegue
-- Frontend:
-  - `VITE_API_URL=https://indux-api.downundersolutions.com`
-
-4) Volúmenes
-- Mongo: persiste `/data/db`.
-- MinIO: persiste `/data`.
-
-5) Despliega
-- Primer despliegue con `SEED=true`. Revisa logs de la API en Dokploy y verifica entradas como `Seeded user admin@indux.local`.
-- Luego, cambia `SEED=false` y vuelve a desplegar para evitar recrear credenciales de demo en el futuro.
-
-6) Proxy (Caddy) – ejemplos más abajo
-
----
-
-## Ejecucion local
-
-Existen dos formas recomendadas:
-
-1) Desarrollo con Vite/ts-node (sin proxy externo)
-- Copia `.env.example` a `.env` y ajusta:
-  - `FRONTEND_URL=http://localhost:5173`
-  - `PUBLIC_S3_ENDPOINT=http://localhost:9000` (para que el navegador suba a MinIO local)
-- Levanta dependencias con Docker (Mongo/MinIO):
-```
-docker compose up -d mongo minio
-```
-- API en modo dev:
-```
-cd api && npm install && npm run dev
-```
-- Frontend en dev (Vite 5173):
-```
-cd frontend && npm install && npm run dev
-```
-- Verifica:
-  - API: http://localhost:8080/health
-  - Frontend: http://localhost:5173
-  - MinIO: http://localhost:9001
-
-2) Docker Compose completo + Caddy externo o override de puertos
-- El `docker-compose.yml` expone puertos solo dentro de la red; no publica `api`/`frontend` al host. Opciones:
-  - Usar un contenedor Caddy en la red `shared_caddy_net` que haga proxy a `api:8080` y `frontend:80`.
-  - O crear `docker-compose.override.yml` local con mapeo de puertos, por ejemplo:
-    ```yaml
-    services:
-      api:
-        ports:
-          - "8080:8080"
-      frontend:
-        ports:
-          - "5173:80"   # accesible en http://localhost:5173
-    ```
-  - Luego:
-    ```
-    docker compose up -d --build
-    ```
-
-Scripts de ayuda (Windows PowerShell):
-- `api/scripts/rebuild-api.ps1 [-NoCache]`
-- `api/scripts/rebuild-frontend.ps1 [-NoCache]`
-- `api/scripts/rebuild-mongo.ps1`
-- `api/scripts/rebuild-minio.ps1`
-- `api/scripts/rebuild-all.ps1 [-NoCache]`
-
----
-
-## Primer inicio de sesión / Usuarios de demo
-
-Durante el primer despliegue con `SEED=true`, se crearán automáticamente usuarios de demo (si no existen):
-- Admin: `admin@indux.local` / `admin123`
-- Manager: `manager@indux.local` / `manager123`
-- Worker: `worker@indux.local` / `worker123`
-
-Recomendaciones de seguridad:
-- Tras validar el acceso, cambia las contraseñas o elimina los usuarios de demo desde el panel de Admin.
-- Desactiva el seed cambiando `SEED=false` y redeploy.
-
-Entrar por primera vez:
-- Frontend: inicia sesión en `/login` con un usuario seed (Admin recomendado).
-- Navegación según rol:
-  - Admin: `/admin` (dashboard y gestión)
-  - Manager: `/review`
-  - Worker: `/wizard`
-
----
-
-## Endpoints API
-
-- `GET /health`
-- `POST /auth/login` -> `{ accessToken, refreshToken, user }`
-- `POST /auth/refresh`
-- `GET /projects`
-- `POST /projects` (admin)
-- `PUT /projects/:id` (admin)
-- `DELETE /projects/:id` (admin)
-- `POST /uploads/presign` (auth) -> `{ key, url }`
-- `POST /submissions` (worker)
-- `GET /submissions[?status=pending|approved|declined|all]` (manager/admin)
-  - Devuelve `userId` y `projectId` con `name` (populate) y `reviewedBy.name` si existe.
-- `POST /submissions/:id/approve|decline` (manager/admin)
-- `POST /reviews/projects` (admin)
-- `GET /reviews/projects` (manager/admin)
-- `POST /reviews/projects/:id/approve|decline` (manager/admin)
-\- `GET /users` (admin)
-\- `POST /users` (admin) - si falta `password`, se genera automáticamente una temporal (8 chars) y se guarda hasheada.
-\- `PUT /users/:id` (admin) - permite actualizar `name`, `role`, `disabled` y `password` (el backend almacena el hash en `password`).
-\- `DELETE /users/:id` (admin) - borrado real del usuario (hard delete).
-
----
-
-## Subidas a MinIO (presign)
-
-- El backend asegura el bucket y firma URLs con MinIO SDK. Las claves no empiezan con / y los prefijos terminan en /.
-- Para que el navegador pueda usar la URL presignada:
-  - Define PUBLIC_S3_ENDPOINT con el host publico que usara el cliente.
-  - No fuerces Content-Type manualmente en el PUT del cliente.
-
-Prefijos y ubicaciones:
-- Capturas de cámara y subidas de imágenes de campos personales se guardan con prefijo worker-uploads/ dentro del bucket S3_BUCKET (por defecto indux).
-- Para descargar/mostrar, usa /uploads/presign-get con la key devuelta por la subida.
-
-Local:
-- Usa PUBLIC_S3_ENDPOINT=http://localhost:9000 (el compose publica 9000 y 9001 por defecto).
-
-Produccion:
-- Usa un dominio publico (p. ej. https://s3.downundersolutions.com) y configura Caddy para no strippear el prefijo del bucket.
-
----
-
-## Caddy (ejemplos)
-
-Requiere que Caddy este unido a `shared_caddy_net` para resolver `api` y `frontend`:
-```
-docker network connect shared_caddy_net caddy
-```
-
-Frontend + API (dos hosts):
-```caddy
-indux-api.downundersolutions.com {
-  encode gzip
-  reverse_proxy api:8080
-}
-
-indux.downundersolutions.com {
-  encode gzip
-  reverse_proxy frontend:80
+{ _id, projectId, type: 'induction', reviewStatus: draft|pending|approved|declined,
+  config: {
+    steps: string[]
+    slides: [ { key, title?, fileKey, thumbKey?, order } ]
+    quiz: { questions: [ { question, options[], answerIndex } ] }
+    settings: { passMark, randomizeQuestions, allowRetry }
+  },
+  createdBy, updatedBy, createdAt, updatedAt
 }
 ```
 
-S3 dedicado (recomendado):
-```caddy
-s3.downundersolutions.com {
-  encode gzip
-  reverse_proxy minio:9000 {
-    header_up Host {http.request.host}
-  }
-}
+**InductionModuleField**
+```
+{ _id, moduleId, key, label, type(text|number|date|select|file|textarea|boolean), required, order, step, options? }
+```
+
+**ModuleReview**
+```
+{ _id, moduleId, projectId, type:'induction', data(snapshot), status: pending|approved|declined,
+  reason?, requestedBy, reviewedBy?, createdAt, updatedAt }
+```
+
+**Submission**
+```
+{ _id, moduleId, projectId, userId, status: pending|approved|declined,
+  payload, uploads:[{key,type}], quiz:{ answers, score, passed }, signatureDataUrl?, certificateKey?,
+  reviewedBy?, reviewReason?, createdAt, updatedAt }
+```
+
+Assignments remain project-scoped (manager/worker) and gate submissions.
+
+---
+
+## Running the Platform Locally
+
+```bash
+# 1. Copy env templates
+cp api/.env.example api/.env
+cp frontend/.env.example frontend/.env
+
+# 2. Start services
+docker-compose up --build
+
+# 3. Access
+# Frontend: http://localhost:5173
+# API:      http://localhost:8080
 ```
 
 ---
 
-## Health check
+## API Surface (key endpoints)
 
-Script de verificacion rapida: `check-health.js`.
+- **Projects**: `GET /projects`, `POST /projects`, `PUT /projects/:id`, `DELETE /projects/:id`
+- **Modules (induction)**:
+  - `POST /projects/:projectId/modules/induction` (create if missing)
+  - `GET /projects/:projectId/modules/induction`
+  - `PUT /modules/:moduleId` (config/status, accepts optional `fields` bulk replacement)
+- **Fields**: `GET /modules/:moduleId/fields`, `POST /modules/:moduleId/fields`, `PUT /module-fields/:id`, `DELETE /module-fields/:id`
+- **Reviews**: `POST /modules/:moduleId/reviews`, `GET /modules/:moduleId/reviews`, `POST /modules/:moduleId/reviews/:reviewId/approve`, `POST /modules/:moduleId/reviews/:reviewId/decline`
+- **Submissions**: `POST /modules/:moduleId/submissions`, `GET /modules/:moduleId/submissions`, `POST /submissions/:id/approve`, `POST /submissions/:id/decline`
+- **Assignments**: unchanged (project-scoped manager/worker assignment)
+- **Auth/Uploads/Users/Brand Config**: unchanged
 
-- Por defecto consulta `http://localhost:PORT` (PORT de `.env`). Puedes forzar base con `BASE_URL`.
-```
-node check-health.js              # usa PORT
-BASE_URL=http://localhost:8080 node check-health.js
-```
-- Comprueba `.env`, `/health`, login de usuarios seed, endpoints clave y una subida presignada a MinIO.
-
----
-
-## Troubleshooting
-
-- CORS/Login:
-  - `FRONTEND_URL` debe incluir el origen activo.
-  - Rebuild del frontend si cambias `VITE_API_URL`.
-  - Preflight: `curl -X OPTIONS http://localhost:8080/auth/login -H "Origin: http://localhost:5173" -i`.
-- MinIO 403 (SignatureDoesNotMatch):
-  - Revisa `PUBLIC_S3_ENDPOINT` y que Caddy preserve el path del bucket, sin strip.
-  - Hora correcta en servidor y URL vigente (10 min por defecto).
-- Rebuild limpio: `docker compose build --no-cache api frontend && docker compose up -d`.
-- Login redirige al refrescar: el frontend hidrata el estado de autenticación desde `localStorage` al iniciar. Si se borra el storage o el navegador lo bloquea, volverás a `/login`. Asegúrate de no estar en modo privado restrictivo y de que tu dominio esté en `FRONTEND_URL`.
-edicion
+A submission requires: worker assignment to the project, and the module reviewStatus approved.
 
 ---
 
-## Creación automática de contraseñas
+## Frontend Highlights
 
-Cuando un administrador crea un usuario desde `/admin/users` y no proporciona el campo `password`, el backend genera automáticamente una contraseña temporal alfanumérica de 8 caracteres. Esta contraseña se encripta con `bcrypt` y se almacena en el campo `password` del documento (que contiene el hash). La creación del usuario continúa normalmente y la respuesta incluye un mensaje informativo.
+- Axios client with refresh token handling (`frontend/src/utils/api.js`).
+- Admin consoles (`/admin/projects`, `AdminConsole`) now edit **Project** metadata separately from the **InductionModule** (fields, slides, quiz, settings).
+- Review queue consumes module-based submissions/reviews (`/modules/...`).
+- Worker induction wizard loads module + fields via `/projects/:projectId/modules/induction` and submits to `/modules/:moduleId/submissions`.
 
-Detalles:
-- Si `password` no está presente en la petición, se genera internamente antes de validar los datos.
-- La validación (`zod`) sigue exigiendo que exista una contraseña válida (la generada cumple la longitud mínima).
-- Para consultas/listados, el backend excluye el campo `password` para no exponer el hash.
-- En caso de error inesperado, el servidor responde con JSON legible y no se cae.
+---
 
-Ejemplo de respuesta al crear un usuario sin `password`:
+## Data Flow Summary
+
 ```
-HTTP/1.1 201 Created
-{
-  "id": "<mongo_id>",
-  "email": "nuevo@indux.local",
-  "name": "Nuevo Usuario",
-  "role": "worker",
-  "disabled": false,
-  "info": "El campo password era requerido y se generó automáticamente."
-}
+Project (clean)
+  ↳ InductionModule (type='induction')
+      ↳ InductionModuleField (personal data schema)
+      ↳ ModuleReview (snapshots config+fields)
+      ↳ Submission (worker output) -> certificate in MinIO
+Assignment (user ↔ project, manager|worker)
 ```
 
-Recomendaciones futuras:
-- Enviar la contraseña temporal por correo al usuario (usando `api/src/services/mailer.ts`) o forzar un flujo de “establecer contraseña” mediante enlace de un solo uso.
-- Registrar en auditoría que se generó una contraseña automática para trazabilidad.
-- Permitir a los administradores copiar/mostrar la contraseña generada una sola vez en el panel, con advertencia de seguridad.
+- Only approved modules accept submissions.
+- Assignments gate worker submissions and manager/team access.
+- Submissions approved -> certificate stored in `certs/{project}/{module}/{submission}.pdf`.
 
 ---
 
-## Gestión de usuarios (Admin)
+## Deployment Notes
 
-- Toggle Activar/Desactivar: desde el panel, el botón cambia el estado `disabled` del usuario mediante `PUT /users/:id { disabled: true|false }`.
-- Eliminar (Delete): el botón realiza un borrado real (`DELETE /users/:id`).
-- Seguridad: las respuestas de `GET/PUT` excluyen el campo `password` para evitar exponer hashes.
-
----
-
-## Manager Team View
-
-Managers can now view their assigned team under the "My Team" tab in the Review panel. The API endpoint `GET /assignments/manager/:id/team` returns all workers linked to the manager’s projects, including their name, email, and project references.
-
-> The team list is now loaded lazily when the manager opens the "My Team" tab, improving performance.
+- `.env` declares Mongo/MinIO credentials, JWT secrets, SMTP, and CORS origins.
+- Docker Compose runs Mongo, MinIO, API, Frontend, Caddy. Caddy strips `/api` before proxying to the API.
+- Certificates generated via `api/src/services/pdf.ts` and stored in MinIO.
+- Health check: `GET /health`.
 
 ---
 
-## Project Assignments (User ↔ Project)
+## Status
 
-Conecta usuarios con proyectos mediante una relación controlada.
+- ✅ Project is clean (no induction data).
+- ✅ Induction module encapsulates config, fields, slides, quiz, reviews, submissions.
+- ✅ Frontend consumes module endpoints (admin editors, review queue, worker wizard).
+- ✅ Legacy project-based induction endpoints removed.
 
-- Admins y managers pueden asignar usuarios (workers o managers) a proyectos.
-- Workers solo pueden ver y participar en sus proyectos asignados.
-- Managers solo pueden ver los proyectos y equipos bajo su responsabilidad.
-
-### Modelo
-
-`Assignment`:
-- `user`: ObjectId, ref `User`, required
-- `project`: ObjectId, ref `Project`, required
-- `role`: enum `['manager','worker']`
-- `assignedBy`: ObjectId, ref `User`
-- `timestamps`: `true`
-- Índice único `{ user, project }`
-
-### Endpoints
-
-- `POST /assignments` (admin, manager)
-  - Body: `{ user, project, role: 'manager'|'worker' }`
-  - Managers solo pueden asignar dentro de proyectos donde son `manager`.
-
-- `GET /assignments/user/:id` (admin, manager, worker)
-  - Lista los proyectos asignados a un usuario.
-  - Admin: completo. Manager: solo en proyectos que gestiona. Worker: solo si solicita su propio ID.
-
-- `GET /assignments/project/:id` (admin, manager)
-  - Lista los usuarios asignados al proyecto.
-  - Manager debe estar asignado como `manager` al proyecto.
-
-- `DELETE /assignments/:id` (admin, manager)
-  - Elimina la asignación. Manager solo dentro de proyectos que gestiona.
-
-### `GET /projects` (filtrado por rol)
-
-- Ahora requiere autenticación.
-- Admin: devuelve todos los proyectos.
-- Manager/Worker: devuelve solo proyectos asignados (existe un `Assignment` para el usuario).
-
-### UI (Admin → Projects → “Assigned Users”)
-
-- Nueva pestaña “Assigned Users” al editar un proyecto.
-- Lista de asignaciones con nombre y rol.
-- Botón “Assign User” abre modal con selector de usuario y rol.
-- Cada fila incluye “Remove” para quitar la asignación.
+Future modules (risk, tasks, materials, etc.) can follow the same pattern: parent Project + module collection + module-specific fields/reviews/submissions.

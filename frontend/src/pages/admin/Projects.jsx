@@ -1,5 +1,24 @@
-import React, { useEffect, useState } from 'react'
-import { Box, Grid, Card, CardContent, Typography, Button, Stack, TextField, MenuItem, Divider, Tabs, Tab, List, ListItemButton, ListItemIcon, ListItemText, CardHeader, Dialog } from '@mui/material'
+﻿import React, { useEffect, useState } from 'react'
+import {
+  Box,
+  Grid,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  Stack,
+  TextField,
+  MenuItem,
+  Divider,
+  Tabs,
+  Tab,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  CardHeader,
+  Dialog
+} from '@mui/material'
 import api from '../../utils/api.js'
 import AsyncButton from '../../components/AsyncButton.jsx'
 import ProjectInfoSection from '../../components/admin/ProjectInfoSection.jsx'
@@ -16,56 +35,115 @@ import PersonIcon from '@mui/icons-material/Person'
 import SlideshowIcon from '@mui/icons-material/Slideshow'
 import QuizIcon from '@mui/icons-material/Quiz'
 
+const defaultConfig = {
+  steps: ['personal', 'uploads', 'slides', 'quiz', 'sign'],
+  slides: [],
+  quiz: { questions: [] },
+  settings: { passMark: 80, randomizeQuestions: false, allowRetry: true }
+}
+
 export default function Projects() {
   const [projects, setProjects] = useState([])
   const [selectedId, setSelectedId] = useState('')
-  const [name, setName] = useState('')
-  const [desc, setDesc] = useState('')
-  const [config, setConfig] = useState({ projectInfo: {}, personalDetails: {}, slides: {}, questions: [] })
+  const [projectForm, setProjectForm] = useState({ name: '', description: '', address: '', status: 'draft' })
+  const [module, setModule] = useState(null)
+  const [moduleConfig, setModuleConfig] = useState(defaultConfig)
+  const [fields, setFields] = useState([])
   const [tab, setTab] = useState(0)
   const [assignments, setAssignments] = useState([])
   const [users, setUsers] = useState([])
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignUserId, setAssignUserId] = useState('')
   const [assignRole, setAssignRole] = useState('worker')
+  const [newProject, setNewProject] = useState({ name: '', description: '' })
 
-  const load = async () => {
+  const accent = '#1976d2'
+
+  const normalizeConfig = (cfg) => ({
+    steps: Array.isArray(cfg?.steps) ? cfg.steps : defaultConfig.steps,
+    slides: Array.isArray(cfg?.slides) ? cfg.slides : [],
+    quiz: cfg?.quiz && Array.isArray(cfg.quiz.questions) ? { questions: cfg.quiz.questions } : { questions: [] },
+    settings: cfg?.settings ? { ...defaultConfig.settings, ...cfg.settings } : { ...defaultConfig.settings }
+  })
+
+  const loadProjects = async () => {
     const r = await api.get('/projects')
-    setProjects(r.data)
+    setProjects(r.data || [])
   }
-  useEffect(()=> { load() }, [])
+  useEffect(() => { loadProjects() }, [])
 
   const createProject = async () => {
-    await api.post('/projects', { name, description: desc, steps: [] })
-    setName(''); setDesc('');
-    await load()
+    if (!newProject.name) return
+    await api.post('/projects', { name: newProject.name, description: newProject.description })
+    setNewProject({ name: '', description: '' })
+    await loadProjects()
   }
 
-  const onSelect = (id) => {
-    setSelectedId(id)
-    const p = projects.find(x => x._id === id)
-    setConfig(p?.config || { projectInfo: {}, personalDetails: {}, slides: {}, questions: [] })
-    // load assignments for this project
-    if (id) {
-      api.get(`/assignments/project/${id}`).then(r => setAssignments(r.data || [])).catch(()=> setAssignments([]))
-    } else {
+  const loadAssignments = async (projectId) => {
+    try {
+      const r = await api.get(`/assignments/project/${projectId}`)
+      setAssignments(r.data || [])
+    } catch {
       setAssignments([])
     }
   }
 
-  const saveConfig = async () => {
+  const loadModule = async (projectId) => {
+    try {
+      const r = await api.get(`/projects/${projectId}/modules/induction`)
+      setModule(r.data.module)
+      setModuleConfig(normalizeConfig(r.data.module?.config))
+      setFields(r.data.fields || [])
+    } catch (e) {
+      if (e?.response?.status === 404) {
+        const created = await api.post(`/projects/${projectId}/modules/induction`, {})
+        setModule(created.data)
+        setModuleConfig(normalizeConfig(created.data?.config))
+        setFields([])
+      } else {
+        setModule(null)
+        setModuleConfig(defaultConfig)
+        setFields([])
+      }
+    }
+  }
+
+  const onSelect = async (id) => {
+    setSelectedId(id)
+    const p = projects.find(x => x._id === id)
+    setProjectForm({ name: p?.name || '', description: p?.description || '', address: p?.address || '', status: p?.status || 'draft' })
+    if (id) {
+      await Promise.all([loadModule(id), loadAssignments(id)])
+    } else {
+      setModule(null)
+      setModuleConfig(defaultConfig)
+      setFields([])
+      setAssignments([])
+    }
+  }
+
+  const saveProject = async () => {
     if (!selectedId) return
-    await api.put(`/projects/${selectedId}`, { config })
+    await api.put(`/projects/${selectedId}`, projectForm)
+    await loadProjects()
+  }
+
+  const saveModule = async () => {
+    if (!module?._id) return
+    const payload = { config: moduleConfig, fields }
+    const r = await api.put(`/modules/${module._id}`, payload)
+    setModule(r.data.module)
+    setFields(r.data.fields || fields)
   }
 
   const sendForReview = async () => {
-    if (!selectedId) return
-    await api.post('/reviews/projects', { projectId: selectedId, data: config })
+    if (!module?._id) return
+    await api.post(`/modules/${module._id}/reviews`)
+    await loadModule(selectedId)
   }
 
   const openAssign = async () => {
     setAssignOpen(true)
-    // Fetch users on demand (admin only route)
     try { const r = await api.get('/users'); setUsers(r.data || []) } catch { setUsers([]) }
   }
   const closeAssign = () => setAssignOpen(false)
@@ -73,16 +151,12 @@ export default function Projects() {
     if (!selectedId || !assignUserId) return
     await api.post('/assignments', { user: assignUserId, project: selectedId, role: assignRole })
     setAssignUserId(''); setAssignRole('worker'); setAssignOpen(false)
-    const r = await api.get(`/assignments/project/${selectedId}`)
-    setAssignments(r.data || [])
+    await loadAssignments(selectedId)
   }
   const removeAssignment = async (id) => {
     await api.delete(`/assignments/${id}`)
-    const r = await api.get(`/assignments/project/${selectedId}`)
-    setAssignments(r.data || [])
+    await loadAssignments(selectedId)
   }
-
-  const accent = '#1976d2'
 
   return (
     <>
@@ -93,13 +167,13 @@ export default function Projects() {
           <CardContent>
             <List sx={{ mb: 1 }}>
               {projects.map(p => {
-                const selected = selectedId===p._id
+                const selected = selectedId === p._id
                 return (
-                  <ListItemButton key={p._id} selected={selected} onClick={()=> onSelect(p._id)} sx={{ borderRadius: 1 }}>
+                  <ListItemButton key={p._id} selected={selected} onClick={() => onSelect(p._id)} sx={{ borderRadius: 1 }}>
                     <ListItemIcon sx={{ minWidth: 36, color: selected ? accent : 'action.active' }}>
                       <FolderIcon />
                     </ListItemIcon>
-                    <ListItemText primary={p.name} primaryTypographyProps={{ fontWeight: selected ? 600 : 400 }} />
+                    <ListItemText primary={p.name} secondary={p.status} primaryTypographyProps={{ fontWeight: selected ? 600 : 400 }} />
                   </ListItemButton>
                 )
               })}
@@ -107,46 +181,60 @@ export default function Projects() {
             </List>
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2" sx={{ mb: 1 }}>Create Project</Typography>
-            <Stack direction="row" spacing={1}>
-              <TextField size="small" label="Name" value={name} onChange={e=> setName(e.target.value)} />
-              <TextField size="small" label="Description" value={desc} onChange={e=> setDesc(e.target.value)} />
+            <Stack spacing={1}>
+              <TextField size="small" label="Name" value={newProject.name} onChange={e => setNewProject({ ...newProject, name: e.target.value })} />
+              <TextField size="small" label="Description" value={newProject.description} onChange={e => setNewProject({ ...newProject, description: e.target.value })} />
+              <AsyncButton variant="contained" startIcon={<AddCircleOutlineIcon />} onClick={createProject} disabled={!newProject.name}>
+                Add
+              </AsyncButton>
             </Stack>
-            <AsyncButton startIcon={<AddCircleOutlineIcon />} sx={{ mt: 1, textTransform: 'none' }} variant="contained" onClick={createProject} disabled={!name}>Create</AsyncButton>
           </CardContent>
         </Card>
       </Grid>
+
       <Grid item xs={12} md={8}>
         <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
           <CardContent>
-            <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ md:'center' }} spacing={1}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Edit Project</Typography>
-              <Stack direction="row" spacing={1}>
-                <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveConfig} disabled={!selectedId} sx={{ textTransform: 'none' }}>Save</AsyncButton>
-                <AsyncButton startIcon={<SendIcon />} variant="contained" onClick={sendForReview} disabled={!selectedId} sx={{ textTransform: 'none', bgcolor: accent }}>Send For Review</AsyncButton>
-              </Stack>
-            </Stack>
             {selectedId ? (
-              <Box sx={{ mt: 2 }}>
-                <Tabs value={tab} onChange={(_,v)=> setTab(v)} sx={{ borderBottom: '1px solid #eee', '& .MuiTabs-indicator': { backgroundColor: accent } }}>
+              <>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+                  <Typography variant="h6">Manage Project</Typography>
+                  <Box sx={{ flex: 1 }} />
+                  <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveProject}>Save Project</AsyncButton>
+                  <AsyncButton startIcon={<SaveIcon />} variant="contained" onClick={saveModule}>Save Module</AsyncButton>
+                  <AsyncButton startIcon={<SendIcon />} variant="contained" color="secondary" onClick={sendForReview}>Send For Review</AsyncButton>
+                </Stack>
+
+                <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: '1px solid #eee', '& .MuiTabs-indicator': { backgroundColor: accent } }}>
                   <Tab icon={<InfoIcon />} iconPosition="start" label="Project Info" sx={{ '&.Mui-selected': { color: accent } }} />
-                  <Tab icon={<PersonIcon />} iconPosition="start" label="Personal Details" sx={{ '&.Mui-selected': { color: accent } }} />
+                  <Tab icon={<PersonIcon />} iconPosition="start" label="Fields" sx={{ '&.Mui-selected': { color: accent } }} />
                   <Tab icon={<SlideshowIcon />} iconPosition="start" label="Slides" sx={{ '&.Mui-selected': { color: accent } }} />
-                  <Tab icon={<QuizIcon />} iconPosition="start" label="Questions" sx={{ '&.Mui-selected': { color: accent } }} />
-                  <Tab icon={<GroupIcon />} iconPosition="start" label="Assigned Users" sx={{ '&.Mui-selected': { color: accent } }} />
+                  <Tab icon={<QuizIcon />} iconPosition="start" label="Quiz" sx={{ '&.Mui-selected': { color: accent } }} />
+                  <Tab icon={<GroupIcon />} iconPosition="start" label="Assignments" sx={{ '&.Mui-selected': { color: accent } }} />
                 </Tabs>
-                <Box sx={{ mt: 2 }} hidden={tab!==0}>
-                  <ProjectInfoSection value={config.projectInfo} onChange={(val)=> setConfig({ ...config, projectInfo: val })} />
+
+                <Box sx={{ mt: 2 }} hidden={tab !== 0}>
+                  <ProjectInfoSection value={projectForm} onChange={(val) => setProjectForm(val)} />
                 </Box>
-                <Box sx={{ mt: 2 }} hidden={tab!==1}>
-                  <PersonalDetailsSection value={config.personalDetails} onChange={(val)=> setConfig({ ...config, personalDetails: val })} />
+
+                <Box sx={{ mt: 2 }} hidden={tab !== 1}>
+                  <PersonalDetailsSection fields={fields} onChange={setFields} />
                 </Box>
-                <Box sx={{ mt: 2 }} hidden={tab!==2}>
-                  <SlidesSection value={config.slides} onChange={(val)=> setConfig({ ...config, slides: val })} />
+
+                <Box sx={{ mt: 2 }} hidden={tab !== 2}>
+                  <SlidesSection slides={moduleConfig.slides} onChange={(slides) => setModuleConfig({ ...moduleConfig, slides })} />
                 </Box>
-                <Box sx={{ mt: 2 }} hidden={tab!==3}>
-                  <QuestionsSection value={config.questions} onChange={(val)=> setConfig({ ...config, questions: val })} />
+
+                <Box sx={{ mt: 2 }} hidden={tab !== 3}>
+                  <QuestionsSection
+                    questions={moduleConfig.quiz?.questions || []}
+                    settings={moduleConfig.settings}
+                    onChange={(qs) => setModuleConfig({ ...moduleConfig, quiz: { questions: qs } })}
+                    onSettingsChange={(settings) => setModuleConfig({ ...moduleConfig, settings })}
+                  />
                 </Box>
-                <Box sx={{ mt: 2 }} hidden={tab!==4}>
+
+                <Box sx={{ mt: 2 }} hidden={tab !== 4}>
                   <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                     <GroupIcon color="action" />
                     <Typography variant="subtitle2">Assigned Users</Typography>
@@ -158,7 +246,7 @@ export default function Projects() {
                       <ListItemButton key={a._id} sx={{ borderRadius: 1 }}>
                         <ListItemIcon sx={{ minWidth: 36 }}><PersonIcon /></ListItemIcon>
                         <ListItemText primary={`${a?.user?.name || a?.user} - ${a.role}`} secondary={a?.user?.email || ''} />
-                        <Button color="error" onClick={()=> removeAssignment(a._id)}>Remove</Button>
+                        <Button color="error" onClick={() => removeAssignment(a._id)}>Remove</Button>
                       </ListItemButton>
                     ))}
                   </List>
@@ -166,7 +254,7 @@ export default function Projects() {
                     <Typography variant="body2" sx={{ opacity: 0.7 }}>No users assigned to this project.</Typography>
                   )}
                 </Box>
-              </Box>
+              </>
             ) : (
               <Typography variant="body2" sx={{ mt: 2, opacity: 0.7 }}>Select a project to edit.</Typography>
             )}
@@ -184,7 +272,7 @@ export default function Projects() {
             select
             label="User"
             value={assignUserId}
-            onChange={(e)=> setAssignUserId(e.target.value)}
+            onChange={(e) => setAssignUserId(e.target.value)}
             helperText="Select a user to assign"
           >
             {users.map(u => (
@@ -195,7 +283,7 @@ export default function Projects() {
             select
             label="Role"
             value={assignRole}
-            onChange={(e)=> setAssignRole(e.target.value)}
+            onChange={(e) => setAssignRole(e.target.value)}
           >
             <MenuItem value="worker">Worker</MenuItem>
             <MenuItem value="manager">Manager</MenuItem>

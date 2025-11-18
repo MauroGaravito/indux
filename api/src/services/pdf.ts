@@ -1,7 +1,10 @@
 import PDFDocument from 'pdfkit';
 import { minio, bucket } from './minio.js';
 
-export async function generateCertificate(key: string, data: { workerName: string; projectName: string }) {
+export async function generateCertificate(
+  key: string,
+  data: { workerName: string; projectName: string; moduleType?: string }
+) {
   const doc = new PDFDocument({ size: 'A4', margin: 50 });
   const chunks: Buffer[] = [];
   return new Promise<string>((resolve, reject) => {
@@ -13,13 +16,16 @@ export async function generateCertificate(key: string, data: { workerName: strin
     });
     doc.on('error', reject);
 
-    doc.fontSize(24).text('Induction Certificate', { align: 'center' });
+    const moduleLabel = data?.moduleType ? `${data.moduleType} module` : 'induction module';
+
+    doc.fontSize(24).text('Completion Certificate', { align: 'center' });
     doc.moveDown();
     doc.fontSize(16).text(`Worker: ${data.workerName}`);
     doc.text(`Project: ${data.projectName}`);
+    doc.text(`Module: ${moduleLabel}`);
     doc.text(`Date: ${new Date().toLocaleDateString()}`);
     doc.moveDown();
-    doc.text('This certifies the worker has completed the induction.', { align: 'left' });
+    doc.text('This certifies the worker has successfully completed the required module.', { align: 'left' });
 
     doc.end();
   });

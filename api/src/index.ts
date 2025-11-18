@@ -5,9 +5,11 @@ import rateLimit from 'express-rate-limit';
 import { connectDB } from './db.js';
 import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
-import submissionRoutes from './routes/submissions.js';
+import moduleRoutes from './routes/modules.js';
+import moduleFieldRoutes from './routes/moduleFields.js';
+import moduleReviewRoutes from './routes/moduleReviews.js';
+import moduleSubmissionRoutes from './routes/moduleSubmissions.js';
 import uploadRoutes from './routes/uploads.js';
-import reviewRoutes from './routes/reviews.js';
 import userRoutes from './routes/users.js';
 import assignmentsRoutes from './routes/assignments.js';
 import brandConfigRoutes from './routes/brandConfigRoutes.js';
@@ -78,9 +80,11 @@ app.get('/health', (_req, res) => {
 // --- Routes ---
 app.use('/auth', authRoutes);
 app.use('/projects', projectRoutes);
-app.use('/submissions', submissionRoutes);
+app.use('/', moduleRoutes);
+app.use('/', moduleFieldRoutes);
+app.use('/', moduleReviewRoutes);
+app.use('/', moduleSubmissionRoutes);
 app.use('/uploads', uploadRoutes);
-app.use('/reviews', reviewRoutes);
 app.use('/users', userRoutes);
 app.use('/assignments', assignmentsRoutes);
 app.use('/brand-config', brandConfigRoutes);

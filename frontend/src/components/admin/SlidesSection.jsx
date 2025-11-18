@@ -1,6 +1,5 @@
-import React, { useState } from 'react'
+ï»¿import React, { useEffect, useState, useMemo } from "react"
 import {
-  Box,
   Card,
   CardHeader,
   CardContent,
@@ -8,33 +7,54 @@ import {
   Typography,
   Button,
   LinearProgress,
-  Paper,
-  Chip
-} from '@mui/material'
-import SlideshowIcon from '@mui/icons-material/Slideshow'
-import CloudUploadIcon from '@mui/icons-material/CloudUpload'
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
-import { uploadFile, presignGet } from '../../utils/upload.js'
+  Chip,
+  Box
+} from "@mui/material"
+import SlideshowIcon from "@mui/icons-material/Slideshow"
+import CloudUploadIcon from "@mui/icons-material/CloudUpload"
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline"
+import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile"
+import { uploadFile, presignGet } from "../../utils/upload.js"
 
-export default function SlidesSection({ value, onChange }) {
-  const v = value || {}
-  const set = (k, val) => onChange({ ...v, [k]: val })
-  const [localName, setLocalName] = useState('')
+// Slides are stored as an array in module.config.slides
+// We edit the first item (primary deck) for simplicity
+export default function SlidesSection({ slides, onChange }) {
+  const accent = "#1976d2"
+  const primary = useMemo(() => (Array.isArray(slides) && slides.length ? slides[0] : null), [slides])
   const [progress, setProgress] = useState(null)
-  const [thumbUrl, setThumbUrl] = useState('')
+  const [thumbUrl, setThumbUrl] = useState("")
+  const [localName, setLocalName] = useState("")
 
-  const accent = '#1976d2'
+  const setPrimary = (patch) => {
+    const base = primary || { key: "primary", title: "Induction Slides", fileKey: "", order: 1 }
+    const next = { ...base, ...patch }
+    const rest = Array.isArray(slides) ? slides.slice(1) : []
+    onChange([next, ...rest])
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadThumb() {
+      if (!primary?.thumbKey) { setThumbUrl(''); return }
+      try {
+        const { url } = await presignGet(primary.thumbKey)
+        if (!cancelled) setThumbUrl(url)
+      } catch {
+        if (!cancelled) setThumbUrl("")
+      }
+    }
+    loadThumb()
+    return () => { cancelled = true }
+  }, [primary?.thumbKey])
 
   const uploadPPT = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     const { key } = await uploadFile('slides/', file, { onProgress: setProgress })
-    set('pptKey', key)
-    setLocalName(file.name)
     setProgress(null)
-
-    // If PDF, try to generate a thumbnail of the first page
+    setLocalName(file.name)
+    setPrimary({ fileKey: key, title: file.name, order: primary?.order ?? 1 })
+    // thumbnail optional
     const ext = (file.name.split('.').pop() || '').toLowerCase()
     if (ext === 'pdf') {
       try {
@@ -42,7 +62,7 @@ export default function SlidesSection({ value, onChange }) {
         const blob = await renderPdfFirstPageToBlob(url, 300)
         if (blob) {
           const { key: tkey } = await uploadFile('slides/', blob, { onProgress: undefined })
-          set('thumbKey', tkey)
+          setPrimary({ fileKey: key, thumbKey: tkey, title: file.name, order: primary?.order ?? 1 })
           const { url: turl } = await presignGet(tkey)
           setThumbUrl(turl)
         }
@@ -50,24 +70,6 @@ export default function SlidesSection({ value, onChange }) {
         // ignore thumbnail failures
       }
     }
-  }
-
-  const uploadedLabel = localName || v.pptKey
-  
-  React.useEffect(() => {
-    let cancelled = false
-    async function loadThumb() {
-      if (!v.thumbKey) { setThumbUrl(''); return }
-      try { const { url } = await presignGet(v.thumbKey); if (!cancelled) setThumbUrl(url) } catch { if (!cancelled) setThumbUrl('') }
-    }
-    loadThumb()
-    return () => { cancelled = true }
-  }, [v.thumbKey])
-
-  const openViewer = () => {
-    const ext = (localName || '').split('.').pop()?.toLowerCase() || 'pptx'
-    const params = new URLSearchParams({ key: v.pptKey || '', name: localName || 'slides', ext })
-    window.open(`/slides-viewer?${params.toString()}`, '_blank', 'noopener,noreferrer')
   }
 
   async function renderPdfFirstPageToBlob(pdfUrl, width = 300) {
@@ -94,32 +96,29 @@ export default function SlidesSection({ value, onChange }) {
     return await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
   }
 
+  const openViewer = () => {
+    if (!primary?.fileKey) return
+    const params = new URLSearchParams({ key: primary.fileKey, name: localName || primary.title || 'slides', ext: 'pdf' })
+    window.open(`/slides-viewer?${params.toString()}`, '_blank', 'noopener,noreferrer')
+  }
+
+  const uploadedLabel = localName || primary?.title || primary?.fileKey
+
   return (
     <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
       <CardHeader
-        avatar={
-          <Box sx={{ bgcolor: 'rgba(25,118,210,0.1)', color: accent, width: 36, height: 36, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <SlideshowIcon fontSize="small" />
-          </Box>
-        }
-        title={<Typography variant="h6" sx={{ fontWeight: 600 }}>Section 3 — Induction Slides</Typography>}
-        subheader={<Typography variant="body2" color="text.secondary">Upload PDF or PowerPoint</Typography>}
+        avatar={<SlideshowIcon sx={{ color: accent }} />}
+        title={<Typography variant="h6" sx={{ fontWeight: 600 }}>Slides</Typography>}
+        subheader={<Typography variant="body2" color="text.secondary">Stored in module.config.slides[0]</Typography>}
         sx={{ pb: 0 }}
       />
       <CardContent>
-        <Paper
-          variant="outlined"
-          sx={{ p: 2, borderStyle: 'dashed', borderColor: uploadedLabel ? accent : 'divider', '&:hover': { borderColor: accent } }}
-        >
+        <Stack spacing={2}>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" justifyContent="space-between">
             <Stack direction="row" spacing={1} alignItems="center">
               <CloudUploadIcon sx={{ color: accent }} />
-              <Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Upload Slides</Typography>
-                <Typography variant="body2" color="text.secondary">.ppt, .pptx up to 20MB</Typography>
-              </Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Upload Slides</Typography>
             </Stack>
-
             <Stack direction="row" spacing={2} alignItems="center">
               <Button
                 variant="contained"
@@ -135,14 +134,12 @@ export default function SlidesSection({ value, onChange }) {
                   onChange={uploadPPT}
                 />
               </Button>
-
               {uploadedLabel && (
                 <Stack direction="row" spacing={1} alignItems="center">
                   <CheckCircleOutlineIcon color="success" />
                   <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>Uploaded: {uploadedLabel}</Typography>
                 </Stack>
               )}
-
               {(thumbUrl || uploadedLabel) && (
                 <Stack direction="row" spacing={1} alignItems="center">
                   {thumbUrl ? (
@@ -151,26 +148,17 @@ export default function SlidesSection({ value, onChange }) {
                     <Chip icon={<InsertDriveFileIcon />} label="Open Viewer" onClick={openViewer} variant="outlined" />
                   )}
                 </Stack>
-              )}            </Stack>
+              )}
+            </Stack>
           </Stack>
-
           {progress != null && (
-            <Box sx={{ mt: 2 }}>
+            <Stack spacing={1}>
               <LinearProgress variant="determinate" value={progress} sx={{ '& .MuiLinearProgress-bar': { backgroundColor: accent } }} />
               <Typography variant="caption" color="text.secondary">{progress}%</Typography>
-            </Box>
+            </Stack>
           )}
-        </Paper>
+        </Stack>
       </CardContent>
     </Card>
   )
 }
-
-
-
-
-
-
-
-
-

@@ -1,31 +1,63 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
-export interface ISubmission extends Document {
-  projectId: mongoose.Types.ObjectId;
-  userId: mongoose.Types.ObjectId;
-  personal: Record<string, any>;
-  // Allow legacy string keys or new key/type objects
-  uploads: Array<{ key: string; type: string } | string>;
-  quiz: { total: number; correct: number; answers?: number[] };
-  signatureDataUrl?: string;
-  status: 'pending' | 'approved' | 'declined';
-  reviewedBy?: mongoose.Types.ObjectId;
-  reviewReason?: string;
-  certificateKey?: string;
+export interface UploadItem {
+  key: string;
+  type: string;
 }
 
-const SubmissionSchema = new Schema<ISubmission>({
-  projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
-  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  personal: { type: Schema.Types.Mixed, default: {} },
-  // Be permissive to support legacy payloads and new structured items
-  uploads: { type: [Schema.Types.Mixed], default: [] },
-  quiz: { total: Number, correct: Number, answers: { type: [Number], default: undefined } },
-  signatureDataUrl: { type: String },
-  status: { type: String, enum: ['pending', 'approved', 'declined'], default: 'pending' },
-  reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
-  reviewReason: { type: String },
-  certificateKey: { type: String }
-}, { timestamps: true });
+export interface QuizPayload {
+  answers: any[];
+  score: number;
+  passed: boolean;
+}
+
+export type SubmissionStatus = 'pending' | 'approved' | 'declined';
+
+export interface ISubmission extends Document {
+  moduleId: Types.ObjectId;
+  projectId: Types.ObjectId;
+  userId: Types.ObjectId;
+  status: SubmissionStatus;
+  payload: Record<string, any>;
+  uploads: UploadItem[];
+  quiz: QuizPayload;
+  signatureDataUrl?: string;
+  certificateKey?: string;
+  reviewedBy?: Types.ObjectId;
+  reviewReason?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const UploadSchema = new Schema<UploadItem>(
+  {
+    key: { type: String, required: true },
+    type: { type: String, default: 'file' },
+  },
+  { _id: false }
+);
+
+const SubmissionSchema = new Schema<ISubmission>(
+  {
+    moduleId: { type: Schema.Types.ObjectId, ref: 'InductionModule', required: true, index: true },
+    projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    status: { type: String, enum: ['pending', 'approved', 'declined'], default: 'pending' },
+    payload: { type: Schema.Types.Mixed, default: {} },
+    uploads: { type: [UploadSchema], default: [] },
+    quiz: {
+      answers: { type: [Schema.Types.Mixed], default: [] },
+      score: { type: Number, default: 0 },
+      passed: { type: Boolean, default: false },
+    },
+    signatureDataUrl: { type: String },
+    certificateKey: { type: String },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    reviewReason: { type: String },
+  },
+  { timestamps: true }
+);
+
+SubmissionSchema.index({ moduleId: 1, userId: 1 }, { unique: false });
 
 export const Submission = mongoose.model<ISubmission>('Submission', SubmissionSchema);
