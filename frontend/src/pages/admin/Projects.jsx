@@ -1,4 +1,5 @@
-﻿import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState, useMemo } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   Box,
   Grid,
@@ -17,40 +18,29 @@ import {
   ListItemIcon,
   ListItemText,
   CardHeader,
-  Dialog
+  Dialog,
+  Chip
 } from '@mui/material'
-import api from '../../utils/api.js'
-import AsyncButton from '../../components/AsyncButton.jsx'
-import ProjectInfoSection from '../../components/admin/ProjectInfoSection.jsx'
-import PersonalDetailsSection from '../../components/admin/PersonalDetailsSection.jsx'
-import SlidesSection from '../../components/admin/SlidesSection.jsx'
-import QuestionsSection from '../../components/admin/QuestionsSection.jsx'
 import FolderIcon from '@mui/icons-material/Folder'
 import GroupIcon from '@mui/icons-material/Group'
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
 import SaveIcon from '@mui/icons-material/Save'
-import SendIcon from '@mui/icons-material/Send'
 import InfoIcon from '@mui/icons-material/Info'
-import PersonIcon from '@mui/icons-material/Person'
-import SlideshowIcon from '@mui/icons-material/Slideshow'
-import QuizIcon from '@mui/icons-material/Quiz'
+import AssignmentIndIcon from '@mui/icons-material/AssignmentInd'
+import api from '../../utils/api.js'
+import AsyncButton from '../../components/AsyncButton.jsx'
+import ProjectInfoSection from '../../components/admin/ProjectInfoSection.jsx'
 import { useTheme } from '@mui/material/styles'
-
-const defaultConfig = {
-  steps: ['personal', 'uploads', 'slides', 'quiz', 'sign'],
-  slides: [],
-  quiz: { questions: [] },
-  settings: { passMark: 80, randomizeQuestions: false, allowRetry: true }
-}
 
 export default function Projects() {
   const theme = useTheme()
+  const accent = theme.palette.primary.main
+  const navigate = useNavigate()
+  const { projectId: projectIdParam } = useParams()
+
   const [projects, setProjects] = useState([])
   const [selectedId, setSelectedId] = useState('')
   const [projectForm, setProjectForm] = useState({ name: '', description: '', address: '', status: 'draft' })
-  const [module, setModule] = useState(null)
-  const [moduleConfig, setModuleConfig] = useState(defaultConfig)
-  const [fields, setFields] = useState([])
   const [tab, setTab] = useState(0)
   const [assignments, setAssignments] = useState([])
   const [users, setUsers] = useState([])
@@ -58,30 +48,15 @@ export default function Projects() {
   const [assignUserId, setAssignUserId] = useState('')
   const [assignRole, setAssignRole] = useState('worker')
   const [newProject, setNewProject] = useState({ name: '', description: '' })
-
-  const accent = theme.palette.primary.main
-
-  const normalizeConfig = (cfg) => ({
-    steps: Array.isArray(cfg?.steps) ? cfg.steps : defaultConfig.steps,
-    slides: Array.isArray(cfg?.slides) ? cfg.slides : [],
-    quiz: cfg?.quiz && Array.isArray(cfg.quiz.questions) ? { questions: cfg.quiz.questions } : { questions: [] },
-    settings: cfg?.settings ? { ...defaultConfig.settings, ...cfg.settings } : { ...defaultConfig.settings }
-  })
+  const [module, setModule] = useState(null)
 
   const loadProjects = async () => {
     const r = await api.get('/projects')
     setProjects(r.data || [])
   }
-  useEffect(() => { loadProjects() }, [])
-
-  const createProject = async () => {
-    if (!newProject.name) return
-    await api.post('/projects', { name: newProject.name, description: newProject.description })
-    setNewProject({ name: '', description: '' })
-    await loadProjects()
-  }
 
   const loadAssignments = async (projectId) => {
+    if (!projectId) return setAssignments([])
     try {
       const r = await api.get(`/assignments/project/${projectId}`)
       setAssignments(r.data || [])
@@ -91,57 +66,58 @@ export default function Projects() {
   }
 
   const loadModule = async (projectId) => {
+    if (!projectId) return setModule(null)
     try {
       const r = await api.get(`/projects/${projectId}/modules/induction`)
-      setModule(r.data.module)
-      setModuleConfig(normalizeConfig(r.data.module?.config))
-      setFields(r.data.fields || [])
+      setModule(r.data?.module || null)
     } catch (e) {
       if (e?.response?.status === 404) {
-        const created = await api.post(`/projects/${projectId}/modules/induction`, {})
-        setModule(created.data)
-        setModuleConfig(normalizeConfig(created.data?.config))
-        setFields([])
+        setModule(null)
       } else {
         setModule(null)
-        setModuleConfig(defaultConfig)
-        setFields([])
       }
     }
   }
 
-  const onSelect = async (id) => {
-    setSelectedId(id)
-    const p = projects.find(x => x._id === id)
-    setProjectForm({ name: p?.name || '', description: p?.description || '', address: p?.address || '', status: p?.status || 'draft' })
-    if (id) {
-      await Promise.all([loadModule(id), loadAssignments(id)])
-    } else {
-      setModule(null)
-      setModuleConfig(defaultConfig)
-      setFields([])
-      setAssignments([])
+  // Select project based on param or first selection
+  useEffect(() => {
+    loadProjects()
+  }, [])
+
+  useEffect(() => {
+    if (!projects.length) return
+    const initialId = projectIdParam || selectedId || projects[0]?._id || ''
+    if (initialId && initialId !== selectedId) {
+      selectProject(initialId)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects, projectIdParam])
+
+  const selectProject = async (id) => {
+    setSelectedId(id)
+    const p = projects.find((x) => x._id === id)
+    if (p) {
+      setProjectForm({ name: p.name || '', description: p.description || '', address: p.address || '', status: p.status || 'draft' })
+      await Promise.all([loadAssignments(id), loadModule(id)])
+    } else {
+      setProjectForm({ name: '', description: '', address: '', status: 'draft' })
+      setAssignments([])
+      setModule(null)
+    }
+    if (id) navigate(`/admin/projects/${id}`, { replace: true })
+  }
+
+  const createProject = async () => {
+    if (!newProject.name) return
+    await api.post('/projects', { name: newProject.name, description: newProject.description })
+    setNewProject({ name: '', description: '' })
+    await loadProjects()
   }
 
   const saveProject = async () => {
     if (!selectedId) return
     await api.put(`/projects/${selectedId}`, projectForm)
     await loadProjects()
-  }
-
-  const saveModule = async () => {
-    if (!module?._id) return
-    const payload = { config: moduleConfig, fields }
-    const r = await api.put(`/modules/${module._id}`, payload)
-    setModule(r.data.module)
-    setFields(r.data.fields || fields)
-  }
-
-  const sendForReview = async () => {
-    if (!module?._id) return
-    await api.post(`/modules/${module._id}/reviews`)
-    await loadModule(selectedId)
   }
 
   const openAssign = async () => {
@@ -160,6 +136,24 @@ export default function Projects() {
     await loadAssignments(selectedId)
   }
 
+  const createModule = async () => {
+    if (!selectedId) return
+    const r = await api.post(`/projects/${selectedId}/modules/induction`, {})
+    const mod = r.data
+    setModule(mod)
+    navigate(`/admin/projects/${selectedId}/modules/induction/${mod._id}`)
+  }
+
+  const openModule = () => {
+    if (!selectedId || !module?._id) return
+    navigate(`/admin/projects/${selectedId}/modules/induction/${module._id}`)
+  }
+
+  const projectTabs = useMemo(() => ([
+    { label: 'Project Info', icon: <InfoIcon /> },
+    { label: 'Assignments', icon: <AssignmentIndIcon /> }
+  ]), [])
+
   return (
     <>
     <Grid container spacing={2}>
@@ -171,7 +165,7 @@ export default function Projects() {
               {projects.map(p => {
                 const selected = selectedId === p._id
                 return (
-                  <ListItemButton key={p._id} selected={selected} onClick={() => onSelect(p._id)} sx={{ borderRadius: 1 }}>
+                  <ListItemButton key={p._id} selected={selected} onClick={() => selectProject(p._id)} sx={{ borderRadius: 1 }}>
                     <ListItemIcon sx={{ minWidth: 36, color: selected ? accent : 'action.active' }}>
                       <FolderIcon />
                     </ListItemIcon>
@@ -200,19 +194,37 @@ export default function Projects() {
             {selectedId ? (
               <>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-                  <Typography variant="h6">Manage Project</Typography>
+                  <Typography variant="h6">Project</Typography>
+                  <Chip label={projectForm.status || 'draft'} />
                   <Box sx={{ flex: 1 }} />
                   <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveProject}>Save Project</AsyncButton>
-                  <AsyncButton startIcon={<SaveIcon />} variant="contained" onClick={saveModule}>Save Module</AsyncButton>
-                  <AsyncButton startIcon={<SendIcon />} variant="contained" color="secondary" onClick={sendForReview}>Send For Review</AsyncButton>
                 </Stack>
 
+                {/* Modules Section */}
+                <Box sx={{ mb: 3, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                    <Typography variant="subtitle1">Modules for this Project</Typography>
+                  </Stack>
+                  {module ? (
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" justifyContent="space-between">
+                      <Stack spacing={0.5}>
+                        <Typography variant="body1">Induction Module</Typography>
+                        <Typography variant="body2" color="text.secondary">Status: {module.reviewStatus || 'draft'}</Typography>
+                      </Stack>
+                      <Button variant="contained" onClick={openModule} sx={{ textTransform: 'none' }}>Open</Button>
+                    </Stack>
+                  ) : (
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" justifyContent="space-between">
+                      <Typography variant="body2" color="text.secondary">No modules yet.</Typography>
+                      <Button variant="contained" onClick={createModule} sx={{ textTransform: 'none' }}>Create Induction Module</Button>
+                    </Stack>
+                  )}
+                </Box>
+
                 <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: '1px solid #eee', '& .MuiTabs-indicator': { backgroundColor: accent } }}>
-                  <Tab icon={<InfoIcon />} iconPosition="start" label="Project Info" sx={{ '&.Mui-selected': { color: accent } }} />
-                  <Tab icon={<PersonIcon />} iconPosition="start" label="Fields" sx={{ '&.Mui-selected': { color: accent } }} />
-                  <Tab icon={<SlideshowIcon />} iconPosition="start" label="Slides" sx={{ '&.Mui-selected': { color: accent } }} />
-                  <Tab icon={<QuizIcon />} iconPosition="start" label="Quiz" sx={{ '&.Mui-selected': { color: accent } }} />
-                  <Tab icon={<GroupIcon />} iconPosition="start" label="Assignments" sx={{ '&.Mui-selected': { color: accent } }} />
+                  {projectTabs.map((t, idx) => (
+                    <Tab key={t.label} icon={t.icon} iconPosition="start" label={t.label} sx={{ '&.Mui-selected': { color: accent } }} value={idx} />
+                  ))}
                 </Tabs>
 
                 <Box sx={{ mt: 2 }} hidden={tab !== 0}>
@@ -220,23 +232,6 @@ export default function Projects() {
                 </Box>
 
                 <Box sx={{ mt: 2 }} hidden={tab !== 1}>
-                  <PersonalDetailsSection fields={fields} onChange={setFields} />
-                </Box>
-
-                <Box sx={{ mt: 2 }} hidden={tab !== 2}>
-                  <SlidesSection slides={moduleConfig.slides} onChange={(slides) => setModuleConfig({ ...moduleConfig, slides })} />
-                </Box>
-
-                <Box sx={{ mt: 2 }} hidden={tab !== 3}>
-                  <QuestionsSection
-                    questions={moduleConfig.quiz?.questions || []}
-                    settings={moduleConfig.settings}
-                    onChange={(qs) => setModuleConfig({ ...moduleConfig, quiz: { questions: qs } })}
-                    onSettingsChange={(settings) => setModuleConfig({ ...moduleConfig, settings })}
-                  />
-                </Box>
-
-                <Box sx={{ mt: 2 }} hidden={tab !== 4}>
                   <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                     <GroupIcon color="action" />
                     <Typography variant="subtitle2">Assigned Users</Typography>
@@ -246,7 +241,7 @@ export default function Projects() {
                   <List>
                     {assignments.map((a) => (
                       <ListItemButton key={a._id} sx={{ borderRadius: 1 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}><PersonIcon /></ListItemIcon>
+                        <ListItemIcon sx={{ minWidth: 36 }}><GroupIcon /></ListItemIcon>
                         <ListItemText primary={`${a?.user?.name || a?.user} - ${a.role}`} secondary={a?.user?.email || ''} />
                         <Button color="error" onClick={() => removeAssignment(a._id)}>Remove</Button>
                       </ListItemButton>

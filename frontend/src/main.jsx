@@ -16,6 +16,7 @@ import AdminProjects from './pages/admin/Projects.jsx'
 import AdminReviews from './pages/admin/Reviews.jsx'
 import AdminUsers from './pages/admin/Users.jsx'
 import AdminSettings from './pages/admin/Settings.jsx'
+import ModuleEditor from './pages/admin/ModuleEditor.jsx'
 import { useAuthStore } from './store/auth.js'
 
 function Nav({ brand }) {
@@ -70,6 +71,8 @@ function App({ brand }) {
           <Route path="/admin" element={<AdminGuard><DashboardLayout /></AdminGuard>}>
             <Route index element={<AdminDashboard />} />
             <Route path="projects" element={<AdminProjects />} />
+            <Route path="projects/:projectId" element={<AdminProjects />} />
+            <Route path="projects/:projectId/modules/induction/:moduleId" element={<ModuleEditor />} />
             <Route path="reviews" element={<AdminReviews />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="settings" element={<AdminSettings />} />
