@@ -123,6 +123,8 @@ export default function InductionWizard() {
   const [signature, setSignature] = useState(null)
   const [status, setStatus] = useState('idle')
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [projectBlocked, setProjectBlocked] = useState(false)
+  const [projectBlockedMessage, setProjectBlockedMessage] = useState('')
   const moduleApproved = module?.reviewStatus === 'approved'
 
   useEffect(() => {
@@ -143,6 +145,9 @@ export default function InductionWizard() {
   const selectProject = async (id) => {
     const p = projects.find((x) => x._id === id)
     setProject(p || null)
+    setProjectBlocked(false)
+    setProjectBlockedMessage('')
+    setStep(0)
     setModule(null)
     setFields([])
     setModuleConfig({ slides: [], quiz: { questions: [] }, settings: { passMark: 80, randomizeQuestions: false, allowRetry: true } })
@@ -151,7 +156,13 @@ export default function InductionWizard() {
     setScore(null)
     setPassed(null)
     setSignature(null)
+    setStatus('idle')
     if (!id) return
+    if (p?.status === 'archived') {
+      setProjectBlocked(true)
+      setProjectBlockedMessage('This project is archived and cannot accept submissions.')
+      return
+    }
     try {
       const r = await api.get(`/projects/${id}/modules/induction`)
       setModule(r.data.module)
@@ -250,10 +261,15 @@ export default function InductionWizard() {
             ))}
           </TextField>
           <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-            <Button variant="contained" onClick={nextStep} disabled={!project || !module || !moduleApproved}>
+            <Button variant="contained" onClick={nextStep} disabled={!project || !module || !moduleApproved || projectBlocked}>
               Continue
             </Button>
           </Stack>
+          {projectBlocked && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              {projectBlockedMessage || 'This project is archived and cannot accept submissions.'}
+            </Alert>
+          )}
           {module && !moduleApproved && (
             <Alert severity="warning" sx={{ mt: 2 }}>
               This module is not approved yet. Please wait for approval before starting the induction.

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Box,
@@ -31,14 +31,17 @@ import api from '../../utils/api.js'
 import AsyncButton from '../../components/AsyncButton.jsx'
 import ProjectInfoSection from '../../components/admin/ProjectInfoSection.jsx'
 import { useTheme } from '@mui/material/styles'
+import { useAuthStore } from '../../store/auth.js'
 
 export default function Projects() {
   const theme = useTheme()
   const accent = theme.palette.primary.main
   const navigate = useNavigate()
   const { projectId: projectIdParam } = useParams()
+  const { user } = useAuthStore()
 
   const [projects, setProjects] = useState([])
+  const [archivedProjects, setArchivedProjects] = useState([])
   const [selectedId, setSelectedId] = useState('')
   const [projectForm, setProjectForm] = useState({ name: '', description: '', address: '', status: 'draft' })
   const [tab, setTab] = useState(0)
@@ -51,8 +54,15 @@ export default function Projects() {
   const [module, setModule] = useState(null)
 
   const loadProjects = async () => {
-    const r = await api.get('/projects')
-    setProjects(r.data || [])
+    try {
+      const r = await api.get('/projects', { params: { includeArchived: true } })
+      const list = r.data || []
+      setProjects(list.filter((p) => p.status !== 'archived'))
+      setArchivedProjects(list.filter((p) => p.status === 'archived'))
+    } catch {
+      setProjects([])
+      setArchivedProjects([])
+    }
   }
 
   const loadAssignments = async (projectId) => {
@@ -99,12 +109,13 @@ export default function Projects() {
     if (p) {
       setProjectForm({ name: p.name || '', description: p.description || '', address: p.address || '', status: p.status || 'draft' })
       await Promise.all([loadAssignments(id), loadModule(id)])
+      if (id) navigate(`/admin/projects/${id}`, { replace: true })
     } else {
       setProjectForm({ name: '', description: '', address: '', status: 'draft' })
       setAssignments([])
       setModule(null)
+      navigate('/admin/projects', { replace: true })
     }
-    if (id) navigate(`/admin/projects/${id}`, { replace: true })
   }
 
   const createProject = async () => {
@@ -118,6 +129,19 @@ export default function Projects() {
     if (!selectedId) return
     await api.put(`/projects/${selectedId}`, projectForm)
     await loadProjects()
+  }
+
+  const archiveProject = async () => {
+    if (!selectedId || projectForm.status === 'archived') return
+    const confirmed = window.confirm('Archive this project? It will be hidden for managers and workers.')
+    if (!confirmed) return
+    await api.put(`/projects/${selectedId}/archive`)
+    setSelectedId('')
+    setProjectForm({ name: '', description: '', address: '', status: 'draft' })
+    setAssignments([])
+    setModule(null)
+    await loadProjects()
+    navigate('/admin/projects', { replace: true })
   }
 
   const openAssign = async () => {
@@ -158,34 +182,55 @@ export default function Projects() {
     <>
     <Grid container spacing={2}>
       <Grid item xs={12} md={4}>
-        <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-          <CardHeader title={<Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Projects</Typography>} />
-          <CardContent>
-            <List sx={{ mb: 1 }}>
-              {projects.map(p => {
-                const selected = selectedId === p._id
-                return (
-                  <ListItemButton key={p._id} selected={selected} onClick={() => selectProject(p._id)} sx={{ borderRadius: 1 }}>
-                    <ListItemIcon sx={{ minWidth: 36, color: selected ? accent : 'action.active' }}>
-                      <FolderIcon />
-                    </ListItemIcon>
-                    <ListItemText primary={p.name} secondary={p.status} primaryTypographyProps={{ fontWeight: selected ? 600 : 400 }} />
-                  </ListItemButton>
-                )
-              })}
-              {!projects.length && <Typography variant="body2" sx={{ opacity: 0.7, px: 2, py: 1 }}>No projects yet.</Typography>}
-            </List>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>Create Project</Typography>
-            <Stack spacing={1}>
-              <TextField size="small" label="Name" value={newProject.name} onChange={e => setNewProject({ ...newProject, name: e.target.value })} />
-              <TextField size="small" label="Description" value={newProject.description} onChange={e => setNewProject({ ...newProject, description: e.target.value })} />
-              <AsyncButton variant="contained" startIcon={<AddCircleOutlineIcon />} onClick={createProject} disabled={!newProject.name}>
-                Add
-              </AsyncButton>
-            </Stack>
-          </CardContent>
-        </Card>
+        <Stack spacing={2}>
+          <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+            <CardHeader title={<Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Projects</Typography>} />
+            <CardContent>
+              <List sx={{ mb: 1 }}>
+                {projects.map(p => {
+                  const selected = selectedId === p._id
+                  return (
+                    <ListItemButton key={p._id} selected={selected} onClick={() => selectProject(p._id)} sx={{ borderRadius: 1 }}>
+                      <ListItemIcon sx={{ minWidth: 36, color: selected ? accent : 'action.active' }}>
+                        <FolderIcon />
+                      </ListItemIcon>
+                      <ListItemText primary={p.name} secondary={p.status} primaryTypographyProps={{ fontWeight: selected ? 600 : 400 }} />
+                    </ListItemButton>
+                  )
+                })}
+                {!projects.length && <Typography variant="body2" sx={{ opacity: 0.7, px: 2, py: 1 }}>No projects yet.</Typography>}
+              </List>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Create Project</Typography>
+              <Stack spacing={1}>
+                <TextField size="small" label="Name" value={newProject.name} onChange={e => setNewProject({ ...newProject, name: e.target.value })} />
+                <TextField size="small" label="Description" value={newProject.description} onChange={e => setNewProject({ ...newProject, description: e.target.value })} />
+                <AsyncButton variant="contained" startIcon={<AddCircleOutlineIcon />} onClick={createProject} disabled={!newProject.name}>
+                  Add
+                </AsyncButton>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          {user?.role === 'admin' && (
+            <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+              <CardHeader title={<Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Archived Projects</Typography>} />
+              <CardContent>
+                <List sx={{ mb: 1 }}>
+                  {archivedProjects.map((p) => (
+                    <ListItemButton key={p._id} sx={{ borderRadius: 1 }}>
+                      <ListItemIcon sx={{ minWidth: 36, color: 'action.active' }}>
+                        <FolderIcon />
+                      </ListItemIcon>
+                      <ListItemText primary={p.name} secondary={p.status} />
+                    </ListItemButton>
+                  ))}
+                  {!archivedProjects.length && <Typography variant="body2" sx={{ opacity: 0.7, px: 2, py: 1 }}>No archived projects.</Typography>}
+                </List>
+              </CardContent>
+            </Card>
+          )}
+        </Stack>
       </Grid>
 
       <Grid item xs={12} md={8}>
@@ -197,6 +242,9 @@ export default function Projects() {
                   <Typography variant="h6">Project</Typography>
                   <Chip label={projectForm.status || 'draft'} />
                   <Box sx={{ flex: 1 }} />
+                  {projectForm.status !== 'archived' && (
+                    <Button color="error" variant="outlined" onClick={archiveProject}>Archive</Button>
+                  )}
                   <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveProject}>Save Project</AsyncButton>
                 </Stack>
 
