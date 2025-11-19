@@ -51,7 +51,6 @@ export default function DashboardLayout({ children }) {
           { label: 'Dashboard', to: '/manager', icon: <DashboardIcon /> },
           { label: 'Projects', to: '/manager/projects', icon: <FolderIcon /> },
           { label: 'Review', to: '/review', icon: <RateReviewIcon /> },
-          { label: 'Slides', to: '/slides-viewer', icon: <MenuBookIcon /> },
         ]
       : [
           { label: 'Wizard', to: '/wizard', icon: <ChecklistIcon /> },
