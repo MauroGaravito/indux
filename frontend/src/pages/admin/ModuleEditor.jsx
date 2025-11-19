@@ -116,10 +116,20 @@ export default function ModuleEditor() {
 
   const saveModule = async () => {
     if (!moduleId) return;
-    const payload = { config: moduleConfig, fields };
+    // Ensure fields carry a key; generate if missing
+    const existingKeys = fields.map((f) => f.key).filter(Boolean);
+    const sanitizedFields = fields.map((f, idx) => {
+      if (f.key) return f;
+      const base = toCamelKey(f.label) || `field${idx + 1}`;
+      const unique = makeUniqueKey(base, existingKeys);
+      existingKeys.push(unique);
+      return { ...f, key: unique };
+    });
+
+    const payload = { config: moduleConfig, fields: sanitizedFields };
     const r = await api.put(`/modules/${moduleId}`, payload);
     setModule(r.data?.module || module);
-    setFields(r.data?.fields || fields);
+    setFields(r.data?.fields || sanitizedFields);
   };
 
   const sendForReview = async () => {
@@ -271,3 +281,27 @@ export default function ModuleEditor() {
     </Card>
   );
 }
+  const toCamelKey = (label) => {
+    if (!label) return ''
+    const clean = label
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9 ]/g, ' ')
+      .trim()
+    if (!clean) return ''
+    const parts = clean.split(/\s+/)
+    const [first, ...rest] = parts
+    return [first.toLowerCase(), ...rest.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())].join('')
+  }
+
+  const makeUniqueKey = (base, existing) => {
+    if (!base) return ''
+    if (!existing.includes(base)) return base
+    let counter = 2
+    let candidate = `${base}${counter}`
+    while (existing.includes(candidate)) {
+      counter += 1
+      candidate = `${base}${counter}`
+    }
+    return candidate
+  }
