@@ -122,20 +122,48 @@ export default function ModuleEditor() {
 
   const saveModule = async () => {
     if (!moduleId) return;
-    // Ensure fields carry a key; generate if missing
+    // Build a request payload that passes backend validation, but keep local state intact (allows drafts with incomplete fields)
     const existingKeys = fields.map((f) => f.key).filter(Boolean);
-    const sanitizedFields = fields.map((f, idx) => {
-      if (f.key) return f;
-      const base = toCamelKey(f.label) || `field${idx + 1}`;
-      const unique = makeUniqueKey(base, existingKeys);
-      existingKeys.push(unique);
-      return { ...f, key: unique };
-    });
+    const sanitizedFields = fields
+      .map((f, idx) => {
+        if (!f.key) {
+          const base = toCamelKey(f.label) || `field${idx + 1}`;
+          const unique = makeUniqueKey(base, existingKeys);
+          existingKeys.push(unique);
+          return { ...f, key: unique };
+        }
+        return f;
+      })
+      // backend requires label/type/key; drop invalid ones for the request (but keep them in UI state)
+      .filter((f) => f.key && f.label && String(f.label).trim() && f.type);
 
-    const payload = { config: moduleConfig, fields: sanitizedFields };
+    const validSlides = (moduleConfig?.slides || []).filter((s) => s?.fileKey);
+    const validQuestions = (moduleConfig?.quiz?.questions || []).filter((q) => {
+      const hasText = q?.question && String(q.question).trim();
+      const opts = Array.isArray(q?.options) ? q.options : [];
+      const answerOk = typeof q?.answerIndex === 'number' && q.answerIndex >= 0 && q.answerIndex < opts.length;
+      return hasText && opts.length >= 2 && answerOk;
+    });
+    const settings = moduleConfig?.settings || {};
+    const safeSettings = {
+      passMark: typeof settings.passMark === 'number' ? settings.passMark : 80,
+      randomizeQuestions: typeof settings.randomizeQuestions === 'boolean' ? settings.randomizeQuestions : false,
+      allowRetry: typeof settings.allowRetry === 'boolean' ? settings.allowRetry : true,
+    };
+
+    const payload = {
+      config: {
+        steps: Array.isArray(moduleConfig?.steps) ? moduleConfig.steps : defaultConfig.steps,
+        slides: validSlides,
+        quiz: { questions: validQuestions },
+        settings: safeSettings,
+      },
+      fields: sanitizedFields,
+    };
+
     const r = await api.put(`/modules/${moduleId}`, payload);
+    // Preserve local state (including drafts), but refresh module metadata
     setModule(r.data?.module || module);
-    setFields(r.data?.fields || sanitizedFields);
   };
 
   const validateBeforeReview = () => {
