@@ -1,5 +1,8 @@
-import React, { useEffect, useState } from 'react'
-import { Card, CardContent, Typography, Table, TableHead, TableBody, TableRow, TableCell, Stack, TextField, MenuItem, Button, Chip } from '@mui/material'
+﻿import React, { useEffect, useState } from 'react'
+import {
+  Card, CardContent, Typography, Table, TableHead, TableBody, TableRow, TableCell,
+  Stack, TextField, MenuItem, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions
+} from '@mui/material'
 import api from '../../utils/api.js'
 
 export default function Users() {
@@ -14,23 +17,15 @@ export default function Users() {
     companyName: '',
     avatarUrl: '',
   })
+  const [editUser, setEditUser] = useState(null)
+
   const load = async () => { const r = await api.get('/users'); setRows(r.data || []) }
   useEffect(()=> { load() }, [])
 
   const add = async () => {
-    // Permitir creación sin password: el backend generará una temporal si falta
     if (!newUser.email || !newUser.name) return
     await api.post('/users', newUser)
-    setNewUser({
-      email: '',
-      name: '',
-      role: 'worker',
-      password: '',
-      position: '',
-      phone: '',
-      companyName: '',
-      avatarUrl: '',
-    })
+    setNewUser({ email: '', name: '', role: 'worker', password: '', position: '', phone: '', companyName: '', avatarUrl: '' })
     await load()
   }
   const toggle = async (u) => {
@@ -41,6 +36,18 @@ export default function Users() {
     const ok = window.confirm(`Delete user ${u.email}? This action cannot be undone.`)
     if (!ok) return
     await api.delete(`/users/${u._id}`)
+    await load()
+  }
+
+  const openEdit = (u) => setEditUser({ ...u, password: '' })
+  const closeEdit = () => setEditUser(null)
+  const saveEdit = async () => {
+    if (!editUser?._id) return
+    const payload = { ...editUser }
+    if (!payload.password) delete payload.password
+    delete payload._id
+    await api.put(`/users/${editUser._id}`, payload)
+    setEditUser(null)
     await load()
   }
 
@@ -68,6 +75,7 @@ export default function Users() {
                 <TableCell align="right">
                   <Stack direction="row" spacing={1} justifyContent="flex-end">
                     <Button size="small" variant="outlined" onClick={()=> toggle(r)}>{r.disabled ? 'Enable' : 'Disable'}</Button>
+                    <Button size="small" variant="outlined" onClick={()=> openEdit(r)}>Edit</Button>
                     <Button size="small" color="error" variant="outlined" onClick={()=> removeUser(r)}>Delete</Button>
                   </Stack>
                 </TableCell>
@@ -92,6 +100,32 @@ export default function Users() {
           <Button variant="contained" onClick={add}>Create</Button>
         </Stack>
       </CardContent>
+
+      <Dialog open={!!editUser} onClose={closeEdit} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit User</DialogTitle>
+        <DialogContent dividers>
+          {editUser && (
+            <Stack spacing={1} sx={{ mt: 1 }}>
+              <TextField label="Email" value={editUser.email} onChange={e=> setEditUser({ ...editUser, email: e.target.value })} />
+              <TextField label="Name" value={editUser.name} onChange={e=> setEditUser({ ...editUser, name: e.target.value })} />
+              <TextField label="Role" select value={editUser.role} onChange={e=> setEditUser({ ...editUser, role: e.target.value })}>
+                <MenuItem value="admin">Admin</MenuItem>
+                <MenuItem value="manager">Manager</MenuItem>
+                <MenuItem value="worker">Worker</MenuItem>
+              </TextField>
+              <TextField label="Password (leave blank to keep)" type="password" value={editUser.password} onChange={e=> setEditUser({ ...editUser, password: e.target.value })} />
+              <TextField label="Position" value={editUser.position || ''} onChange={e=> setEditUser({ ...editUser, position: e.target.value })} />
+              <TextField label="Phone" value={editUser.phone || ''} onChange={e=> setEditUser({ ...editUser, phone: e.target.value })} />
+              <TextField label="Company Name" value={editUser.companyName || ''} onChange={e=> setEditUser({ ...editUser, companyName: e.target.value })} />
+              <TextField label="Avatar URL" value={editUser.avatarUrl || ''} onChange={e=> setEditUser({ ...editUser, avatarUrl: e.target.value })} />
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeEdit}>Cancel</Button>
+          <Button variant="contained" onClick={saveEdit}>Save</Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   )
 }
