@@ -18,6 +18,10 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
@@ -48,6 +52,8 @@ export default function ModuleEditor() {
   const [reviews, setReviews] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [tab, setTab] = useState(0);
+  const [validationOpen, setValidationOpen] = useState(false);
+  const [validationMessages, setValidationMessages] = useState<string[]>([]);
 
   const moduleStatus = module?.reviewStatus || 'draft';
 
@@ -132,8 +138,76 @@ export default function ModuleEditor() {
     setFields(r.data?.fields || sanitizedFields);
   };
 
+  const validateBeforeReview = () => {
+    const errors: string[] = [];
+
+    // Module status
+    if (module?.reviewStatus && !['draft', 'declined'].includes(module.reviewStatus)) {
+      errors.push('Module status must be draft or declined to request a new review.');
+    }
+
+    // Fields
+    const flds = Array.isArray(fields) ? fields : [];
+    flds.forEach((f, idx) => {
+      if (!f.label || !String(f.label).trim()) {
+        errors.push(`Field ${idx + 1}: label is required`);
+      }
+      if (!f.key || !String(f.key).trim()) {
+        errors.push(`Field ${idx + 1}: key is required`);
+      }
+      if (!f.type) {
+        errors.push(`Field ${idx + 1}: type is required`);
+      }
+    });
+
+    // Slides
+    const slides = moduleConfig?.slides || [];
+    if (!slides.length || slides.some((s) => !s?.fileKey)) {
+      errors.push('Slides: at least one slide with fileKey is required');
+    }
+
+    // Quiz
+    const questions = moduleConfig?.quiz?.questions || [];
+    if (!questions.length) {
+      errors.push('Quiz: at least one question is required');
+    } else {
+      questions.forEach((q, idx) => {
+        if (!q.question || !String(q.question).trim()) {
+          errors.push(`Question ${idx + 1}: question text is required`);
+        }
+        const opts = Array.isArray(q.options) ? q.options : [];
+        if (opts.length < 2) {
+          errors.push(`Question ${idx + 1}: must have at least 2 options`);
+        }
+        if (typeof q.answerIndex !== 'number' || q.answerIndex < 0 || q.answerIndex >= opts.length) {
+          errors.push(`Question ${idx + 1}: answerIndex is invalid`);
+        }
+      });
+    }
+
+    // Settings
+    const settings = moduleConfig?.settings || {};
+    if (typeof settings.passMark !== 'number') {
+      errors.push('Settings: pass mark is missing');
+    }
+    if (typeof settings.randomizeQuestions !== 'boolean') {
+      errors.push('Settings: randomizeQuestions must be boolean');
+    }
+    if (typeof settings.allowRetry !== 'boolean') {
+      errors.push('Settings: allowRetry must be boolean');
+    }
+
+    return errors;
+  };
+
   const sendForReview = async () => {
     if (!moduleId) return;
+    const errors = validateBeforeReview();
+    if (errors.length) {
+      setValidationMessages(errors);
+      setValidationOpen(true);
+      return;
+    }
     await api.post(`/modules/${moduleId}/reviews`);
     await Promise.all([loadModule(), loadReviews()]);
   };
@@ -197,88 +271,115 @@ export default function ModuleEditor() {
   }
 
   return (
-    <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-      <CardContent>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-          <Button startIcon={<ArrowBackIcon />} component={RouterLink} to="/admin/projects">Back</Button>
-          <Typography variant="h6">Induction Module</Typography>
-          <Chip label={`Project: ${projectName || projectId}`} />
-          <Chip label={`Status: ${moduleStatus}`} color={moduleStatus === 'approved' ? 'success' : moduleStatus === 'pending' ? 'warning' : 'default'} />
-          <Box sx={{ flex: 1 }} />
-          <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveModule}>Save</AsyncButton>
-          <AsyncButton startIcon={<SendIcon />} variant="contained" color="secondary" onClick={sendForReview}>Send For Review</AsyncButton>
-        </Stack>
+    <>
+      <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <CardContent>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+            <Button startIcon={<ArrowBackIcon />} component={RouterLink} to="/admin/projects">Back</Button>
+            <Typography variant="h6">Induction Module</Typography>
+            <Chip label={`Project: ${projectName || projectId}`} />
+            <Chip label={`Status: ${moduleStatus}`} color={moduleStatus === 'approved' ? 'success' : moduleStatus === 'pending' ? 'warning' : 'default'} />
+            <Box sx={{ flex: 1 }} />
+            <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveModule}>Save</AsyncButton>
+            <AsyncButton startIcon={<SendIcon />} variant="contained" color="secondary" onClick={sendForReview}>Send For Review</AsyncButton>
+          </Stack>
 
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: '1px solid #eee' }}>
-          <Tab label="Fields" />
-          <Tab label="Slides" />
-          <Tab label="Quiz" />
-          <Tab label="Settings" />
-          <Tab label="Review" />
-          <Tab label="Assignments" />
-        </Tabs>
+          <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: '1px solid #eee' }}>
+            <Tab label="Fields" />
+            <Tab label="Slides" />
+            <Tab label="Quiz" />
+            <Tab label="Settings" />
+            <Tab label="Review" />
+            <Tab label="Assignments" />
+          </Tabs>
 
-        <Box sx={{ mt: 2 }} hidden={tab !== 0}>
-          <PersonalDetailsSection fields={fields} onChange={setFields} />
-        </Box>
+          <Box sx={{ mt: 2 }} hidden={tab !== 0}>
+            <PersonalDetailsSection fields={fields} onChange={setFields} />
+          </Box>
 
-        <Box sx={{ mt: 2 }} hidden={tab !== 1}>
-          <SlidesSection slides={moduleConfig.slides} onChange={(slides) => setModuleConfig({ ...moduleConfig, slides })} />
-        </Box>
+          <Box sx={{ mt: 2 }} hidden={tab !== 1}>
+            <SlidesSection slides={moduleConfig.slides} onChange={(slides) => setModuleConfig({ ...moduleConfig, slides })} />
+          </Box>
 
-        <Box sx={{ mt: 2 }} hidden={tab !== 2}>
-          <QuestionsSection
-            questions={moduleConfig.quiz?.questions || []}
-            onChange={(qs) => setModuleConfig({ ...moduleConfig, quiz: { questions: qs } })}
-          />
-        </Box>
+          <Box sx={{ mt: 2 }} hidden={tab !== 2}>
+            <QuestionsSection
+              questions={moduleConfig.quiz?.questions || []}
+              onChange={(qs) => setModuleConfig({ ...moduleConfig, quiz: { questions: qs } })}
+            />
+          </Box>
 
-        <Box sx={{ mt: 2 }} hidden={tab !== 3}>
-          <SettingsTab />
-        </Box>
+          <Box sx={{ mt: 2 }} hidden={tab !== 3}>
+            <SettingsTab />
+          </Box>
 
-        <Box sx={{ mt: 2 }} hidden={tab !== 4}>
-          <Stack spacing={2}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <RateReviewIcon color="action" />
-              <Typography variant="subtitle2">Reviews</Typography>
-            </Stack>
-            {reviews.length === 0 && <Alert severity="info">No reviews yet.</Alert>}
-            {reviews.length > 0 && (
-              <Stack spacing={1}>
-                {reviews.map((r) => (
-                  <Box key={r._id} sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Chip size="small" label={r.status} color={r.status === 'approved' ? 'success' : r.status === 'declined' ? 'error' : 'default'} />
-                      <Typography variant="body2" sx={{ flex: 1 }}>Requested: {new Date(r.createdAt).toLocaleString()}</Typography>
-                      {r.reason && <Typography variant="body2" color="text.secondary">Reason: {r.reason}</Typography>}
-                    </Stack>
-                  </Box>
-                ))}
+          <Box sx={{ mt: 2 }} hidden={tab !== 4}>
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <RateReviewIcon color="action" />
+                <Typography variant="subtitle2">Reviews</Typography>
               </Stack>
-            )}
-          </Stack>
-        </Box>
-
-        <Box sx={{ mt: 2 }} hidden={tab !== 5}>
-          <Stack spacing={2}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <GroupIcon color="action" />
-              <Typography variant="subtitle2">Project Assignments</Typography>
+              {reviews.length === 0 && <Alert severity="info">No reviews yet.</Alert>}
+              {reviews.length > 0 && (
+                <Stack spacing={1}>
+                  {reviews.map((r) => (
+                    <Box key={r._id} sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip size="small" label={r.status} color={r.status === 'approved' ? 'success' : r.status === 'declined' ? 'error' : 'default'} />
+                        <Typography variant="body2" sx={{ flex: 1 }}>Requested: {new Date(r.createdAt).toLocaleString()}</Typography>
+                        {r.reason && <Typography variant="body2" color="text.secondary">Reason: {r.reason}</Typography>}
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
+              )}
             </Stack>
-            <List>
-              {assignments.map((a) => (
-                <ListItemButton key={a._id} sx={{ borderRadius: 1 }}>
-                  <ListItemIcon sx={{ minWidth: 36 }}><GroupIcon /></ListItemIcon>
-                  <ListItemText primary={`${a?.user?.name || a?.user} - ${a.role}`} secondary={a?.user?.email || ''} />
-                </ListItemButton>
-              ))}
-            </List>
-            {!assignments.length && <Alert severity="info">No assignments found for this project.</Alert>}
-          </Stack>
-        </Box>
-      </CardContent>
-    </Card>
+          </Box>
+
+          <Box sx={{ mt: 2 }} hidden={tab !== 5}>
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <GroupIcon color="action" />
+                <Typography variant="subtitle2">Project Assignments</Typography>
+              </Stack>
+              <List>
+                {assignments.map((a) => (
+                  <ListItemButton key={a._id} sx={{ borderRadius: 1 }}>
+                    <ListItemIcon sx={{ minWidth: 36 }}><GroupIcon /></ListItemIcon>
+                    <ListItemText primary={`${a?.user?.name || a?.user} - ${a.role}`} secondary={a?.user?.email || ''} />
+                  </ListItemButton>
+                ))}
+              </List>
+              {!assignments.length && <Alert severity="info">No assignments found for this project.</Alert>}
+            </Stack>
+          </Box>
+        </CardContent>
+      </Card>
+      <ValidationDialog open={validationOpen} onClose={() => setValidationOpen(false)} messages={validationMessages} />
+    </>
+  );
+}
+
+// Validation dialog
+function ValidationDialog({ open, onClose, messages }) {
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Validation Required</DialogTitle>
+      <DialogContent dividers>
+        <Typography variant="body2" sx={{ mb: 1 }}>
+          Please complete the following before submitting the module for review:
+        </Typography>
+        <Stack component="ul" spacing={1} sx={{ pl: 2, mb: 1 }}>
+          {(messages || []).map((m, idx) => (
+            <Typography component="li" variant="body2" key={idx}>
+              • {m}
+            </Typography>
+          ))}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>OK</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
   const toCamelKey = (label) => {
@@ -305,3 +406,5 @@ export default function ModuleEditor() {
     }
     return candidate
   }
+
+
