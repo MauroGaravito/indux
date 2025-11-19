@@ -42,7 +42,7 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   if (!Types.ObjectId.isValid(id)) return res.status(400).json({ error: 'Invalid project id' });
   const parsed = ProjectUpdateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const proj = await Project.findByIdAndUpdate(id, { ...parsed.data, updatedBy: req.user!.sub }, { new: true });
+  const proj = await Project.findByIdAndUpdate(id, { ...parsed.data, updatedBy: req.user!.sub as any }, { new: true });
   res.json(proj);
 });
 

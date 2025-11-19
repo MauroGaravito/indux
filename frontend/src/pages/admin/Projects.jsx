@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
+  Alert,
   Box,
   Grid,
   Card,
@@ -19,7 +20,8 @@ import {
   ListItemText,
   CardHeader,
   Dialog,
-  Chip
+  Chip,
+  Snackbar
 } from '@mui/material'
 import FolderIcon from '@mui/icons-material/Folder'
 import GroupIcon from '@mui/icons-material/Group'
@@ -52,6 +54,7 @@ export default function Projects() {
   const [assignRole, setAssignRole] = useState('worker')
   const [newProject, setNewProject] = useState({ name: '', description: '' })
   const [module, setModule] = useState(null)
+  const [errorMsg, setErrorMsg] = useState('')
 
   const loadProjects = async () => {
     try {
@@ -144,6 +147,23 @@ export default function Projects() {
     navigate('/admin/projects', { replace: true })
   }
 
+  const restoreProject = async (id) => {
+    const confirmed = window.confirm('Restore this project?')
+    if (!confirmed) return
+    try {
+      const r = await api.put(`/projects/${id}`, { status: 'active' })
+      const restored = r.data
+      setArchivedProjects((prev) => prev.filter((p) => p._id !== id))
+      setProjects((prev) => [restored, ...prev])
+      setSelectedId('')
+      setProjectForm({ name: '', description: '', address: '', status: 'draft' })
+      setAssignments([])
+      setModule(null)
+    } catch (e) {
+      setErrorMsg(e?.response?.data?.error || 'Failed to restore project')
+    }
+  }
+
   const openAssign = async () => {
     setAssignOpen(true)
     try { const r = await api.get('/users'); setUsers(r.data || []) } catch { setUsers([]) }
@@ -223,6 +243,9 @@ export default function Projects() {
                         <FolderIcon />
                       </ListItemIcon>
                       <ListItemText primary={p.name} secondary={p.status} />
+                      <Button size="small" variant="outlined" onClick={() => restoreProject(p._id)}>
+                        Restore
+                      </Button>
                     </ListItemButton>
                   ))}
                   {!archivedProjects.length && <Typography variant="body2" sx={{ opacity: 0.7, px: 2, py: 1 }}>No archived projects.</Typography>}
@@ -340,6 +363,9 @@ export default function Projects() {
         <AsyncButton variant="contained" disabled={!assignUserId} onClick={doAssign}>Assign</AsyncButton>
       </Stack>
     </Dialog>
+    <Snackbar open={!!errorMsg} autoHideDuration={4000} onClose={() => setErrorMsg('')}>
+      <Alert severity="error" onClose={() => setErrorMsg('')}>{errorMsg}</Alert>
+    </Snackbar>
     </>
   )
 }
