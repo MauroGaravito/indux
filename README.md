@@ -43,6 +43,9 @@ docker-compose.yml -> API + Frontend + Mongo + MinIO + Caddy
   createdBy, updatedBy, createdAt, updatedAt
 }
 ```
+- Draft vs Review:
+  - PUT `/modules/:id` (draft save): permite payloads incompletos (slides/quiz/fields/settings vacíos) sin 400.
+  - POST `/modules/:id/reviews` (enviar a revisión): validación estricta (slides >=1, quiz >=1 pregunta válida, fields con label/key/type, settings completos, estado draft/declined).
 
 **InductionModuleField**
 ```
@@ -63,6 +66,12 @@ docker-compose.yml -> API + Frontend + Mongo + MinIO + Caddy
 ```
 
 Assignments remain project-scoped (manager/worker) and gate submissions.
+
+**User** (extendido)
+```
+{ email, name, password(hashed), role, disabled?, position?, phone?, companyName?, avatarUrl? }
+```
+- Admin UI permite crear y editar usuarios con estos campos adicionales (inputs de texto).
 
 ---
 
@@ -103,9 +112,11 @@ A submission requires: worker assignment to the project, and the module reviewSt
 ## Frontend Highlights
 
 - Axios client with refresh token handling (`frontend/src/utils/api.js`).
-- Admin consoles (`/admin/projects`, `AdminConsole`) now edit **Project** metadata separately from the **InductionModule** (fields, slides, quiz, settings).
-- Review queue consumes module-based submissions/reviews (`/modules/...`).
-- Worker induction wizard loads module + fields via `/projects/:projectId/modules/induction` and submits to `/modules/:moduleId/submissions`.
+- Admin consoles (`/admin/projects`, `AdminConsole`) edit **Project** metadata por separado; el editor de módulo maneja fields/slides/quiz/settings y envía a revisión.
+- Review queue consume submissions/reviews basadas en módulo (`/modules/...`).
+- Worker induction wizard carga módulo + fields vía `/projects/:projectId/modules/induction` y envía a `/modules/:moduleId/submissions`.
+- Slides viewer soporta PDF y PPT/PPTX (pdf.js u Office viewer según extensión).
+- Admin Users permite crear/editar usuarios con campos extra (`position`, `phone`, `companyName`, `avatarUrl`); password opcional (se genera si falta).
 
 ---
 
