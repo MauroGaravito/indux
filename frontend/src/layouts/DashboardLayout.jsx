@@ -53,6 +53,7 @@ export default function DashboardLayout({ children }) {
           { label: 'Review', to: '/review', icon: <RateReviewIcon /> },
         ]
       : [
+          { label: 'Dashboard', to: '/worker/dashboard', icon: <DashboardIcon /> },
           { label: 'Wizard', to: '/wizard', icon: <ChecklistIcon /> },
         ];
 

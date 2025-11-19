@@ -22,11 +22,18 @@ import ManagerProjects from './pages/manager/ManagerProjects.jsx'
 import ManagerProjectDetail from './pages/manager/ManagerProjectDetail.jsx'
 import ManagerModuleEditor from './pages/manager/ManagerModuleEditor.jsx'
 import ManagerTeam from './pages/manager/ManagerTeam.jsx'
+import WorkerDashboard from './pages/worker/WorkerDashboard.jsx'
 import { useAuthStore } from './store/auth.js'
 
 function Nav({ brand }) {
   const { user, logout } = useAuthStore()
-  const dashboardPath = user?.role === 'admin' ? '/admin' : user?.role === 'manager' ? '/manager' : user ? '/wizard' : '/login'
+  const dashboardPath = user?.role === 'admin'
+    ? '/admin'
+    : user?.role === 'manager'
+      ? '/manager'
+      : user
+        ? '/worker/dashboard'
+        : '/login'
   const brandName = brand?.companyName || 'Indux'
   const logoUrl = brand?.logoUrl || ''
   return (
@@ -89,6 +96,10 @@ function App({ brand }) {
             <Route path="projects/:projectId/module/:moduleId" element={<ManagerModuleEditor />} />
             <Route path="projects/:projectId/team" element={<ManagerTeam />} />
           </Route>
+          <Route path="/worker" element={<WorkerGuard><DashboardLayout /></WorkerGuard>}>
+            <Route index element={<Navigate to="/worker/dashboard" replace />} />
+            <Route path="dashboard" element={<WorkerDashboard />} />
+          </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Container>
@@ -107,6 +118,13 @@ function ManagerGuard({ children }) {
   const { user } = useAuthStore()
   if (!user) return <Navigate to="/login" replace />
   if (user.role !== 'manager') return <Navigate to="/" replace />
+  return children
+}
+
+function WorkerGuard({ children }) {
+  const { user } = useAuthStore()
+  if (!user) return <Navigate to="/login" replace />
+  if (user.role !== 'worker') return <Navigate to="/" replace />
   return children
 }
 
