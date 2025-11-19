@@ -19,11 +19,24 @@ export default function ManagerProjects() {
     setError('')
     try {
       const r = await api.get(`/assignments/user/${user.sub}`)
-      const list = (r.data || []).filter((a) => a.role === 'manager' && a.project && a.project.status !== 'archived')
-      setAssignments(list)
+      const list = (r.data || []).filter((a) => a.role === 'manager' && a.project)
+
+      // Merge with projects list to ensure status is present
+      const projectsResp = await api.get('/projects')
+      const projectsById = Object.fromEntries((projectsResp.data || []).map((p) => [String(p._id), p]))
+
+      const visible = list
+        .map((entry) => {
+          const pid = entry.project?._id || entry.project
+          const hydrated = projectsById[String(pid)] || entry.project
+          return { ...entry, project: hydrated }
+        })
+        .filter((a) => a.project && a.project.status !== 'archived')
+
+      setAssignments(visible)
       const statuses = {}
       await Promise.all(
-        list.map(async (entry) => {
+        visible.map(async (entry) => {
           const pid = entry.project._id || entry.project
           try {
             const mod = await api.get(`/projects/${pid}/modules/induction`)
