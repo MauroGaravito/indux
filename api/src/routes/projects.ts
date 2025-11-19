@@ -53,7 +53,7 @@ router.put('/:id/archive', requireAuth, requireRole('admin'), async (req, res) =
   const proj = await Project.findById(id);
   if (!proj) return res.status(404).json({ error: 'Project not found' });
   proj.status = 'archived';
-  proj.updatedBy = req.user!.sub;
+  proj.updatedBy = req.user!.sub as any;
   await proj.save();
   res.json(proj);
 });
@@ -65,7 +65,7 @@ router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   const proj = await Project.findById(id);
   if (!proj) return res.status(404).json({ error: 'Project not found' });
   proj.status = 'archived';
-  proj.updatedBy = req.user!.sub;
+  proj.updatedBy = req.user!.sub as any;
   await proj.save();
   res.json(proj);
 });
