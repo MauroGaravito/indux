@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { Types } from 'mongoose';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { Assignment } from '../models/Assignment.js';
-import { Project } from '../models/Project.js';
 
 const router = Router();
 
@@ -31,11 +30,6 @@ router.post('/', requireAuth, requireRole('admin', 'manager'), async (req, res) 
 
     const doc = await Assignment.create({ user, project, role, assignedBy: req.user!.sub });
 
-    // Keep Project.managers in sync when assigning a manager
-    if (role === 'manager') {
-      await Project.findByIdAndUpdate(project, { $addToSet: { managers: user } });
-    }
-
     const populated = await doc.populate([{ path: 'user', select: '-password' }, { path: 'project' }]);
     return res.status(201).json(populated);
   } catch (e: any) {
@@ -53,7 +47,7 @@ router.get('/user/:id', requireAuth, requireRole('admin', 'manager', 'worker'), 
     if (req.user!.role === 'admin' || req.user!.sub === targetUserId) {
       const list = await Assignment.find({ user: targetUserId })
         .populate([
-          { path: 'project' },
+          { path: 'project', select: 'name status address description createdAt updatedAt' },
           { path: 'user', select: '-password' },
         ])
         .lean();
@@ -66,7 +60,7 @@ router.get('/user/:id', requireAuth, requireRole('admin', 'manager', 'worker'), 
       const managedProjectIds = managed.map(a => a.project.toString());
       const list = await Assignment.find({ user: targetUserId, project: { $in: managedProjectIds } })
         .populate([
-          { path: 'project' },
+          { path: 'project', select: 'name status address description createdAt updatedAt' },
           { path: 'user', select: '-password' },
         ])
         .lean();
@@ -110,11 +104,6 @@ router.delete('/:id', requireAuth, requireRole('admin', 'manager'), async (req, 
       if (!allowed) return res.status(403).json({ error: 'Forbidden' });
     }
     await Assignment.findByIdAndDelete(id);
-
-    // If removing a manager assignment, also pull from Project.managers
-    if (doc.role === 'manager') {
-      await Project.findByIdAndUpdate(doc.project, { $pull: { managers: doc.user } });
-    }
 
     return res.json({ ok: true });
   } catch (e: any) {
