@@ -139,7 +139,7 @@ export default function ModuleEditor() {
   };
 
   const validateBeforeReview = () => {
-    const errors: string[] = [];
+    const errors = [];
 
     // Module status
     if (module?.reviewStatus && !['draft', 'declined'].includes(module.reviewStatus)) {
