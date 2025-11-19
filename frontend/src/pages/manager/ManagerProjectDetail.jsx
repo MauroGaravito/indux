@@ -22,6 +22,7 @@ export default function ManagerProjectDetail() {
   const [project, setProject] = useState(null)
   const [moduleId, setModuleId] = useState('')
   const [error, setError] = useState('')
+  const [managerAssignments, setManagerAssignments] = useState([])
 
   const loadProject = async () => {
     try {
@@ -47,19 +48,49 @@ export default function ManagerProjectDetail() {
     }
   }
 
+  const loadManagers = async () => {
+    try {
+      const res = await api.get(`/assignments/project/${projectId}`)
+      const managers = (res.data || [])
+        .filter((entry) => entry.role === 'manager' && entry.user)
+        .map((entry) => ({
+          id: entry._id,
+          userId: entry.user?._id || entry.user,
+          name: entry.user?.name || 'Manager',
+          email: entry.user?.email || '',
+        }))
+      setManagerAssignments(managers)
+    } catch (e) {
+      setManagerAssignments([])
+      if (e?.response?.status === 403) {
+        setError('Not authorized to view managers for this project.')
+      }
+    }
+  }
+
   useEffect(() => {
     loadProject()
     loadModule()
+    loadManagers()
   }, [projectId])
 
   const managers = useMemo(() => {
-    if (!project?.managers?.length) return []
-    return project.managers.map((m, idx) => ({
-      key: String(m),
-      label: `Manager ${idx + 1}`,
-      avatar: String(m).slice(-2).toUpperCase(),
-    }))
-  }, [project])
+    if (!managerAssignments.length) return []
+    return managerAssignments.map((entry) => {
+      const initials = entry.name
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((word) => word[0]?.toUpperCase() || '')
+        .join('') || 'MG'
+      return {
+        key: entry.id || entry.userId,
+        label: entry.name,
+        avatar: initials,
+        email: entry.email,
+      }
+    })
+  }, [managerAssignments])
 
   const moduleStatusChip = (status) => {
     const palette = {
@@ -99,15 +130,23 @@ export default function ManagerProjectDetail() {
           <Divider />
           <Stack spacing={1}>
             <Typography variant="subtitle2">Managers</Typography>
-            {managers.length ? (
-              <Stack direction="row" spacing={1}>
-                {managers.map((mgr) => (
-                  <Chip key={mgr.key} avatar={<Avatar sx={{ bgcolor: 'primary.main', width: 24, height: 24 }}>{mgr.avatar}</Avatar>} label={mgr.label} />
-                ))}
-              </Stack>
-            ) : (
-              <Typography variant="body2" color="text.secondary">Managers not listed for this project.</Typography>
-            )}
+            {managers.length
+              ? (
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  {managers.map((mgr) => (
+                    <Chip
+                      key={mgr.key}
+                      avatar={<Avatar sx={{ bgcolor: 'primary.main', width: 24, height: 24 }}>{mgr.avatar}</Avatar>}
+                      label={mgr.label}
+                      title={mgr.email}
+                      sx={{ mb: 1 }}
+                    />
+                  ))}
+                </Stack>
+                )
+              : (
+                <Typography variant="body2" color="text.secondary">Managers not listed for this project.</Typography>
+                )}
           </Stack>
           <Divider />
           <Card elevation={0} sx={{ borderRadius: 2, bgcolor: moduleStatus.color === 'error' ? 'rgba(244, 67, 54, 0.08)' : moduleStatus.color === 'warning' ? 'rgba(255, 152, 0, 0.08)' : moduleStatus.color === 'success' ? 'rgba(76, 175, 80, 0.08)' : 'rgba(0,0,0,0.04)' }}>
