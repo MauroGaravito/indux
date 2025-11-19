@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { ModuleReview } from '../models/ModuleReview.js';
 import { InductionModule } from '../models/InductionModule.js';
 import { InductionModuleField } from '../models/InductionModuleField.js';
+import { InductionModuleConfigStrictSchema, ModuleFieldStrictSchema } from '../utils/validators.js';
 
 const router = Router();
 
@@ -13,8 +14,35 @@ router.post('/modules/:moduleId/reviews', requireAuth, requireRole('admin'), asy
   const mod = await InductionModule.findById(moduleId);
   if (!mod) return res.status(404).json({ error: 'Module not found' });
 
+  // Reviewable status
+  if (mod.reviewStatus && !['draft', 'declined'].includes(mod.reviewStatus)) {
+    return res.status(400).json({ error: 'Module is not in draft/declined state' });
+  }
+
   const fields = await InductionModuleField.find({ moduleId }).sort({ order: 1, createdAt: 1 }).lean();
   const snapshot = { module: mod.toObject(), fields };
+
+  // Strict validation for review submission
+  const cfgResult = InductionModuleConfigStrictSchema.safeParse(mod.config || {});
+  if (!cfgResult.success) {
+    return res.status(400).json({ error: cfgResult.error.flatten() });
+  }
+  const fieldsResult = Array.isArray(fields)
+    ? (() => {
+        const failures = [];
+        fields.forEach((f, idx) => {
+          const parsed = ModuleFieldStrictSchema.safeParse(f);
+          if (!parsed.success) {
+            failures.push({ index: idx, issues: parsed.error.flatten() });
+          }
+        });
+        return failures;
+      })()
+    : [{ index: 0, issues: { formErrors: ['Fields must be an array'], fieldErrors: {} } }];
+
+  if (fieldsResult.length) {
+    return res.status(400).json({ error: { formErrors: ['Field validation failed'], fieldErrors: fieldsResult } });
+  }
 
   const review = await ModuleReview.create({
     moduleId: mod._id,

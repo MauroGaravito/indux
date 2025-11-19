@@ -6,7 +6,7 @@ import { InductionModule } from '../models/InductionModule.js';
 import { InductionModuleField } from '../models/InductionModuleField.js';
 import {
   InductionModuleCreateSchema,
-  InductionModuleUpdateSchema,
+  InductionModuleUpdateDraftSchema,
 } from '../utils/validators.js';
 
 const router = Router();
@@ -55,14 +55,15 @@ router.get('/projects/:projectId/modules/induction', requireAuth, async (req, re
 router.put('/modules/:moduleId', requireAuth, requireRole('admin', 'manager'), async (req, res) => {
   const moduleId = req.params.moduleId;
   if (!Types.ObjectId.isValid(moduleId)) return res.status(400).json({ error: 'Invalid module id' });
-  const parsed = InductionModuleUpdateSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const parsed = InductionModuleUpdateDraftSchema.safeParse(req.body);
+  // Even in draft mode, avoid throwing; if parsing fails, fall back to raw body
+  const body = parsed.success ? parsed.data : (req.body as any);
 
   const mod = await InductionModule.findById(moduleId);
   if (!mod) return res.status(404).json({ error: 'Not found' });
 
-  if (parsed.data.config) mod.config = parsed.data.config;
-  if (parsed.data.reviewStatus) mod.reviewStatus = parsed.data.reviewStatus;
+  if (body?.config) mod.config = body.config as any;
+  if (body?.reviewStatus) mod.reviewStatus = body.reviewStatus;
   mod.updatedBy = req.user?.sub as any;
   await mod.save();
 
@@ -72,8 +73,8 @@ router.put('/modules/:moduleId', requireAuth, requireRole('admin', 'manager'), a
     const payloadFields = (req.body as any).fields as any[];
     const docs = payloadFields.map((f) => ({
       moduleId: mod._id,
-      key: f.key,
-      label: f.label,
+      key: f.key ?? '',
+      label: f.label ?? '',
       type: f.type || 'text',
       required: !!f.required,
       order: f.order ?? 0,

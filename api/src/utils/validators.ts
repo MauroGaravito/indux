@@ -33,7 +33,7 @@ const QuizConfigSchema = z.object({
   questions: z.array(QuizQuestionSchema).default([]),
 });
 
-const ModuleSettingsSchema = z.object({
+export const ModuleSettingsSchema = z.object({
   passMark: z.number().min(0).max(100).default(80),
   randomizeQuestions: z.boolean().default(false),
   allowRetry: z.boolean().default(true),
@@ -60,6 +60,60 @@ export const InductionModuleUpdateSchema = z.object({
   config: InductionModuleConfigSchema.optional(),
   reviewStatus: z.enum(['draft', 'pending', 'approved', 'declined']).optional(),
 }).strict();
+
+// Draft-friendly schema: allows empty/partial payloads (used on PUT save)
+export const InductionModuleUpdateDraftSchema = z.object({
+  config: z
+    .object({
+      steps: z.array(z.string()).optional(),
+      slides: z.array(z.any()).optional(),
+      quiz: z.object({ questions: z.array(z.any()).optional() }).optional(),
+      settings: z
+        .object({
+          passMark: z.number().optional(),
+          randomizeQuestions: z.boolean().optional(),
+          allowRetry: z.boolean().optional(),
+        })
+        .optional(),
+    })
+    .partial()
+    .optional(),
+  reviewStatus: z.enum(['draft', 'pending', 'approved', 'declined']).optional(),
+}).strict().passthrough();
+
+// Strict schemas for review validation
+const SlideItemStrictSchema = z.object({
+  key: z.string().min(1),
+  title: z.string().optional(),
+  fileKey: z.string().min(1),
+  thumbKey: z.string().optional(),
+  order: z.number().optional(),
+});
+
+const QuizQuestionStrictSchema = z.object({
+  question: z.string().min(1),
+  options: z.array(z.string().min(1)).min(2),
+  answerIndex: z.number().int().nonnegative(),
+});
+
+export const InductionModuleConfigStrictSchema = z.object({
+  steps: z.array(z.string()).optional(),
+  slides: z.array(SlideItemStrictSchema).min(1),
+  quiz: z.object({
+    questions: z.array(QuizQuestionStrictSchema).min(1),
+  }),
+  settings: ModuleSettingsSchema,
+});
+
+export const ModuleFieldStrictSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  type: z.enum(['text', 'number', 'date', 'select', 'file', 'textarea', 'boolean']),
+  required: z.boolean().optional(),
+  order: z.number().optional(),
+  step: z.string().optional(),
+  options: z.array(z.string()).optional(),
+});
 
 export const ModuleFieldCreateSchema = z.object({
   moduleId: z.string().min(1),
