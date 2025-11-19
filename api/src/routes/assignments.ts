@@ -104,8 +104,12 @@ router.get('/project/:id', requireAuth, requireRole('admin', 'manager'), async (
   if (!Types.ObjectId.isValid(projectId)) return res.status(400).json({ error: 'Invalid project id' });
   try {
     if (req.user!.role === 'manager') {
-      const allowed = await isManagerOfProject(req.user!.sub, projectId);
-      if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+      const allowed = await Assignment.exists({
+        user: req.user!.sub,
+        project: projectId,
+        role: 'manager',
+      });
+      if (!allowed) return res.status(403).json({ error: 'Manager not assigned to this project' });
     }
     const list = await Assignment.find({ project: projectId })
       .populate([{ path: 'user', select: '-password' }, { path: 'project' }])
