@@ -12,9 +12,10 @@ export default function SlidesViewer() {
   const params = new URLSearchParams(location.search)
   const key = params.get('key') || ''
   const name = params.get('name') || 'slides'
-  const ext = (params.get('ext') || '').toLowerCase()
+  const extParam = (params.get('ext') || '').toLowerCase()
   const [url, setUrl] = React.useState('')
   const [error, setError] = React.useState('')
+  const [ext, setExt] = React.useState(extParam)
 
   React.useEffect(() => {
     let cancelled = false
@@ -24,6 +25,20 @@ export default function SlidesViewer() {
     if (key) load()
     return () => { cancelled = true }
   }, [key])
+
+  // Detect extension from url if not provided
+  React.useEffect(() => {
+    if (extParam) { setExt(extParam); return }
+    if (!url) return
+    try {
+      const u = new URL(url)
+      const path = u.pathname || ''
+      const candidate = (path.split('.').pop() || '').toLowerCase()
+      if (candidate) setExt(candidate)
+    } catch {
+      // ignore
+    }
+  }, [url, extParam])
 
   return (
     <Stack spacing={2} sx={{ p: 2 }}>

@@ -100,7 +100,9 @@ export default function SlidesSection({ slides, onChange }) {
 
   const openViewer = () => {
     if (!primary?.fileKey) return
-    const params = new URLSearchParams({ key: primary.fileKey, name: localName || primary.title || 'slides', ext: 'pdf' })
+    const baseName = localName || primary?.title || primary?.fileKey || 'slides'
+    const ext = (baseName.split('.').pop() || '').toLowerCase()
+    const params = new URLSearchParams({ key: primary.fileKey, name: baseName, ext })
     window.open(`/slides-viewer?${params.toString()}`, '_blank', 'noopener,noreferrer')
   }
 
