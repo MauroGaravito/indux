@@ -14,11 +14,11 @@ export default function ManagerProjects() {
   const [loading, setLoading] = useState(false)
 
   const loadProjects = async () => {
-    if (!user?.sub) return
+    if (!user?.id) return
     setLoading(true)
     setError('')
     try {
-      const r = await api.get(`/assignments/user/${user.sub}`)
+      const r = await api.get(`/assignments/user/${user.id}`)
       const list = (r.data || []).filter((a) => a.role === 'manager' && a.project && a.project.status !== 'archived')
       setAssignments(list)
       const statuses = {}
