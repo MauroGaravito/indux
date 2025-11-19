@@ -36,7 +36,6 @@ import QuestionsSection from '../../components/admin/QuestionsSection.jsx';
 import { useAuthStore } from '../../store/auth.js';
 import LockIcon from '@mui/icons-material/Lock';
 import EditIcon from '@mui/icons-material/Edit';
-import { useAuthStore } from '../../store/auth.js';
 
 const defaultConfig = {
   steps: ['personal', 'uploads', 'slides', 'quiz', 'sign'],
