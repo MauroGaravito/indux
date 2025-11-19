@@ -29,11 +29,12 @@ router.post('/modules/:moduleId/reviews', requireAuth, requireRole('admin'), asy
   }
   const fieldsResult = Array.isArray(fields)
     ? (() => {
-        const failures: Array<{ index: number; issues: ReturnType<typeof ModuleFieldStrictSchema.safeParse>['error']['flatten'] }> = [];
+        const failures: Array<{ index: number; issues: any }> = [];
         fields.forEach((f, idx) => {
           const parsed = ModuleFieldStrictSchema.safeParse(f);
           if (!parsed.success) {
-            failures.push({ index: idx, issues: parsed.error.flatten() });
+            const issues = parsed.error ? parsed.error.flatten() : { formErrors: ['Invalid field'], fieldErrors: {} };
+            failures.push({ index: idx, issues });
           }
         });
         return failures;
