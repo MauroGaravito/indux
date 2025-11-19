@@ -53,7 +53,7 @@ export default function ModuleEditor() {
   const [assignments, setAssignments] = useState([]);
   const [tab, setTab] = useState(0);
   const [validationOpen, setValidationOpen] = useState(false);
-  const [validationMessages, setValidationMessages] = useState<string[]>([]);
+  const [validationMessages, setValidationMessages] = useState([]);
 
   const moduleStatus = module?.reviewStatus || 'draft';
 
