@@ -1,22 +1,16 @@
-﻿import React from 'react'
+import React from 'react'
 import {
   Card,
   CardHeader,
   CardContent,
   Stack,
-  TextField,
-  Checkbox,
-  FormControlLabel,
-  IconButton,
   Button,
   Typography,
-  Paper,
-  Grid
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import PersonIcon from '@mui/icons-material/Person'
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
-import DeleteIcon from '@mui/icons-material/Delete'
+import FieldItem from './FieldItem.jsx'
 
 // Helper to generate a camelCase key from a label
 const toCamelKey = (label) => {
@@ -44,6 +38,8 @@ const makeUniqueKey = (base, existingKeys) => {
   return candidate
 }
 
+const STEP_SUGGESTIONS = ['personal', 'emergency', 'company', 'documents', 'other']
+
 export default function PersonalDetailsSection({ fields, onChange }) {
   const list = Array.isArray(fields) ? fields : []
   const theme = useTheme()
@@ -55,18 +51,51 @@ export default function PersonalDetailsSection({ fields, onChange }) {
       .map((f) => f.key)
       .filter(Boolean)
 
+  const normalizeOrder = (arr) => arr.map((f, idx) => ({ ...f, order: idx + 1 }))
+
+  const updateList = (updater) => {
+    const next = updater(list)
+    onChange(normalizeOrder(next))
+  }
+
   const setField = (idx, patch) => {
-    onChange(list.map((f, i) => (i === idx ? { ...f, ...patch } : f)))
+    updateList((prev) => prev.map((f, i) => (i === idx ? { ...f, ...patch } : f)))
   }
 
   const addField = () => {
-    onChange([
-      ...list,
-      { key: '', label: '', type: 'text', required: false, order: list.length + 1, step: 'personal' }
+    updateList((prev) => [
+      ...prev,
+      { key: '', label: '', type: 'text', required: false, order: prev.length + 1, step: 'personal' },
     ])
   }
 
-  const removeField = (idx) => onChange(list.filter((_, i) => i !== idx))
+  const removeField = (idx) => updateList((prev) => prev.filter((_, i) => i !== idx))
+
+  const moveField = (from, to) => {
+    if (to < 0 || to >= list.length) return
+    updateList((prev) => {
+      const next = [...prev]
+      const [item] = next.splice(from, 1)
+      next.splice(to, 0, item)
+      return next
+    })
+  }
+
+  const handleLabelChange = (idx, nextLabel) => {
+    const target = list[idx]
+    if (target && !target.key) {
+      const base = toCamelKey(nextLabel)
+      const unique = makeUniqueKey(base, existingKeys(idx))
+      setField(idx, { label: nextLabel, key: unique })
+    } else {
+      setField(idx, { label: nextLabel })
+    }
+  }
+
+  const handleOptionsChange = (idx, value) => {
+    const parts = (value || '').split(',').map((s) => s.trim()).filter(Boolean)
+    setField(idx, { options: parts })
+  }
 
   return (
     <Card elevation={1} sx={{ borderRadius: 2, bgcolor: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -83,89 +112,22 @@ export default function PersonalDetailsSection({ fields, onChange }) {
           </Button>
 
           {list.map((f, idx) => (
-            <Paper key={f.key || idx} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-              <Grid container spacing={2} alignItems="center">
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    fullWidth
-                    label="Label"
-                    value={f.label || ''}
-                    onChange={(e) => {
-                      const nextLabel = e.target.value
-                      if (!f.key) {
-                        const base = toCamelKey(nextLabel)
-                        const unique = makeUniqueKey(base, existingKeys(idx))
-                        setField(idx, { label: nextLabel, key: unique })
-                      } else {
-                        setField(idx, { label: nextLabel })
-                      }
-                    }}
-                  />
-                </Grid>
-
-                <Grid item xs={12} md={2}>
-                  <TextField
-                    fullWidth
-                    select
-                    label="Type"
-                    value={f.type || 'text'}
-                    onChange={(e) => setField(idx, { type: e.target.value })}
-                    SelectProps={{ native: true }}
-                  >
-                    <option value="text">Text</option>
-                    <option value="number">Number</option>
-                    <option value="date">Date</option>
-                    <option value="select">Select</option>
-                    <option value="file">File</option>
-                    <option value="textarea">Textarea</option>
-                    <option value="boolean">Boolean</option>
-                  </TextField>
-                </Grid>
-
-                <Grid item xs={12} md={2}>
-                  <TextField
-                    fullWidth
-                    label="Step"
-                    value={f.step || 'personal'}
-                    onChange={(e) => setField(idx, { step: e.target.value })}
-                    helperText="Grouping/step key"
-                  />
-                </Grid>
-
-                <Grid item xs={12} md={1}>
-                  <TextField
-                    type="number"
-                    fullWidth
-                    label="Order"
-                    value={f.order ?? idx + 1}
-                    onChange={(e) => setField(idx, { order: Number(e.target.value) })}
-                  />
-                </Grid>
-
-                <Grid item xs={12} md={1}>
-                  <FormControlLabel
-                    control={<Checkbox checked={!!f.required} onChange={(e) => setField(idx, { required: e.target.checked })} />}
-                    label="Required"
-                  />
-                </Grid>
-
-                <Grid item xs={12} md={2}>
-                  <TextField
-                    fullWidth
-                    label="Options (comma separated)"
-                    value={(f.options || []).join(', ')}
-                    onChange={(e) => setField(idx, { options: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
-                    disabled={f.type !== 'select'}
-                  />
-                </Grid>
-
-                <Grid item xs={12} md={1}>
-                  <IconButton color="error" onClick={() => removeField(idx)}>
-                    <DeleteIcon />
-                  </IconButton>
-                </Grid>
-              </Grid>
-            </Paper>
+            <FieldItem
+              key={f.key || idx}
+              field={f}
+              index={idx}
+              onLabelChange={(val) => handleLabelChange(idx, val)}
+              onTypeChange={(val) => setField(idx, { type: val })}
+              onStepChange={(val) => setField(idx, { step: val || 'personal' })}
+              onRequiredChange={(val) => setField(idx, { required: val })}
+              onOptionsChange={(val) => handleOptionsChange(idx, val)}
+              onRemove={() => removeField(idx)}
+              onMoveUp={() => moveField(idx, idx - 1)}
+              onMoveDown={() => moveField(idx, idx + 1)}
+              disableMoveUp={idx === 0}
+              disableMoveDown={idx === list.length - 1}
+              suggestedSteps={STEP_SUGGESTIONS}
+            />
           ))}
         </Stack>
       </CardContent>
