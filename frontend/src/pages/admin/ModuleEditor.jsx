@@ -65,8 +65,8 @@ export default function ModuleEditor({ mode = 'admin' }) {
   const canEditModule = !isManagerMode || ['draft', 'declined'].includes(moduleStatus);
   const isReadOnly = isManagerMode && !canEditModule;
   const isManagerOfProject = useMemo(() => {
-    if (!isManagerMode || !user?.sub) return false;
-    return assignments.some((a) => String(a?.user?._id || a?.user) === String(user.sub) && a.role === 'manager');
+    if (!isManagerMode || !user?.id) return false;
+    return assignments.some((a) => String(a?.user?._id || a?.user) === String(user.id) && a.role === 'manager');
   }, [assignments, isManagerMode, user]);
   const showActions = canEditModule && (!isManagerMode || isManagerOfProject);
   const bannerPalette = {

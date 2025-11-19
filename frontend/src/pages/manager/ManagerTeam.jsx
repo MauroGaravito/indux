@@ -39,9 +39,9 @@ export default function ManagerTeam() {
   }
 
   const loadWorkersPool = async () => {
-    if (!user?.sub) return
+    if (!user?.id) return
     try {
-      const r = await api.get(`/assignments/manager/${user.sub}/team`)
+      const r = await api.get(`/assignments/manager/${user.id}/team`)
       const list = r.data || []
       setWorkersPool(list)
     } catch {

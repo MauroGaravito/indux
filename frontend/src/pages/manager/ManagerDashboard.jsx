@@ -17,12 +17,12 @@ export default function ManagerDashboard() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!user?.sub) return
+    if (!user?.id) return
     let isCancelled = false
 
     const loadMetrics = async () => {
       try {
-        const resp = await api.get(`/assignments/user/${user.sub}`)
+        const resp = await api.get(`/assignments/user/${user.id}`)
         const list = (resp.data || []).filter((a) => a.role === 'manager' && a.project && a.project.status !== 'archived')
         if (isCancelled) return
         setMetrics((prev) => ({ ...prev, projects: list.length }))
