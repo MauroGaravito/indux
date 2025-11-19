@@ -18,7 +18,7 @@ import QuizIcon from "@mui/icons-material/Quiz"
 import DeleteIcon from "@mui/icons-material/Delete"
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline"
 
-export default function QuestionsSection({ questions, onChange, settings, onSettingsChange }) {
+export default function QuestionsSection({ questions, onChange }) {
   const list = Array.isArray(questions) ? questions : []
   const theme = useTheme()
   const accent = theme.palette.primary.main
@@ -36,40 +36,11 @@ export default function QuestionsSection({ questions, onChange, settings, onSett
       <CardHeader
         avatar={<QuizIcon sx={{ color: accent }} />}
         title={<Typography variant="h6" sx={{ fontWeight: 600 }}>Quiz</Typography>}
-        subheader={<Typography variant="body2" color="text.secondary">Multiple choice questions stored in module.config.quiz</Typography>}
+        subheader={<Typography variant="body2" color="text.secondary">Manage questions. Settings live in the Settings tab.</Typography>}
         sx={{ pb: 0 }}
       />
       <CardContent>
         <Stack spacing={2}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
-              label="Pass mark (%)"
-              type="number"
-              value={settings?.passMark ?? 80}
-              onChange={(e) => onSettingsChange({ ...settings, passMark: Number(e.target.value) })}
-            />
-            <TextField
-              select
-              SelectProps={{ native: true }}
-              label="Randomize questions"
-              value={settings?.randomizeQuestions ? 'yes' : 'no'}
-              onChange={(e) => onSettingsChange({ ...settings, randomizeQuestions: e.target.value === 'yes' })}
-            >
-              <option value="no">No</option>
-              <option value="yes">Yes</option>
-            </TextField>
-            <TextField
-              select
-              SelectProps={{ native: true }}
-              label="Allow retry"
-              value={settings?.allowRetry ? 'yes' : 'no'}
-              onChange={(e) => onSettingsChange({ ...settings, allowRetry: e.target.value === 'yes' })}
-            >
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </TextField>
-          </Stack>
-
           <Button startIcon={<AddCircleOutlineIcon />} variant="outlined" onClick={add} sx={{ textTransform: 'none', alignSelf: 'flex-start' }}>
             Add Question
           </Button>

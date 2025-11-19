@@ -219,9 +219,7 @@ export default function ModuleEditor() {
         <Box sx={{ mt: 2 }} hidden={tab !== 2}>
           <QuestionsSection
             questions={moduleConfig.quiz?.questions || []}
-            settings={moduleConfig.settings}
             onChange={(qs) => setModuleConfig({ ...moduleConfig, quiz: { questions: qs } })}
-            onSettingsChange={(settings) => setModuleConfig({ ...moduleConfig, settings })}
           />
         </Box>
 
