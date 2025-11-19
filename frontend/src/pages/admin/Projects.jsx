@@ -51,7 +51,6 @@ export default function Projects() {
   const [users, setUsers] = useState([])
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignUserId, setAssignUserId] = useState('')
-  const [assignRole, setAssignRole] = useState('worker')
   const [newProject, setNewProject] = useState({ name: '', description: '' })
   const [module, setModule] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
@@ -166,13 +165,19 @@ export default function Projects() {
 
   const openAssign = async () => {
     setAssignOpen(true)
-    try { const r = await api.get('/users'); setUsers(r.data || []) } catch { setUsers([]) }
+    try {
+      const r = await api.get('/users')
+      setUsers((r.data || []).filter((u) => u.role === 'manager'))
+    } catch {
+      setUsers([])
+    }
   }
   const closeAssign = () => setAssignOpen(false)
   const doAssign = async () => {
     if (!selectedId || !assignUserId) return
-    await api.post('/assignments', { user: assignUserId, project: selectedId, role: assignRole })
-    setAssignUserId(''); setAssignRole('worker'); setAssignOpen(false)
+    await api.post('/assignments', { user: assignUserId, project: selectedId, role: 'manager' })
+    setAssignUserId('')
+    setAssignOpen(false)
     await loadAssignments(selectedId)
   }
   const removeAssignment = async (id) => {
@@ -333,29 +338,25 @@ export default function Projects() {
 
     {/* Assign User Modal */}
     <Dialog open={assignOpen} onClose={closeAssign} maxWidth="sm" fullWidth>
-      <CardHeader title={<Typography variant="subtitle1">Assign User to Project</Typography>} />
+      <CardHeader title={<Typography variant="subtitle1">Assign manager to project</Typography>} />
       <CardContent>
         <Stack spacing={2}>
           <TextField
             select
-            label="User"
+            label="Manager"
             value={assignUserId}
             onChange={(e) => setAssignUserId(e.target.value)}
-            helperText="Select a user to assign"
+            helperText="Only users with the manager role are listed"
           >
-            {users.map(u => (
-              <MenuItem key={u._id} value={u._id}>{u.name} ({u.email})</MenuItem>
+            {users.map((u) => (
+              <MenuItem key={u._id} value={u._id}>
+                {u.name} ({u.email})
+              </MenuItem>
             ))}
           </TextField>
-          <TextField
-            select
-            label="Role"
-            value={assignRole}
-            onChange={(e) => setAssignRole(e.target.value)}
-          >
-            <MenuItem value="worker">Worker</MenuItem>
-            <MenuItem value="manager">Manager</MenuItem>
-          </TextField>
+          <Typography variant="caption" color="text.secondary">
+            This modal assigns managers to projects; worker assignments happen via the Manager team view.
+          </Typography>
         </Stack>
       </CardContent>
       <Stack direction="row" spacing={1} sx={{ px: 2, pb: 2, justifyContent: 'flex-end' }}>
