@@ -44,7 +44,12 @@ router.get('/user/:id', requireAuth, requireRole('admin', 'manager', 'worker'), 
 
   try {
     if (req.user!.role === 'admin' || req.user!.sub === targetUserId) {
-      const list = await Assignment.find({ user: targetUserId }).populate('project').lean();
+      const list = await Assignment.find({ user: targetUserId })
+        .populate([
+          { path: 'project' },
+          { path: 'user', select: '-password' },
+        ])
+        .lean();
       return res.json(list);
     }
 
@@ -53,7 +58,10 @@ router.get('/user/:id', requireAuth, requireRole('admin', 'manager', 'worker'), 
       const managed = await Assignment.find({ user: req.user!.sub, role: 'manager' }).lean();
       const managedProjectIds = managed.map(a => a.project.toString());
       const list = await Assignment.find({ user: targetUserId, project: { $in: managedProjectIds } })
-        .populate('project')
+        .populate([
+          { path: 'project' },
+          { path: 'user', select: '-password' },
+        ])
         .lean();
       return res.json(list);
     }
