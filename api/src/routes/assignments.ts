@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Types } from 'mongoose';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { Assignment } from '../models/Assignment.js';
+import { Project } from '../models/Project.js';
 
 const router = Router();
 
@@ -43,6 +44,9 @@ router.get('/user/:id', requireAuth, requireRole('admin', 'manager', 'worker'), 
   const targetUserId = req.params.id;
   if (!Types.ObjectId.isValid(targetUserId)) return res.status(400).json({ error: 'Invalid user id' });
 
+  const filterWithExistingProject = (list: any[]) =>
+    list.filter((entry) => entry?.project && entry.project?._id);
+
   try {
     if (req.user!.role === 'admin' || req.user!.sub === targetUserId) {
       const list = await Assignment.find({ user: targetUserId })
@@ -51,20 +55,41 @@ router.get('/user/:id', requireAuth, requireRole('admin', 'manager', 'worker'), 
           { path: 'user', select: '-password' },
         ])
         .lean();
-      return res.json(list);
+      return res.json(filterWithExistingProject(list));
     }
 
     // Manager: only assignments in projects they manage
     if (req.user!.role === 'manager') {
-      const managed = await Assignment.find({ user: req.user!.sub, role: 'manager' }).lean();
-      const managedProjectIds = managed.map(a => a.project.toString());
-      const list = await Assignment.find({ user: targetUserId, project: { $in: managedProjectIds } })
+      const managed = await Assignment.find({ user: req.user!.sub, role: 'manager' })
+        .populate([{ path: 'project', select: '_id' }])
+        .lean();
+      const managedProjectIds = managed
+        .map((a) => (a?.project?._id ? a.project._id.toString() : null))
+        .filter((id): id is string => !!id);
+
+      if (!managedProjectIds.length) {
+        return res.json([]);
+      }
+
+      const existingProjects = await Project.find({ _id: { $in: managedProjectIds } })
+        .select('_id')
+        .lean();
+      const existingProjectIds = new Set(existingProjects.map((p) => p._id.toString()));
+
+      if (!existingProjectIds.size) {
+        return res.json([]);
+      }
+
+      const list = await Assignment.find({
+        user: targetUserId,
+        project: { $in: Array.from(existingProjectIds) },
+      })
         .populate([
           { path: 'project', select: 'name status address description createdAt updatedAt' },
           { path: 'user', select: '-password' },
         ])
         .lean();
-      return res.json(list);
+      return res.json(filterWithExistingProject(list));
     }
 
     return res.status(403).json({ error: 'Forbidden' });
