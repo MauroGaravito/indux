@@ -54,6 +54,7 @@ export default function ModuleEditor() {
   const [tab, setTab] = useState(0);
   const [validationOpen, setValidationOpen] = useState(false);
   const [validationMessages, setValidationMessages] = useState([]);
+  const [submitError, setSubmitError] = useState('');
 
   const moduleStatus = module?.reviewStatus || 'draft';
 
@@ -122,6 +123,7 @@ export default function ModuleEditor() {
 
   const saveModule = async () => {
     if (!moduleId) return;
+    setSubmitError('');
     // Build a request payload that passes backend validation, but keep local state intact (allows drafts with incomplete fields)
     const existingKeys = fields.map((f) => f.key).filter(Boolean);
     const sanitizedFields = fields
@@ -161,9 +163,14 @@ export default function ModuleEditor() {
       fields: sanitizedFields,
     };
 
-    const r = await api.put(`/modules/${moduleId}`, payload);
-    // Preserve local state (including drafts), but refresh module metadata
-    setModule(r.data?.module || module);
+    try {
+      const r = await api.put(`/modules/${moduleId}`, payload);
+      // Preserve local state (including drafts), but refresh module metadata
+      setModule(r.data?.module || module);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e?.message || 'Failed to save module';
+      setSubmitError(typeof msg === 'string' ? msg : 'Failed to save module');
+    }
   };
 
   const validateBeforeReview = () => {
@@ -230,14 +237,20 @@ export default function ModuleEditor() {
 
   const sendForReview = async () => {
     if (!moduleId) return;
+    setSubmitError('');
     const errors = validateBeforeReview();
     if (errors.length) {
       setValidationMessages(errors);
       setValidationOpen(true);
       return;
     }
-    await api.post(`/modules/${moduleId}/reviews`);
-    await Promise.all([loadModule(), loadReviews()]);
+    try {
+      await api.post(`/modules/${moduleId}/reviews`);
+      await Promise.all([loadModule(), loadReviews()]);
+    } catch (e) {
+      const msg = e?.response?.data?.error || e?.message || 'Failed to send for review';
+      setSubmitError(typeof msg === 'string' ? msg : 'Failed to send for review');
+    }
   };
 
   const SettingsTab = () => (
@@ -302,6 +315,11 @@ export default function ModuleEditor() {
     <>
       <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <CardContent>
+          {submitError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {typeof submitError === 'string' ? submitError : 'Unexpected error'}
+            </Alert>
+          )}
           <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
             <Button startIcon={<ArrowBackIcon />} component={RouterLink} to="/admin/projects">Back</Button>
             <Typography variant="h6">Induction Module</Typography>
