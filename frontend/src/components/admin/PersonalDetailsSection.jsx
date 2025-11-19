@@ -40,7 +40,7 @@ const makeUniqueKey = (base, existingKeys) => {
 
 const STEP_SUGGESTIONS = ['personal', 'emergency', 'company', 'documents', 'other']
 
-export default function PersonalDetailsSection({ fields, onChange }) {
+export default function PersonalDetailsSection({ fields, onChange, readOnly = false }) {
   const list = Array.isArray(fields) ? fields : []
   const theme = useTheme()
   const accent = theme.palette.primary.main
@@ -54,6 +54,7 @@ export default function PersonalDetailsSection({ fields, onChange }) {
   const normalizeOrder = (arr) => arr.map((f, idx) => ({ ...f, order: idx + 1 }))
 
   const updateList = (updater) => {
+    if (readOnly) return
     const next = updater(list)
     onChange(normalizeOrder(next))
   }
@@ -63,15 +64,20 @@ export default function PersonalDetailsSection({ fields, onChange }) {
   }
 
   const addField = () => {
+    if (readOnly) return
     updateList((prev) => [
       ...prev,
       { key: '', label: '', type: 'text', required: false, order: prev.length + 1, step: 'personal' },
     ])
   }
 
-  const removeField = (idx) => updateList((prev) => prev.filter((_, i) => i !== idx))
+  const removeField = (idx) => {
+    if (readOnly) return
+    updateList((prev) => prev.filter((_, i) => i !== idx))
+  }
 
   const moveField = (from, to) => {
+    if (readOnly) return
     if (to < 0 || to >= list.length) return
     updateList((prev) => {
       const next = [...prev]
@@ -107,7 +113,7 @@ export default function PersonalDetailsSection({ fields, onChange }) {
       />
       <CardContent>
         <Stack spacing={2}>
-          <Button startIcon={<AddCircleOutlineIcon />} variant="outlined" onClick={addField} sx={{ textTransform: 'none', alignSelf: 'flex-start' }}>
+          <Button startIcon={<AddCircleOutlineIcon />} variant="outlined" onClick={addField} disabled={readOnly} sx={{ textTransform: 'none', alignSelf: 'flex-start' }}>
             Add Field
           </Button>
 
@@ -127,6 +133,7 @@ export default function PersonalDetailsSection({ fields, onChange }) {
               disableMoveUp={idx === 0}
               disableMoveDown={idx === list.length - 1}
               suggestedSteps={STEP_SUGGESTIONS}
+              readOnly={readOnly}
             />
           ))}
         </Stack>

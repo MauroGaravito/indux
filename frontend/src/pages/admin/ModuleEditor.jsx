@@ -33,6 +33,10 @@ import AsyncButton from '../../components/AsyncButton.jsx';
 import PersonalDetailsSection from '../../components/admin/PersonalDetailsSection.jsx';
 import SlidesSection from '../../components/admin/SlidesSection.jsx';
 import QuestionsSection from '../../components/admin/QuestionsSection.jsx';
+import { useAuthStore } from '../../store/auth.js';
+import LockIcon from '@mui/icons-material/Lock';
+import EditIcon from '@mui/icons-material/Edit';
+import { useAuthStore } from '../../store/auth.js';
 
 const defaultConfig = {
   steps: ['personal', 'uploads', 'slides', 'quiz', 'sign'],
@@ -41,9 +45,10 @@ const defaultConfig = {
   settings: { passMark: 80, randomizeQuestions: false, allowRetry: true },
 };
 
-export default function ModuleEditor() {
+export default function ModuleEditor({ mode = 'admin' }) {
   const { projectId, moduleId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
 
   const [projectName, setProjectName] = useState('');
   const [module, setModule] = useState(null);
@@ -57,6 +62,30 @@ export default function ModuleEditor() {
   const [submitError, setSubmitError] = useState('');
 
   const moduleStatus = module?.reviewStatus || 'draft';
+  const isManagerMode = mode === 'manager';
+  const canEditModule = !isManagerMode || ['draft', 'declined'].includes(moduleStatus);
+  const isReadOnly = isManagerMode && !canEditModule;
+  const isManagerOfProject = useMemo(() => {
+    if (!isManagerMode || !user?.sub) return false;
+    return assignments.some((a) => String(a?.user?._id || a?.user) === String(user.sub) && a.role === 'manager');
+  }, [assignments, isManagerMode, user]);
+  const showActions = canEditModule && (!isManagerMode || isManagerOfProject);
+  const bannerPalette = {
+    draft: 'rgba(0, 0, 0, 0.04)',
+    pending: 'rgba(255, 152, 0, 0.16)',
+    approved: 'rgba(76, 175, 80, 0.16)',
+    declined: 'rgba(244, 67, 54, 0.16)',
+  };
+  const bannerColor = bannerPalette[moduleStatus] || 'rgba(0, 0, 0, 0.04)';
+  const bannerTextColors = {
+    draft: 'text.primary',
+    pending: 'warning.dark',
+    approved: 'success.dark',
+    declined: 'error.dark',
+  };
+  const bannerTextColor = bannerTextColors[moduleStatus] || 'text.primary';
+  const bannerLabel = isReadOnly ? 'Read-only Mode' : 'Manager Editing Mode';
+  const BannerIcon = isReadOnly ? LockIcon : EditIcon;
 
   const normalizeConfig = (cfg) => ({
     steps: Array.isArray(cfg?.steps) ? cfg.steps : defaultConfig.steps,
@@ -122,6 +151,7 @@ export default function ModuleEditor() {
   }, [projectId, moduleId]);
 
   const saveModule = async () => {
+    if (!canEditModule) return;
     if (!moduleId) return;
     setSubmitError('');
     // Build a request payload that passes backend validation, but keep local state intact (allows drafts with incomplete fields)
@@ -236,6 +266,7 @@ export default function ModuleEditor() {
   };
 
   const sendForReview = async () => {
+    if (!canEditModule) return;
     if (!moduleId) return;
     setSubmitError('');
     const errors = validateBeforeReview();
@@ -313,6 +344,30 @@ export default function ModuleEditor() {
 
   return (
     <>
+      {isManagerMode && (
+        <Box
+          sx={{
+            mb: 2,
+            p: 2,
+            borderRadius: 2,
+            bgcolor: bannerColor,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+          }}
+        >
+          <BannerIcon fontSize="small" sx={{ color: bannerTextColor }} />
+          <Typography variant="body2" sx={{ fontWeight: 600, color: bannerTextColor }}>
+            {bannerLabel}
+          </Typography>
+          <Chip label={`Status: ${moduleStatus}`} size="small" color={moduleStatus === 'pending' ? 'warning' : moduleStatus === 'approved' ? 'success' : moduleStatus === 'declined' ? 'error' : 'default'} />
+          {isReadOnly && (
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              Updates are disabled for pending/approved modules.
+            </Typography>
+          )}
+        </Box>
+      )}
       <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <CardContent>
           {submitError && (
@@ -321,14 +376,22 @@ export default function ModuleEditor() {
             </Alert>
           )}
           <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-            <Button startIcon={<ArrowBackIcon />} component={RouterLink} to="/admin/projects">Back</Button>
+            <Button startIcon={<ArrowBackIcon />} component={RouterLink} to={mode === 'manager' ? '/manager/projects' : '/admin/projects'}>Back</Button>
             <Typography variant="h6">Induction Module</Typography>
             <Chip label={`Project: ${projectName || projectId}`} />
             <Chip label={`Status: ${moduleStatus}`} color={moduleStatus === 'approved' ? 'success' : moduleStatus === 'pending' ? 'warning' : 'default'} />
+            {isReadOnly && <Chip label="Read-only" color="info" />}
             <Box sx={{ flex: 1 }} />
-            <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveModule}>Save</AsyncButton>
-            <AsyncButton startIcon={<SendIcon />} variant="contained" color="secondary" onClick={sendForReview}>Send For Review</AsyncButton>
+            {showActions && (
+              <>
+                <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveModule}>Save</AsyncButton>
+                <AsyncButton startIcon={<SendIcon />} variant="contained" color="secondary" onClick={sendForReview}>Send For Review</AsyncButton>
+              </>
+            )}
           </Stack>
+          {isManagerMode && !isManagerOfProject && (
+            <Alert severity="warning" sx={{ mb: 2 }}>You are not assigned as manager to this project. Module is read-only.</Alert>
+          )}
 
           <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: '1px solid #eee' }}>
             <Tab label="Fields" />
@@ -340,17 +403,18 @@ export default function ModuleEditor() {
           </Tabs>
 
           <Box sx={{ mt: 2 }} hidden={tab !== 0}>
-            <PersonalDetailsSection fields={fields} onChange={setFields} />
+            <PersonalDetailsSection fields={fields} onChange={isReadOnly ? () => {} : setFields} readOnly={isReadOnly} />
           </Box>
 
           <Box sx={{ mt: 2 }} hidden={tab !== 1}>
-            <SlidesSection slides={moduleConfig.slides} onChange={(slides) => setModuleConfig({ ...moduleConfig, slides })} />
+            <SlidesSection slides={moduleConfig.slides} onChange={isReadOnly ? () => {} : (slides) => setModuleConfig({ ...moduleConfig, slides })} readOnly={isReadOnly} />
           </Box>
 
           <Box sx={{ mt: 2 }} hidden={tab !== 2}>
             <QuestionsSection
               questions={moduleConfig.quiz?.questions || []}
-              onChange={(qs) => setModuleConfig({ ...moduleConfig, quiz: { questions: qs } })}
+              onChange={isReadOnly ? () => {} : (qs) => setModuleConfig({ ...moduleConfig, quiz: { questions: qs } })}
+              readOnly={isReadOnly}
             />
           </Box>
 

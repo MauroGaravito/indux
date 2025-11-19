@@ -19,7 +19,7 @@ import { uploadFile, presignGet } from "../../utils/upload.js"
 
 // Slides are stored as an array in module.config.slides
 // We edit the first item (primary deck) for simplicity
-export default function SlidesSection({ slides, onChange }) {
+export default function SlidesSection({ slides, onChange, readOnly = false }) {
   const theme = useTheme()
   const accent = theme.palette.primary.main
   const primary = useMemo(() => (Array.isArray(slides) && slides.length ? slides[0] : null), [slides])
@@ -129,6 +129,7 @@ export default function SlidesSection({ slides, onChange }) {
                 component="label"
                 startIcon={<CloudUploadIcon />}
                 sx={{ bgcolor: accent, textTransform: 'none' }}
+                disabled={readOnly}
               >
                 Choose File
                 <input
@@ -136,6 +137,7 @@ export default function SlidesSection({ slides, onChange }) {
                   type="file"
                   accept=".pdf,.ppt,.pptx,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                   onChange={uploadPPT}
+                  disabled={readOnly}
                 />
               </Button>
               {uploadedLabel && (

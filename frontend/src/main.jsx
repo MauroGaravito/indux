@@ -17,11 +17,16 @@ import AdminReviews from './pages/admin/Reviews.jsx'
 import AdminUsers from './pages/admin/Users.jsx'
 import AdminSettings from './pages/admin/Settings.jsx'
 import ModuleEditor from './pages/admin/ModuleEditor.jsx'
+import ManagerDashboard from './pages/manager/ManagerDashboard.jsx'
+import ManagerProjects from './pages/manager/ManagerProjects.jsx'
+import ManagerProjectDetail from './pages/manager/ManagerProjectDetail.jsx'
+import ManagerModuleEditor from './pages/manager/ManagerModuleEditor.jsx'
+import ManagerTeam from './pages/manager/ManagerTeam.jsx'
 import { useAuthStore } from './store/auth.js'
 
 function Nav({ brand }) {
   const { user, logout } = useAuthStore()
-  const dashboardPath = user?.role === 'admin' ? '/admin' : user?.role === 'manager' ? '/review' : user ? '/wizard' : '/login'
+  const dashboardPath = user?.role === 'admin' ? '/admin' : user?.role === 'manager' ? '/manager' : user ? '/wizard' : '/login'
   const brandName = brand?.companyName || 'Indux'
   const logoUrl = brand?.logoUrl || ''
   return (
@@ -77,6 +82,13 @@ function App({ brand }) {
             <Route path="users" element={<AdminUsers />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>
+          <Route path="/manager" element={<ManagerGuard><DashboardLayout /></ManagerGuard>}>
+            <Route index element={<ManagerDashboard />} />
+            <Route path="projects" element={<ManagerProjects />} />
+            <Route path="projects/:projectId" element={<ManagerProjectDetail />} />
+            <Route path="projects/:projectId/module/:moduleId" element={<ManagerModuleEditor />} />
+            <Route path="projects/:projectId/team" element={<ManagerTeam />} />
+          </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Container>
@@ -88,6 +100,13 @@ function AdminGuard({ children }) {
   const { user } = useAuthStore()
   if (!user) return <Navigate to="/login" replace />
   if (user.role !== 'admin') return <Navigate to="/" replace />
+  return children
+}
+
+function ManagerGuard({ children }) {
+  const { user } = useAuthStore()
+  if (!user) return <Navigate to="/login" replace />
+  if (user.role !== 'manager') return <Navigate to="/" replace />
   return children
 }
 

@@ -48,7 +48,10 @@ export default function DashboardLayout({ children }) {
       ]
     : role === 'manager'
       ? [
+          { label: 'Dashboard', to: '/manager', icon: <DashboardIcon /> },
+          { label: 'Projects', to: '/manager/projects', icon: <FolderIcon /> },
           { label: 'Review', to: '/review', icon: <RateReviewIcon /> },
+          { label: 'Slides', to: '/slides-viewer', icon: <MenuBookIcon /> },
         ]
       : [
           { label: 'Wizard', to: '/wizard', icon: <ChecklistIcon /> },
@@ -68,13 +71,6 @@ export default function DashboardLayout({ children }) {
             <ListItemText primary={i.label} />
           </ListItemButton>
         ))}
-        {/* Common entry to slides viewer if needed */}
-        {role !== 'admin' && (
-          <ListItemButton component={RouterLink} to="/slides-viewer" onClick={() => isMobile && setOpen(false)}>
-            <ListItemIcon><MenuBookIcon /></ListItemIcon>
-            <ListItemText primary="Slides" />
-          </ListItemButton>
-        )}
       </List>
       <Box sx={{ flexGrow: 1 }} />
       <Divider />
