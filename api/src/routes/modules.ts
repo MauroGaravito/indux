@@ -11,6 +11,14 @@ import {
 
 const router = Router();
 
+const DEFAULT_USER_FIELDS = [
+  { key: 'fullName', label: 'Full Name', type: 'text', required: true },
+  { key: 'email', label: 'Email', type: 'text', required: true },
+  { key: 'phone', label: 'Phone', type: 'text', required: false },
+  { key: 'position', label: 'Position', type: 'text', required: false },
+  { key: 'companyName', label: 'Company Name', type: 'text', required: false },
+];
+
 // Create or return an induction module for a project
 router.post('/projects/:projectId/modules/induction', requireAuth, requireRole('admin', 'manager'), async (req, res) => {
   const projectId = req.params.projectId;
@@ -37,6 +45,15 @@ router.post('/projects/:projectId/modules/induction', requireAuth, requireRole('
     createdBy: req.user?.sub,
     updatedBy: req.user?.sub,
   });
+
+  // Seed default personal data fields on first creation
+  const defaultFields = DEFAULT_USER_FIELDS.map((field, idx) => ({
+    ...field,
+    moduleId: module._id,
+    order: idx + 1,
+    step: 'personal',
+  }));
+  await InductionModuleField.insertMany(defaultFields);
 
   res.status(201).json(module);
 });
