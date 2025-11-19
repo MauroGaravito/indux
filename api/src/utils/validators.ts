@@ -155,7 +155,11 @@ export const UserCreateSchema = z.object({
   email: z.string().email(),
   name: z.string().min(1),
   role: z.enum(['admin', 'manager', 'worker']),
-  password: z.string().min(6),
+  password: z.string().min(6).optional(),
+  position: z.string().optional(),
+  phone: z.string().optional(),
+  companyName: z.string().optional(),
+  avatarUrl: z.string().optional(),
 });
 
 export const UserUpdateSchema = z.object({
@@ -163,4 +167,8 @@ export const UserUpdateSchema = z.object({
   role: z.enum(['admin', 'manager', 'worker']).optional(),
   password: z.string().min(6).optional(),
   disabled: z.boolean().optional(),
+  position: z.string().optional(),
+  phone: z.string().optional(),
+  companyName: z.string().optional(),
+  avatarUrl: z.string().optional(),
 });

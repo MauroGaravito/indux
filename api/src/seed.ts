@@ -8,15 +8,24 @@ import { Assignment } from './models/Assignment.js';
 export async function seedAll() {
   // Users
   const users = [
-    { email: 'admin@indux.local', name: 'Admin', role: 'admin' as const, password: 'admin123' },
-    { email: 'manager@indux.local', name: 'Manager', role: 'manager' as const, password: 'manager123' },
-    { email: 'worker@indux.local', name: 'Worker', role: 'worker' as const, password: 'worker123' },
+    { email: 'admin@indux.local', name: 'Admin', role: 'admin' as const, password: 'admin123', position: 'Administrator', phone: '+1-555-0001', companyName: 'Indux HQ', avatarUrl: '' },
+    { email: 'manager@indux.local', name: 'Manager', role: 'manager' as const, password: 'manager123', position: 'Site Manager', phone: '+1-555-0002', companyName: 'Indux HQ', avatarUrl: '' },
+    { email: 'worker@indux.local', name: 'Worker', role: 'worker' as const, password: 'worker123', position: 'Electrician', phone: '+1-555-0003', companyName: 'Subcontractor LLC', avatarUrl: '' },
   ];
   for (const u of users) {
     const exists = await User.findOne({ email: u.email });
     if (!exists) {
       const passwordHash = await bcrypt.hash(u.password, 10);
-      await User.create({ email: u.email, name: u.name, role: u.role, password: passwordHash });
+      await User.create({
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        password: passwordHash,
+        position: u.position,
+        phone: u.phone,
+        companyName: u.companyName,
+        avatarUrl: u.avatarUrl,
+      });
       console.log('Seeded user', u.email);
     }
   }

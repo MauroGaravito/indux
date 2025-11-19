@@ -4,7 +4,16 @@ import api from '../../utils/api.js'
 
 export default function Users() {
   const [rows, setRows] = useState([])
-  const [newUser, setNewUser] = useState({ email: '', name: '', role: 'worker', password: '' })
+  const [newUser, setNewUser] = useState({
+    email: '',
+    name: '',
+    role: 'worker',
+    password: '',
+    position: '',
+    phone: '',
+    companyName: '',
+    avatarUrl: '',
+  })
   const load = async () => { const r = await api.get('/users'); setRows(r.data || []) }
   useEffect(()=> { load() }, [])
 
@@ -12,7 +21,16 @@ export default function Users() {
     // Permitir creación sin password: el backend generará una temporal si falta
     if (!newUser.email || !newUser.name) return
     await api.post('/users', newUser)
-    setNewUser({ email: '', name: '', role: 'worker', password: '' })
+    setNewUser({
+      email: '',
+      name: '',
+      role: 'worker',
+      password: '',
+      position: '',
+      phone: '',
+      companyName: '',
+      avatarUrl: '',
+    })
     await load()
   }
   const toggle = async (u) => {
@@ -67,6 +85,10 @@ export default function Users() {
             <MenuItem value="worker">Worker</MenuItem>
           </TextField>
           <TextField size="small" label="Password" type="password" value={newUser.password} onChange={e=> setNewUser({ ...newUser, password: e.target.value })} />
+          <TextField size="small" label="Position" value={newUser.position} onChange={e=> setNewUser({ ...newUser, position: e.target.value })} />
+          <TextField size="small" label="Phone" value={newUser.phone} onChange={e=> setNewUser({ ...newUser, phone: e.target.value })} />
+          <TextField size="small" label="Company Name" value={newUser.companyName} onChange={e=> setNewUser({ ...newUser, companyName: e.target.value })} />
+          <TextField size="small" label="Avatar URL" value={newUser.avatarUrl} onChange={e=> setNewUser({ ...newUser, avatarUrl: e.target.value })} />
           <Button variant="contained" onClick={add}>Create</Button>
         </Stack>
       </CardContent>
