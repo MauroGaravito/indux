@@ -30,11 +30,12 @@ router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
 
   try {
     const { email, name, role, password, position, phone, companyName, avatarUrl } = parsed.data;
+    const safePassword = password || generateRandomPassword(8);
     const exists = await User.findOne({ email });
     if (exists) return res.status(409).json({ error: 'Email already exists' });
 
     // Store the bcrypt hash in the 'password' field (used by login)
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(safePassword, 10);
     const user = await User.create({ email, name, role, password: passwordHash, position, phone, companyName, avatarUrl });
 
     const payload: any = {
@@ -70,6 +71,7 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
       // Persist the hash in 'password' (used by login)
       patch.password = await bcrypt.hash(patch.password, 10);
     }
+    if (patch.password === undefined) delete patch.password;
     const updated = await User.findByIdAndUpdate(req.params.id, patch, { new: true }).select('-password');
     if (!updated) return res.status(404).json({ error: 'User not found' });
     res.json(updated);
