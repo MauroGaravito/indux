@@ -31,6 +31,13 @@ import { uploadFile, presignGet } from '../utils/upload.js'
 import AsyncButton from '../components/AsyncButton.jsx'
 
 const stepsLabels = ['Project', 'Personal', 'Slides', 'Test', 'Sign', 'Submit']
+const createSubmissionGate = (overrides = {}) => ({
+  status: null,
+  blocked: false,
+  message: '',
+  severity: 'info',
+  ...overrides
+})
 
 function DynamicField({ field, value, onChange }) {
   const [progress, setProgress] = useState(null)
@@ -125,6 +132,7 @@ export default function InductionWizard() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [projectBlocked, setProjectBlocked] = useState(false)
   const [projectBlockedMessage, setProjectBlockedMessage] = useState('')
+  const [submissionGate, setSubmissionGate] = useState(createSubmissionGate())
   const moduleApproved = module?.reviewStatus === 'approved'
 
   useEffect(() => {
@@ -142,6 +150,58 @@ export default function InductionWizard() {
     [quizQuestions, answers]
   )
 
+  const checkSubmissionStatus = async (moduleId) => {
+    if (!moduleId) {
+      setSubmissionGate(createSubmissionGate())
+      return
+    }
+    try {
+      const { data } = await api.get(`/modules/${moduleId}/submissions/my`)
+      const status = data?.submission?.status || null
+      if (!status) {
+        setSubmissionGate(createSubmissionGate())
+        return
+      }
+      if (status === 'approved') {
+        setSubmissionGate(
+          createSubmissionGate({
+            status,
+            blocked: true,
+            severity: 'success',
+            message: 'You already have an approved submission for this module. No further action is required.'
+          })
+        )
+        return
+      }
+      if (status === 'pending') {
+        setSubmissionGate(
+          createSubmissionGate({
+            status,
+            blocked: true,
+            severity: 'info',
+            message: 'You already submitted this induction and it is pending review. Please wait for approval.'
+          })
+        )
+        return
+      }
+      if (status === 'declined') {
+        const reason = data?.submission?.reviewReason
+        setSubmissionGate(
+          createSubmissionGate({
+            status,
+            blocked: false,
+            severity: 'warning',
+            message: `Your previous submission was declined.${reason ? ` Reason: ${reason}` : ''} You may submit again.`
+          })
+        )
+        return
+      }
+      setSubmissionGate(createSubmissionGate())
+    } catch {
+      setSubmissionGate(createSubmissionGate())
+    }
+  }
+
   const selectProject = async (id) => {
     const p = projects.find((x) => x._id === id)
     setProject(p || null)
@@ -157,6 +217,7 @@ export default function InductionWizard() {
     setPassed(null)
     setSignature(null)
     setStatus('idle')
+    setSubmissionGate(createSubmissionGate())
     if (!id) return
     if (p?.status === 'archived') {
       setProjectBlocked(true)
@@ -168,6 +229,9 @@ export default function InductionWizard() {
       setModule(r.data.module)
       setFields(r.data.fields || [])
       setModuleConfig(r.data.module?.config || { slides: [], quiz: { questions: [] }, settings: { passMark: 80, randomizeQuestions: false, allowRetry: true } })
+      if (r.data.module?._id) {
+        await checkSubmissionStatus(r.data.module._id)
+      }
     } catch {
       setModule(null)
     }
@@ -261,7 +325,7 @@ export default function InductionWizard() {
             ))}
           </TextField>
           <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-            <Button variant="contained" onClick={nextStep} disabled={!project || !module || !moduleApproved || projectBlocked}>
+            <Button variant="contained" onClick={nextStep} disabled={!project || !module || !moduleApproved || projectBlocked || submissionGate.blocked}>
               Continue
             </Button>
           </Stack>
@@ -273,6 +337,11 @@ export default function InductionWizard() {
           {module && !moduleApproved && (
             <Alert severity="warning" sx={{ mt: 2 }}>
               This module is not approved yet. Please wait for approval before starting the induction.
+            </Alert>
+          )}
+          {submissionGate.message && (
+            <Alert severity={submissionGate.severity} sx={{ mt: 2 }}>
+              {submissionGate.message}
             </Alert>
           )}
         </Paper>

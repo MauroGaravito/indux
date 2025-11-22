@@ -58,6 +58,19 @@ router.post('/modules/:moduleId/submissions', requireAuth, requireRole('worker')
   res.status(201).json(sub);
 });
 
+router.get('/modules/:moduleId/submissions/my', requireAuth, requireRole('worker'), async (req, res) => {
+  const moduleId = req.params.moduleId;
+  if (!Types.ObjectId.isValid(moduleId)) return res.status(400).json({ error: 'Invalid module id' });
+  const mod = await InductionModule.findById(moduleId);
+  if (!mod) return res.status(404).json({ error: 'Module not found' });
+  const assigned = await Assignment.findOne({ user: req.user!.sub, project: mod.projectId, role: 'worker' });
+  if (!assigned) return res.status(403).json({ error: 'Not assigned to project' });
+  const submission = await Submission.findOne({ moduleId, userId: req.user!.sub }).sort({ createdAt: -1 });
+  if (!submission) return res.json({ submission: null });
+  const { _id, status, updatedAt, reviewReason } = submission;
+  res.json({ submission: { _id, status, updatedAt, reviewReason } });
+});
+
 router.get('/modules/:moduleId/submissions', requireAuth, requireRole('manager', 'admin'), async (req, res) => {
   const moduleId = req.params.moduleId;
   if (!Types.ObjectId.isValid(moduleId)) return res.status(400).json({ error: 'Invalid module id' });
