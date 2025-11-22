@@ -93,7 +93,7 @@ router.get('/workers/me/submissions', requireAuth, requireRole('worker'), async 
   const subs = await Submission.find({ userId: req.user!.sub, projectId: { $in: projectIds } })
     .sort({ createdAt: -1 })
     .populate('projectId', 'name address')
-    .select('moduleId status certificateKey createdAt updatedAt projectId')
+    .select('moduleId status certificateKey createdAt updatedAt projectId reviewReason')
     .lean();
 
   const submissions = subs.map((s) => ({
@@ -103,6 +103,8 @@ router.get('/workers/me/submissions', requireAuth, requireRole('worker'), async 
     certificateKey: s.certificateKey,
     createdAt: s.createdAt,
     updatedAt: s.updatedAt,
+    reviewReason: s.reviewReason,
+    projectId: s.projectId ? (s.projectId as any)._id : null,
     project: s.projectId
       ? {
           id: (s.projectId as any)._id,

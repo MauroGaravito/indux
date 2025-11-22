@@ -99,7 +99,7 @@ router.get('/user/:id', requireAuth, requireRole('admin', 'manager', 'worker'), 
 });
 
 // GET /assignments/project/:id → list project’s users
-router.get('/project/:id', requireAuth, requireRole('admin', 'manager'), async (req, res) => {
+router.get('/project/:id', requireAuth, requireRole('admin', 'manager', 'worker'), async (req, res) => {
   const projectId = req.params.id;
   if (!Types.ObjectId.isValid(projectId)) return res.status(400).json({ error: 'Invalid project id' });
   try {
@@ -110,6 +110,13 @@ router.get('/project/:id', requireAuth, requireRole('admin', 'manager'), async (
         role: 'manager',
       });
       if (!allowed) return res.status(403).json({ error: 'Manager not assigned to this project' });
+    } else if (req.user!.role === 'worker') {
+      const assigned = await Assignment.exists({
+        user: req.user!.sub,
+        project: projectId,
+        role: 'worker',
+      });
+      if (!assigned) return res.status(403).json({ error: 'Worker not assigned to this project' });
     }
     const list = await Assignment.find({ project: projectId })
       .populate([{ path: 'user', select: '-password' }, { path: 'project' }])
