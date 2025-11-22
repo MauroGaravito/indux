@@ -221,11 +221,11 @@ export default function InductionWizard() {
     }
   }
 
-  const openViewer = async () => {
+  const openViewer = () => {
     const firstSlide = moduleConfig?.slides?.[0]
     if (!firstSlide?.fileKey) return
-    const { url } = await presignGet(firstSlide.fileKey)
-    window.open(url, '_blank', 'noopener,noreferrer')
+    const viewerUrl = `/slides-viewer?key=${encodeURIComponent(firstSlide.fileKey)}`
+    window.open(viewerUrl, '_blank')
   }
 
   if (!user) return <Alert severity="info">Please log in as a worker to complete induction.</Alert>

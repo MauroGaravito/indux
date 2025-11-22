@@ -19,7 +19,7 @@ Indux is a single-tenant safety induction platform built around a clean separati
 /api        -> Express API (Project + module architecture)
 /frontend   -> React app (Vite)
 /docs       -> Architecture notes
-docker-compose.yml -> API + Frontend + Mongo + MinIO + Caddy
+docker-compose.yml -> API + Frontend + Mongo + MinIO (expects external Caddy)
 ```
 
 ---
@@ -80,18 +80,36 @@ Assignments remain project-scoped (`role: 'manager' | 'worker'`) and gate every 
 
 ## Running the Platform Locally
 
+### 1. Prepare env + Docker resources
+
+The compose stack reads everything from the root `.env`, so copy the single template and adjust the values (JWT secrets, SMTP, MinIO credentials, etc.).
+
 ```bash
-# 1. Copy env templates
-cp api/.env.example api/.env
-cp frontend/.env.example frontend/.env
-
-# 2. Start everything
-docker-compose up --build
-
-# 3. URLs
-# Frontend: http://localhost:5173
-# API:      http://localhost:8080
+cp .env.example .env
 ```
+
+`docker-compose.yml` references external volumes and a pre-existing shared network that Caddy (or any other reverse proxy) also joins. Create them once:
+
+```bash
+docker network create shared_caddy_net
+docker volume create indux_mongo_data
+docker volume create indux_minio_data
+```
+
+> If you prefer Docker-managed (non-external) volumes/networks, update `docker-compose.yml` accordingly.
+
+### 2. Start the stack
+
+```bash
+docker-compose up --build
+```
+
+The API and frontend containers only `expose` their internal ports because the expectation is that Caddy (running outside this compose file) terminates TLS and publishes ports 80/443. Make sure your Caddy instance is attached to `shared_caddy_net` and proxies traffic to:
+
+- `api`: `http://indux-api:8080`
+- `frontend`: `http://indux-frontend`
+
+For quick local tinkering without Caddy, bind ports directly in `docker-compose.yml` (e.g., add `ports: - "8080:8080"` on the API service and `ports: - "5173:80"` on the frontend).
 
 ---
 
@@ -143,7 +161,7 @@ Assignment (user ↔ project, role manager|worker)
 ## Deployment Notes
 
 - `.env` files declare Mongo/MinIO connection strings, JWT secrets, SMTP, and CORS origins.
-- Docker Compose services: Mongo, MinIO, API, Frontend, Caddy (reverse proxy). Caddy strips `/api` before proxying to the backend.
+- Docker Compose services: Mongo, MinIO, API, Frontend. Reverse proxy (Caddy/Dokploy) runs separately, joins `shared_caddy_net`, and strips `/api` before proxying to the backend.
 - Certificates are rendered via `api/src/services/pdf.ts` and uploaded to MinIO.
 - Liveness check: `GET /health`.
 
