@@ -23,6 +23,7 @@ import ManagerProjectDetail from './pages/manager/ManagerProjectDetail.jsx'
 import ManagerModuleEditor from './pages/manager/ManagerModuleEditor.jsx'
 import ManagerTeam from './pages/manager/ManagerTeam.jsx'
 import WorkerDashboard from './pages/worker/WorkerDashboard.jsx'
+import WorkerHistory from './pages/worker/WorkerHistory.jsx'
 import { useAuthStore } from './store/auth.js'
 
 function Nav({ brand }) {
@@ -99,6 +100,7 @@ function App({ brand }) {
           <Route path="/worker" element={<WorkerGuard><DashboardLayout /></WorkerGuard>}>
             <Route index element={<Navigate to="/worker/dashboard" replace />} />
             <Route path="dashboard" element={<WorkerDashboard />} />
+            <Route path="history" element={<WorkerHistory />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -55,6 +55,7 @@ export default function DashboardLayout({ children }) {
       : [
           { label: 'Dashboard', to: '/worker/dashboard', icon: <DashboardIcon /> },
           { label: 'Wizard', to: '/wizard', icon: <ChecklistIcon /> },
+          { label: 'History & Certificates', to: '/worker/history', icon: <MenuBookIcon /> },
         ];
 
   // Fallback title
