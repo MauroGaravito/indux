@@ -85,6 +85,36 @@ router.get('/modules/:moduleId/submissions', requireAuth, requireRole('manager',
   res.json(list);
 });
 
+router.get('/workers/me/submissions', requireAuth, requireRole('worker'), async (req, res) => {
+  const assignments = await Assignment.find({ user: req.user!.sub, role: 'worker' }).select('project').lean();
+  const projectIds = assignments.map((a) => a.project).filter(Boolean);
+  if (!projectIds.length) return res.json({ submissions: [] });
+
+  const subs = await Submission.find({ userId: req.user!.sub, projectId: { $in: projectIds } })
+    .sort({ createdAt: -1 })
+    .populate('projectId', 'name address')
+    .select('moduleId status certificateKey createdAt updatedAt projectId')
+    .lean();
+
+  const submissions = subs.map((s) => ({
+    id: s._id,
+    moduleId: s.moduleId,
+    status: s.status,
+    certificateKey: s.certificateKey,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+    project: s.projectId
+      ? {
+          id: (s.projectId as any)._id,
+          name: (s.projectId as any).name,
+          address: (s.projectId as any).address || ''
+        }
+      : null
+  }));
+
+  res.json({ submissions });
+});
+
 router.post('/submissions/:id/approve', requireAuth, requireRole('manager', 'admin'), async (req, res) => {
   const sub = await Submission.findById(req.params.id);
   if (!sub) return res.status(404).json({ error: 'Not found' });

@@ -123,6 +123,7 @@ For quick local tinkering without Caddy, bind ports directly in `docker-compose.
 - **Fields**: `GET /modules/:moduleId/fields`, `POST /modules/:moduleId/fields`, `PUT /module-fields/:id`, `DELETE /module-fields/:id`
 - **Reviews**: `POST /modules/:moduleId/reviews`, `GET /modules/:moduleId/reviews`, `POST /modules/:moduleId/reviews/:reviewId/approve|decline`
 - **Submissions**: `POST /modules/:moduleId/submissions`, `GET /modules/:moduleId/submissions`, `POST /submissions/:id/approve|decline`
+- **Worker submission status**: `GET /modules/:moduleId/submissions/my` (checks latest submission for the authenticated worker to block duplicate attempts)
 - **Assignments**: `POST /assignments`, `GET /assignments/user/:id`, `GET /assignments/project/:id`, `DELETE /assignments/:id`, `GET /assignments/manager/:id/team`
 - **Auth/Uploads/Users/Brand Config**: standard CRUD as defined in `api/src/routes`.
 
@@ -243,8 +244,9 @@ npm run seed
 ## Worker Flow (Induction Wizard)
 
 1. Worker opens `/induction/:projectId` and fetches module data + fields.  
-2. Completes dynamic steps (personal data, uploads, slides, quiz, signature).  
-3. Wizard submits to `/modules/:moduleId/submissions`.  
+2. Wizard immediately checks `/modules/:moduleId/submissions/my` to see if the worker already has a submission (blocks if `approved`/`pending`, allows retry if `declined`).  
+3. Completes dynamic steps (personal data, uploads, slides, quiz, signature).  
+4. Wizard submits to `/modules/:moduleId/submissions`.  
 4. Managers/admins review submission; once approved, certificate PDF is stored in MinIO and shown to worker.
 
 Requirements: worker assignment exists and module `reviewStatus === 'approved'`.
