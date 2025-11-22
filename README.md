@@ -124,6 +124,7 @@ For quick local tinkering without Caddy, bind ports directly in `docker-compose.
 - **Reviews**: `POST /modules/:moduleId/reviews`, `GET /modules/:moduleId/reviews`, `POST /modules/:moduleId/reviews/:reviewId/approve|decline`
 - **Submissions**: `POST /modules/:moduleId/submissions`, `GET /modules/:moduleId/submissions`, `POST /submissions/:id/approve|decline`
 - **Worker submission status**: `GET /modules/:moduleId/submissions/my` (checks latest submission for the authenticated worker to block duplicate attempts)
+- **Worker submission history**: `GET /workers/me/submissions` (lists the worker's submissions across assigned projects, incl. certificates and review reasons)
 - **Assignments**: `POST /assignments`, `GET /assignments/user/:id`, `GET /assignments/project/:id`, `DELETE /assignments/:id`, `GET /assignments/manager/:id/team`
 - **Auth/Uploads/Users/Brand Config**: standard CRUD as defined in `api/src/routes`.
 
@@ -247,7 +248,7 @@ npm run seed
 2. Wizard immediately checks `/modules/:moduleId/submissions/my` to see if the worker already has a submission (blocks if `approved`/`pending`, allows retry if `declined`).  
 3. Completes dynamic steps (personal data, uploads, slides, quiz, signature).  
 4. Wizard submits to `/modules/:moduleId/submissions`.  
-4. Managers/admins review submission; once approved, certificate PDF is stored in MinIO and shown to worker.
+5. Managers/admins review submission; once approved, certificate PDF is stored in MinIO and shown to worker. Workers can see their history/certificates via `/workers/me/submissions` (rendered in `frontend/src/pages/worker/WorkerHistory.jsx`) and the Worker Dashboard surfaces per-project status + manager info.
 
 Requirements: worker assignment exists and module `reviewStatus === 'approved'`.
 
