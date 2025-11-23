@@ -4,6 +4,16 @@ Indux is a single-tenant safety induction platform built around a clean separati
 
 ---
 
+## 2025-11-23 – Authorization & Workflow Updates
+
+- Managers can only approve/decline induction modules or submissions for projects where they hold an assignment; admins remain unrestricted.
+- Download endpoints (`POST /uploads/presign-get`, `GET /uploads/stream`) now verify project ownership so only admins, assigned managers or authorized workers can access stored files (slides, thumbnails, certificates, worker uploads).
+- Assigned managers may submit modules for review and continue editing while modules are in `draft`, `declined`, or `pending`; approved modules stay read-only for managers.
+- Worker submissions in `pending` state are updated in-place instead of deleted/recreated, preventing data loss during retries.
+- Access to `GET /projects/:projectId/modules/induction` now requires a matching assignment (manager or worker) unless the caller is an admin.
+
+---
+
 ## Stack Overview
 
 | Layer       | Technology / Notes                                                                 |
