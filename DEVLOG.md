@@ -16,3 +16,9 @@
 3. Delivered a full workflow and security assessment covering admin-manager-worker pipelines, module lifecycle, assignment logic, API structure, and frontend alignment.
 4. Prepared for the “full user-to-certificate pipeline” session by confirming every stage from project creation to certificate download is documented and validated.
 5. Agreed that DEVLOG now serves as the single source of truth for daily platform updates and documentation alignment.
+
+## 24 November 2025
+
+1. Fixed the worker Slides Viewer so it now passes the file name and extension to `/slides-viewer`, allowing PDF decks to render via pdf.js just like admin/manager views.
+2. Rewrote `README.md` to present a concise, Australian-English overview of the workflow, roles, lifecycle, security, APIs, frontend experience, tech stack, and roadmap.
+3. Rebuilt `architecture.md` with the full technical reference (models, endpoints, workflows, uploads, security, Docker, troubleshooting, and seed data) to keep documentation aligned with current behaviour.
