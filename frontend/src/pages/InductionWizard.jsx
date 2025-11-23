@@ -288,8 +288,11 @@ export default function InductionWizard() {
   const openViewer = () => {
     const firstSlide = moduleConfig?.slides?.[0]
     if (!firstSlide?.fileKey) return
-    const viewerUrl = `/slides-viewer?key=${encodeURIComponent(firstSlide.fileKey)}`
-    window.open(viewerUrl, '_blank')
+    const baseName = firstSlide?.title || firstSlide?.fileKey || 'slides'
+    const ext = (baseName.split('.').pop() || '').toLowerCase()
+    const params = new URLSearchParams({ key: firstSlide.fileKey, name: baseName, ext })
+    const viewerUrl = `/slides-viewer?${params.toString()}`
+    window.open(viewerUrl, '_blank', 'noopener,noreferrer')
   }
 
   if (!user) return <Alert severity="info">Please sign in as a worker to complete your induction.</Alert>
