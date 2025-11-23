@@ -82,7 +82,7 @@ router.put('/modules/:moduleId', requireAuth, requireRole('admin', 'manager'), a
   if (req.user!.role === 'manager') {
     const assignment = await Assignment.findOne({ user: req.user!.sub, project: mod.projectId, role: 'manager' });
     if (!assignment) return res.status(403).json({ error: 'Forbidden' });
-    if (!['draft', 'declined'].includes(mod.reviewStatus || 'draft')) {
+    if (!['draft', 'declined', 'pending'].includes(mod.reviewStatus || 'draft')) {
       return res.status(403).json({ error: 'Forbidden' });
     }
   }
