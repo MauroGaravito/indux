@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { Project } from '../models/Project.js';
 import { InductionModule } from '../models/InductionModule.js';
 import { InductionModuleField } from '../models/InductionModuleField.js';
+import { Assignment } from '../models/Assignment.js';
 import {
   InductionModuleCreateSchema,
   InductionModuleUpdateDraftSchema,
@@ -78,6 +79,13 @@ router.put('/modules/:moduleId', requireAuth, requireRole('admin', 'manager'), a
 
   const mod = await InductionModule.findById(moduleId);
   if (!mod) return res.status(404).json({ error: 'Not found' });
+  if (req.user!.role === 'manager') {
+    const assignment = await Assignment.findOne({ user: req.user!.sub, project: mod.projectId, role: 'manager' });
+    if (!assignment) return res.status(403).json({ error: 'Forbidden' });
+    if (!['draft', 'declined'].includes(mod.reviewStatus || 'draft')) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+  }
 
   if (body?.config) mod.config = body.config as any;
   if (body?.reviewStatus) mod.reviewStatus = body.reviewStatus;
