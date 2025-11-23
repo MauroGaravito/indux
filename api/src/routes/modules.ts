@@ -65,6 +65,12 @@ router.get('/projects/:projectId/modules/induction', requireAuth, async (req, re
   if (!Types.ObjectId.isValid(projectId)) return res.status(400).json({ error: 'Invalid project id' });
   const module = await InductionModule.findOne({ projectId, type: 'induction' }).lean();
   if (!module) return res.status(404).json({ error: 'Module not found' });
+  if (req.user?.role !== 'admin') {
+    const role = req.user?.role === 'manager' ? 'manager' : req.user?.role === 'worker' ? 'worker' : null;
+    if (!role) return res.status(403).json({ error: 'Forbidden' });
+    const assignment = await Assignment.findOne({ user: req.user!.sub, project: projectId, role });
+    if (!assignment) return res.status(403).json({ error: 'Forbidden' });
+  }
   const fields = await InductionModuleField.find({ moduleId: module._id }).sort({ order: 1, createdAt: 1 }).lean();
   res.json({ module, fields });
 });
