@@ -124,6 +124,10 @@ router.post('/submissions/:id/approve', requireAuth, requireRole('manager', 'adm
   const project = await Project.findById(sub.projectId);
   const mod = await InductionModule.findById(sub.moduleId);
   if (!user || !project || !mod) return res.status(400).json({ error: 'Invalid submission context' });
+  if (req.user!.role === 'manager') {
+    const assignment = await Assignment.findOne({ user: req.user!.sub, project: project._id, role: 'manager' });
+    if (!assignment) return res.status(403).json({ error: 'Not assigned to project' });
+  }
 
   await ensureBucket();
   const certKey = `certs/${project._id}/${mod._id}/${uuidv4()}.pdf`;
@@ -140,6 +144,10 @@ router.post('/submissions/:id/approve', requireAuth, requireRole('manager', 'adm
 router.post('/submissions/:id/decline', requireAuth, requireRole('manager', 'admin'), async (req, res) => {
   const sub = await Submission.findById(req.params.id);
   if (!sub) return res.status(404).json({ error: 'Not found' });
+  if (req.user!.role === 'manager') {
+    const assignment = await Assignment.findOne({ user: req.user!.sub, project: sub.projectId, role: 'manager' });
+    if (!assignment) return res.status(403).json({ error: 'Not assigned to project' });
+  }
   sub.status = 'declined';
   sub.reviewReason = (req.body && req.body.reason) || 'Not specified';
   sub.reviewedBy = req.user!.sub as any;

@@ -5,6 +5,7 @@ import { ModuleReview } from '../models/ModuleReview.js';
 import { InductionModule } from '../models/InductionModule.js';
 import { InductionModuleField } from '../models/InductionModuleField.js';
 import { InductionModuleConfigStrictSchema, ModuleFieldStrictSchema } from '../utils/validators.js';
+import { Assignment } from '../models/Assignment.js';
 
 const router = Router();
 
@@ -76,6 +77,10 @@ router.post('/modules/:moduleId/reviews/:reviewId/approve', requireAuth, require
   const review = await ModuleReview.findById(reviewId);
   if (!review) return res.status(404).json({ error: 'Not found' });
   if (String(review.moduleId) !== moduleId) return res.status(400).json({ error: 'Review does not belong to module' });
+  if (req.user!.role === 'manager') {
+    const assignment = await Assignment.findOne({ user: req.user!.sub, project: review.projectId, role: 'manager' });
+    if (!assignment) return res.status(403).json({ error: 'Not assigned to project' });
+  }
 
   review.status = 'approved';
   review.reviewedBy = req.user!.sub as any;
@@ -94,6 +99,10 @@ router.post('/modules/:moduleId/reviews/:reviewId/decline', requireAuth, require
   const review = await ModuleReview.findById(reviewId);
   if (!review) return res.status(404).json({ error: 'Not found' });
   if (String(review.moduleId) !== moduleId) return res.status(400).json({ error: 'Review does not belong to module' });
+  if (req.user!.role === 'manager') {
+    const assignment = await Assignment.findOne({ user: req.user!.sub, project: review.projectId, role: 'manager' });
+    if (!assignment) return res.status(403).json({ error: 'Not assigned to project' });
+  }
 
   review.status = 'declined';
   review.reason = (req.body && req.body.reason) || 'Not specified';
