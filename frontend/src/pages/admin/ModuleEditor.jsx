@@ -332,7 +332,7 @@ export default function ModuleEditor({ mode = 'admin' }) {
               <Button startIcon={<ArrowBackIcon />} component={RouterLink} to="/admin/projects">
                 Back to Projects
               </Button>
-              <Typography variant="h6">Module not found</Typography>
+              <Typography variant="h6">Induction module not found</Typography>
             </Stack>
             <Alert severity="warning">No induction module exists for this project. Create one from the Projects page.</Alert>
           </Stack>
@@ -362,7 +362,7 @@ export default function ModuleEditor({ mode = 'admin' }) {
           <Chip label={`Status: ${moduleStatus}`} size="small" color={moduleStatus === 'pending' ? 'warning' : moduleStatus === 'approved' ? 'success' : moduleStatus === 'declined' ? 'error' : 'default'} />
           {isReadOnly && (
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              Updates are disabled for pending/approved modules.
+              Updates are disabled while the module is approved.
             </Typography>
           )}
         </Box>
@@ -375,30 +375,30 @@ export default function ModuleEditor({ mode = 'admin' }) {
             </Alert>
           )}
           <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-            <Button startIcon={<ArrowBackIcon />} component={RouterLink} to={mode === 'manager' ? '/manager/projects' : '/admin/projects'}>Back</Button>
-            <Typography variant="h6">Induction Module</Typography>
-            <Chip label={`Project: ${projectName || projectId}`} />
+            <Button startIcon={<ArrowBackIcon />} component={RouterLink} to={mode === 'manager' ? '/manager/projects' : '/admin/projects'}>Back to projects</Button>
+          <Typography variant="h6">Induction module configuration</Typography>
+          <Chip label={`Project: ${projectName || projectId}`} />
             <Chip label={`Status: ${moduleStatus}`} color={moduleStatus === 'approved' ? 'success' : moduleStatus === 'pending' ? 'warning' : 'default'} />
             {isReadOnly && <Chip label="Read-only" color="info" />}
             <Box sx={{ flex: 1 }} />
             {showActions && (
               <>
-                <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveModule}>Save</AsyncButton>
-                <AsyncButton startIcon={<SendIcon />} variant="contained" color="secondary" onClick={sendForReview}>Send For Review</AsyncButton>
+                <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveModule}>Save changes</AsyncButton>
+                <AsyncButton startIcon={<SendIcon />} variant="contained" color="secondary" onClick={sendForReview}>Send module for review</AsyncButton>
               </>
             )}
           </Stack>
           {isManagerMode && !isManagerOfProject && (
-            <Alert severity="warning" sx={{ mb: 2 }}>You are not assigned as manager to this project. Module is read-only.</Alert>
+            <Alert severity="warning" sx={{ mb: 2 }}>You must be an assigned manager for this project. Module access is read-only.</Alert>
           )}
 
           <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: '1px solid #eee' }}>
-            <Tab label="Fields" />
-            <Tab label="Slides" />
-            <Tab label="Quiz" />
-            <Tab label="Settings" />
-            <Tab label="Review" />
-            <Tab label="Assignments" />
+            <Tab label="Personal data fields" />
+            <Tab label="Slides & documents" />
+            <Tab label="Quiz & questions" />
+            <Tab label="Module settings" />
+            <Tab label="Review history" />
+            <Tab label="Project managers" />
           </Tabs>
 
           <Box sx={{ mt: 2 }} hidden={tab !== 0}>

@@ -11,7 +11,7 @@ import { presignGet } from '../utils/upload.js'
 export default function SlidesViewer() {
   const params = new URLSearchParams(location.search)
   const key = params.get('key') || ''
-  const name = params.get('name') || 'slides'
+  const name = params.get('name') || 'Induction Slides'
   const extParam = (params.get('ext') || '').toLowerCase()
   const [url, setUrl] = React.useState('')
   const [error, setError] = React.useState('')
@@ -20,7 +20,7 @@ export default function SlidesViewer() {
   React.useEffect(() => {
     let cancelled = false
     async function load() {
-      try { const { url } = await presignGet(key); if (!cancelled) setUrl(url) } catch (e) { if (!cancelled) setError('Could not load file') }
+      try { const { url } = await presignGet(key); if (!cancelled) setUrl(url) } catch (e) { if (!cancelled) setError('Unable to load this file') }
     }
     if (key) load()
     return () => { cancelled = true }
@@ -44,9 +44,9 @@ export default function SlidesViewer() {
     <Stack spacing={2} sx={{ p: 2 }}>
       <Stack direction="row" alignItems="center" spacing={1}>
         <IconButton onClick={() => window.close()}><ArrowBackIcon /></IconButton>
-        <Typography variant="h6" sx={{ flexGrow: 1 }}>{name}</Typography>
+        <Typography variant="h6" sx={{ flexGrow: 1 }}>Induction slides - {name}</Typography>
         {url && (
-          <Button startIcon={<OpenInNewIcon />} onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>Open Original</Button>
+          <Button startIcon={<OpenInNewIcon />} onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>Open original file</Button>
         )}
       </Stack>
 
@@ -61,7 +61,7 @@ function OfficeViewer({ url }) {
   const src = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
   return (
     <Box sx={{ height: '80vh', borderRadius: 1, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}>
-      <iframe title="slides" src={src} style={{ border: 0, width: '100%', height: '100%' }} />
+      <iframe title="Induction slides" src={src} style={{ border: 0, width: '100%', height: '100%' }} />
     </Box>
   )
 }
@@ -130,7 +130,7 @@ function PdfPlayer({ url }) {
       </Paper>
       <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
         <IconButton onClick={prev} disabled={page<=1}><NavigateBeforeIcon /></IconButton>
-        <Typography variant="body2">{page} / {numPages}</Typography>
+        <Typography variant="body2">Page {page} of {numPages}</Typography>
         <IconButton onClick={next} disabled={page>=numPages}><NavigateNextIcon /></IconButton>
         <IconButton onClick={() => setPlaying(s => !s)}>{playing ? <PauseIcon /> : <PlayArrowIcon />}</IconButton>
       </Stack>

@@ -40,26 +40,26 @@ export default function DashboardLayout({ children }) {
 
   const items = role === 'admin'
     ? [
-        { label: 'Dashboard', to: '/admin', icon: <DashboardIcon /> },
-        { label: 'Projects', to: '/admin/projects', icon: <FolderIcon /> },
-        { label: 'Reviews', to: '/admin/reviews', icon: <RateReviewIcon /> },
-        { label: 'Users', to: '/admin/users', icon: <PeopleIcon /> },
-        { label: 'Settings', to: '/admin/settings', icon: <SettingsIcon /> },
+        { label: 'Admin Dashboard', to: '/admin', icon: <DashboardIcon /> },
+        { label: 'Project Register', to: '/admin/projects', icon: <FolderIcon /> },
+        { label: 'Module Reviews', to: '/admin/reviews', icon: <RateReviewIcon /> },
+        { label: 'User Directory', to: '/admin/users', icon: <PeopleIcon /> },
+        { label: 'Safety Settings', to: '/admin/settings', icon: <SettingsIcon /> },
       ]
     : role === 'manager'
       ? [
-          { label: 'Dashboard', to: '/manager', icon: <DashboardIcon /> },
-          { label: 'Projects', to: '/manager/projects', icon: <FolderIcon /> },
-          { label: 'Review', to: '/review', icon: <RateReviewIcon /> },
+          { label: 'Project Dashboard', to: '/manager', icon: <DashboardIcon /> },
+          { label: 'My Projects', to: '/manager/projects', icon: <FolderIcon /> },
+          { label: 'Pending Approvals', to: '/review', icon: <RateReviewIcon /> },
         ]
       : [
-          { label: 'Dashboard', to: '/worker/dashboard', icon: <DashboardIcon /> },
-          { label: 'Wizard', to: '/wizard', icon: <ChecklistIcon /> },
-          { label: 'History & Certificates', to: '/worker/history', icon: <MenuBookIcon /> },
+          { label: 'Worker Dashboard', to: '/worker/dashboard', icon: <DashboardIcon /> },
+          { label: 'Induction Wizard', to: '/wizard', icon: <ChecklistIcon /> },
+          { label: 'Induction History & Certificates', to: '/worker/history', icon: <MenuBookIcon /> },
         ];
 
   // Fallback title
-  const title = role === 'admin' ? 'Admin Console' : role === 'manager' ? 'Manager' : 'Worker';
+  const title = role === 'admin' ? 'Admin Operations' : role === 'manager' ? 'Manager Console' : 'Worker Portal';
 
   const DrawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -76,7 +76,7 @@ export default function DashboardLayout({ children }) {
       <Box sx={{ flexGrow: 1 }} />
       <Divider />
       <Box sx={{ p: 2 }}>
-        <Typography variant="caption" sx={{ opacity: 0.7 }}>© {new Date().getFullYear()} Indux</Typography>
+        <Typography variant="caption" sx={{ opacity: 0.7 }}>Indux Safety {new Date().getFullYear()}</Typography>
       </Box>
     </Box>
   );
@@ -91,7 +91,7 @@ export default function DashboardLayout({ children }) {
           </IconButton>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>{title}</Typography>
           <Typography sx={{ mr: 2 }}>{user?.name || user?.email}</Typography>
-          <Button color="inherit" onClick={() => { logout(); navigate('/login'); }}>Logout</Button>
+          <Button color="inherit" onClick={() => { logout(); navigate('/login'); }}>Sign out</Button>
         </Toolbar>
       </AppBar>
 

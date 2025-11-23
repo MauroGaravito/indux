@@ -35,7 +35,7 @@ export default function ManagerProjects() {
       )
       setModuleStatuses(statuses)
     } catch (e) {
-      setError(e?.response?.data?.error || 'Failed to load projects')
+      setError(e?.response?.data?.error || 'Unable to load assigned projects.')
       setAssignments([])
     } finally {
       setLoading(false)
@@ -50,7 +50,7 @@ export default function ManagerProjects() {
       const modId = r?.data?.module?._id
       if (modId) navigate(`/manager/projects/${projectId}/module/${modId}`)
     } catch (e) {
-      setError('Module not found for this project.')
+      setError('Induction module not found for this project.')
     }
   }
 
@@ -68,9 +68,9 @@ export default function ManagerProjects() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h5" sx={{ fontWeight: 700 }}>Projects</Typography>
+      <Typography variant="h5" sx={{ fontWeight: 700 }}>Assigned projects</Typography>
       {error && <Alert severity="error">{error}</Alert>}
-      {loading && <Alert severity="info">Loading projects...</Alert>}
+      {loading && <Alert severity="info">Loading assigned projects...</Alert>}
       <Grid container spacing={2}>
         {projects.map((p) => {
           const moduleStatus = moduleStatuses[p._id] || moduleStatuses[String(p._id)] || 'draft'
@@ -90,18 +90,18 @@ export default function ManagerProjects() {
                       </Typography>
                     )}
                     <Typography variant="body2" color="text.secondary">
-                      {p.description || 'No description provided.'}
+                      {p.description || 'No project description provided.'}
                     </Typography>
                     <Stack direction="row" alignItems="center" spacing={1}>
                       <Chip label={moduleChip.label} color={moduleChip.color} />
                       <Divider orientation="vertical" flexItem />
-                      <Chip label="Induction module" size="small" variant="outlined" />
+                      <Chip label="Induction module status" size="small" variant="outlined" />
                     </Stack>
                     <Box sx={{ flex: 1 }} />
                     <Stack direction="row" spacing={1} flexWrap="wrap">
-                      <Button size="small" variant="text" onClick={() => navigate(`/manager/projects/${p._id}`)}>Open Project</Button>
-                      <AsyncButton size="small" variant="contained" onClick={() => openModule(p._id)}>Open Module</AsyncButton>
-                      <Button size="small" variant="outlined" onClick={() => navigate(`/manager/projects/${p._id}/team`)}>Manage Team</Button>
+                      <Button size="small" variant="text" onClick={() => navigate(`/manager/projects/${p._id}`)}>Project overview</Button>
+                      <AsyncButton size="small" variant="contained" onClick={() => openModule(p._id)}>Edit induction module</AsyncButton>
+                      <Button size="small" variant="outlined" onClick={() => navigate(`/manager/projects/${p._id}/team`)}>Manage assigned workers</Button>
                     </Stack>
                   </Stack>
                 </CardContent>

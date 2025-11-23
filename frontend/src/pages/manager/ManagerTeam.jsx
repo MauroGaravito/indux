@@ -33,7 +33,7 @@ export default function ManagerTeam() {
       const r = await api.get(`/assignments/project/${projectId}`)
       setAssignments(r.data || [])
     } catch (e) {
-      setError(e?.response?.data?.error || 'Failed to load team')
+      setError(e?.response?.data?.error || 'Unable to load assigned workers.')
       setAssignments([])
     }
   }
@@ -69,7 +69,7 @@ export default function ManagerTeam() {
       setSelectedWorker(null)
       await loadAssignments()
     } catch (e) {
-      setError(e?.response?.data?.error || 'Failed to add worker')
+      setError(e?.response?.data?.error || 'Unable to add worker to this project.')
     } finally {
       setLoading(false)
     }
@@ -82,13 +82,13 @@ export default function ManagerTeam() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h5" sx={{ fontWeight: 700 }}>Team</Typography>
+      <Typography variant="h5" sx={{ fontWeight: 700 }}>Assigned workers</Typography>
       {error && <Alert severity="error">{error}</Alert>}
 
       <Card>
         <CardContent>
           <Stack spacing={2}>
-            <Typography variant="subtitle1">Current Workers</Typography>
+            <Typography variant="subtitle1">Assigned workers</Typography>
             <Grid container spacing={2}>
               {workers.map((w) => {
                 const userData = w.user || {}
@@ -118,13 +118,13 @@ export default function ManagerTeam() {
                           <Chip label={userData.position} size="small" sx={{ mt: 0.5 }} />
                         )}
                       </Box>
-                      <Button color="error" onClick={() => removeWorker(w._id)}>Remove</Button>
+                      <Button color="error" onClick={() => removeWorker(w._id)}>Remove worker</Button>
                     </Box>
                   </Grid>
                 )
               })}
             </Grid>
-            {!workers.length && <Alert severity="info">No workers assigned yet.</Alert>}
+            {!workers.length && <Alert severity="info">No workers assigned to this project yet.</Alert>}
           </Stack>
         </CardContent>
       </Card>
@@ -132,17 +132,17 @@ export default function ManagerTeam() {
       <Card>
         <CardContent>
           <Stack spacing={2}>
-            <Typography variant="subtitle1">Add Worker</Typography>
+            <Typography variant="subtitle1">Add worker to project</Typography>
             <Autocomplete
               options={availableWorkers}
               getOptionLabel={(option) => `${option.name} (${option.email})`}
               value={selectedWorker}
               onChange={(_, value) => setSelectedWorker(value)}
               noOptionsText="No available workers"
-              renderInput={(params) => <TextField {...params} label="Select Worker" helperText="Workers available across your teams" />}
+              renderInput={(params) => <TextField {...params} label="Select worker" helperText="Workers available across your teams" />}
               disableClearable
             />
-            <AsyncButton variant="contained" onClick={addWorker} disabled={!selectedWorker} loading={loading}>Add to Project</AsyncButton>
+            <AsyncButton variant="contained" onClick={addWorker} disabled={!selectedWorker} loading={loading}>Add to project</AsyncButton>
           </Stack>
         </CardContent>
       </Card>

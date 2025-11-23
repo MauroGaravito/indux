@@ -61,18 +61,18 @@ export default function AdminDashboard() {
 
   return (
     <Box>
-      <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>Overview</Typography>
+      <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>Admin dashboard overview</Typography>
       {loading && <LinearProgress sx={{ mb: 2 }} />}
       <Grid container spacing={2}>
         <Grid item xs={12} sm={6} md={3}><Stat label="Projects" value={loading ? '...' : String(stats.projects)} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><Stat label="Inductions Completed" value={loading ? '...' : String(stats.completed)} /></Grid>
-        <Grid item xs={12} sm={6} md={3}><Stat label="Pending Reviews" value={loading ? '...' : String(stats.pendingReviews)} /></Grid>
+        <Grid item xs={12} sm={6} md={3}><Stat label="Inductions completed" value={loading ? '...' : String(stats.completed)} /></Grid>
+        <Grid item xs={12} sm={6} md={3}><Stat label="Pending approvals" value={loading ? '...' : String(stats.pendingReviews)} /></Grid>
         <Grid item xs={12} sm={6} md={3}><Stat label="Users" value={loading ? '...' : String(stats.users)} /></Grid>
       </Grid>
       <Card elevation={0} sx={{ mt: 3, border: '1px solid #E5E7EB', borderRadius: 3 }}>
         <CardContent>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Activity</Typography>
-          <Typography variant="body2" sx={{ opacity: 0.8 }}>Charts and detailed metrics can be integrated here.</Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>Safety activity</Typography>
+          <Typography variant="body2" sx={{ opacity: 0.8 }}>Charts and detailed WHS metrics can be integrated here.</Typography>
         </CardContent>
       </Card>
     </Box>

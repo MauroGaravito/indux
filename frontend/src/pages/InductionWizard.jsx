@@ -292,12 +292,14 @@ export default function InductionWizard() {
     window.open(viewerUrl, '_blank')
   }
 
-  if (!user) return <Alert severity="info">Please log in as a worker to complete induction.</Alert>
+  if (!user) return <Alert severity="info">Please sign in as a worker to complete your induction.</Alert>
   if (user.role !== 'worker') return <Alert severity="warning">Switch to a worker account to submit an induction.</Alert>
+
+  const wizardTitle = project?.name ? `Induction wizard - ${project.name}` : 'Induction wizard'
 
   return (
     <Stack spacing={3}>
-      <Typography variant="h5">Induction Wizard</Typography>
+      <Typography variant="h5">{wizardTitle}</Typography>
       <Stepper activeStep={step} alternativeLabel>
         {stepsLabels.map((label) => (
           <Step key={label}>
@@ -308,7 +310,7 @@ export default function InductionWizard() {
 
       {step === 0 && (
         <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle1">Select Project</Typography>
+          <Typography variant="subtitle1">Select project</Typography>
           <TextField
             fullWidth
             select
@@ -326,7 +328,7 @@ export default function InductionWizard() {
           </TextField>
           <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
             <Button variant="contained" onClick={nextStep} disabled={!project || !module || !moduleApproved || projectBlocked || submissionGate.blocked}>
-              Continue
+              Next step
             </Button>
           </Stack>
           {projectBlocked && (

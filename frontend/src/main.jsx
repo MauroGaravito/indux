@@ -53,17 +53,17 @@ function Nav({ brand }) {
           <Typography variant="h6" sx={{ fontWeight: 700 }}>{brandName}</Typography>
         </Box>
         <Button color="inherit" component={Link} to="/">Home</Button>
-        <Button color="inherit" component={Link} to={dashboardPath}>Dashboard</Button>
+        <Button color="inherit" component={Link} to={dashboardPath}>My Dashboard</Button>
         {user?.role !== 'worker' && (
-          <Button color="inherit" component={Link} to="/review">Review</Button>
+          <Button color="inherit" component={Link} to="/review">Pending Approvals</Button>
         )}
         {user?.role === 'admin' && (
-          <Button color="inherit" component={Link} to="/admin">Admin</Button>
+          <Button color="inherit" component={Link} to="/admin">Admin Console</Button>
         )}
         {user ? (
-          <Button color="inherit" onClick={logout}>Logout</Button>
+          <Button color="inherit" onClick={logout}>Sign out</Button>
         ) : (
-          <Button color="inherit" component={Link} to="/login">Login</Button>
+          <Button color="inherit" component={Link} to="/login">Sign in</Button>
         )}
       </Toolbar>
     </AppBar>

@@ -94,8 +94,8 @@ export default function ReviewQueue() {
 
   useEffect(() => { if (user) loadAll() }, [user])
 
-  if (!user) return <Alert severity="info">Please log in as manager/admin.</Alert>
-  if (!['manager', 'admin'].includes(user.role)) return <Alert severity="warning">Managers/Admins only.</Alert>
+  if (!user) return <Alert severity="info">Please sign in as a manager or admin.</Alert>
+  if (!['manager', 'admin'].includes(user.role)) return <Alert severity="warning">Managers or admins only.</Alert>
 
   const openView = (mode, title, data) => {
     setViewMode(mode)
@@ -114,22 +114,22 @@ export default function ReviewQueue() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h5">Review Queue</Typography>
+      <Typography variant="h5">Pending Approvals</Typography>
       <Tabs value={tab} onChange={(_, v) => setTab(v)}>
-        <Tab label="Submissions" />
-        <Tab label="Module Reviews" />
+        <Tab label="Submission Reviews" />
+        <Tab label="Module Review Requests" />
       </Tabs>
 
       {tab === 0 && (
         <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle1" sx={{ mb: 1 }}>Pending Submissions</Typography>
+          <Typography variant="subtitle1" sx={{ mb: 1 }}>Pending submission reviews</Typography>
           <Table size="small">
             <TableHead>
               <TableRow>
                 <TableCell>Project</TableCell>
                 <TableCell>Worker</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell>Created</TableCell>
+                <TableCell>Submitted</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -142,22 +142,22 @@ export default function ReviewQueue() {
                   <TableCell>{new Date(s.createdAt || s._createdAt || Date.now()).toLocaleString()}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      <Button size="small" onClick={() => openView('submission', 'Submission', s)}>View</Button>
-                      <AsyncButton size="small" color="success" variant="contained" onClick={() => approveSubmission(s._id)}>Approve</AsyncButton>
-                      <Button size="small" color="error" onClick={() => openDecline('submission', s._id)}>Decline</Button>
+                      <Button size="small" onClick={() => openView('submission', 'Submission details', s)}>Open details</Button>
+                      <AsyncButton size="small" color="success" variant="contained" onClick={() => approveSubmission(s._id)}>Approve submission</AsyncButton>
+                      <Button size="small" color="error" onClick={() => openDecline('submission', s._id)}>Decline submission</Button>
                     </Stack>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-          {!submissions.length && <Alert severity="info" sx={{ mt: 2 }}>No pending submissions.</Alert>}
+          {!submissions.length && <Alert severity="info" sx={{ mt: 2 }}>No pending submission reviews to action.</Alert>}
         </Paper>
       )}
 
       {tab === 1 && (
         <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle1" sx={{ mb: 1 }}>Module Reviews</Typography>
+          <Typography variant="subtitle1" sx={{ mb: 1 }}>Module review requests</Typography>
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -177,16 +177,16 @@ export default function ReviewQueue() {
                   <TableCell>{r.requestedBy}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      <Button size="small" onClick={() => openView('moduleReview', 'Module Review', r)}>View</Button>
-                      <AsyncButton size="small" color="success" variant="contained" onClick={() => approveReview(r)}>Approve</AsyncButton>
-                      <Button size="small" color="error" onClick={() => { setDeclineReason('Not adequate'); setDeclineKind('review'); setDeclineId(r._id); setDeclineOpen(true); }}>Decline</Button>
+                      <Button size="small" onClick={() => openView('moduleReview', 'Module review snapshot', r)}>Open snapshot</Button>
+                      <AsyncButton size="small" color="success" variant="contained" onClick={() => approveReview(r)}>Approve module</AsyncButton>
+                      <Button size="small" color="error" onClick={() => { setDeclineReason('Not adequate'); setDeclineKind('review'); setDeclineId(r._id); setDeclineOpen(true); }}>Decline module</Button>
                     </Stack>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-          {!reviews.length && <Alert severity="info" sx={{ mt: 2 }}>No reviews yet.</Alert>}
+          {!reviews.length && <Alert severity="info" sx={{ mt: 2 }}>No module review requests at the moment.</Alert>}
         </Paper>
       )}
 
@@ -205,9 +205,9 @@ export default function ReviewQueue() {
       </Dialog>
 
       <Dialog open={declineOpen} onClose={closeDecline}>
-        <DialogTitle>Decline {declineKind}</DialogTitle>
+        <DialogTitle>Decline request</DialogTitle>
         <DialogContent>
-          <TextField fullWidth label="Reason" value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} />
+          <TextField fullWidth label="Reason for decline" value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} />
         </DialogContent>
         <DialogActions>
           <Button onClick={closeDecline}>Cancel</Button>
@@ -217,7 +217,7 @@ export default function ReviewQueue() {
               ? declineSubmission()
               : (reviews.find(r => r._id === declineId) ? declineReview(reviews.find(r => r._id === declineId)) : closeDecline()))}
           >
-            Decline
+            Confirm decline
           </AsyncButton>
         </DialogActions>
       </Dialog>
@@ -236,8 +236,8 @@ function InfoRow({ label, value }) {
 
 function SubmissionDetails({ submission }) {
   if (!submission) return null
-  const worker = submission.userId?.name || submission.userId?.email || submission.userId || 'Unknown'
-  const submitted = submission.createdAt ? new Date(submission.createdAt).toLocaleString() : 'N/A'
+  const worker = submission.userId?.name || submission.userId?.email || submission.userId || 'Unknown worker'
+  const submitted = submission.createdAt ? new Date(submission.createdAt).toLocaleString() : 'Not recorded'
   const quiz = submission.quiz || {}
   const answers = Array.isArray(quiz.answers) ? quiz.answers : []
   const payloadEntries = Object.entries(submission.payload || {})
@@ -245,17 +245,17 @@ function SubmissionDetails({ submission }) {
   return (
     <Stack spacing={2}>
       <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>Submission Summary</Typography>
+        <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>Submission summary</Typography>
         <Stack spacing={1}>
           <InfoRow label="Project" value={submission.project?.name || ''} />
-          <InfoRow label="Worker" value={worker} />
+          <InfoRow label="Worker name" value={worker} />
           <InfoRow label="Status" value={submission.status} />
-          <InfoRow label="Submitted" value={submitted} />
+          <InfoRow label="Submitted on" value={submitted} />
         </Stack>
       </Paper>
       {!!payloadEntries.length && (
         <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>Form Responses</Typography>
+          <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>Personal details</Typography>
           <Stack spacing={1}>
             {payloadEntries.map(([key, value]) => (
               <InfoRow key={key} label={key} value={typeof value === 'object' ? JSON.stringify(value) : String(value)} />
@@ -265,7 +265,7 @@ function SubmissionDetails({ submission }) {
       )}
       {answers.length > 0 && (
         <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>Quiz</Typography>
+          <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>Quiz results</Typography>
           <Stack spacing={1}>
             <InfoRow label="Score" value={`${quiz.score ?? 0}%`} />
             <InfoRow label="Result" value={quiz.passed ? 'Passed' : 'Failed'} />
@@ -290,18 +290,18 @@ function ModuleReviewDetails({ review }) {
   return (
     <Stack spacing={2}>
       <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>Module Overview</Typography>
+        <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>Induction module overview</Typography>
         <Stack spacing={1}>
           <InfoRow label="Project" value={review.project?.name || ''} />
-          <InfoRow label="Module Name" value={moduleData.name || 'Induction'} />
-          <InfoRow label="Review Status" value={moduleData.reviewStatus || review.status} />
-          <InfoRow label="Requested By" value={review.requestedBy} />
-          <InfoRow label="Submitted" value={review.createdAt ? new Date(review.createdAt).toLocaleString() : 'N/A'} />
+          <InfoRow label="Module name" value={moduleData.name || 'Induction'} />
+          <InfoRow label="Review status" value={moduleData.reviewStatus || review.status} />
+          <InfoRow label="Requested by" value={review.requestedBy} />
+          <InfoRow label="Submitted on" value={review.createdAt ? new Date(review.createdAt).toLocaleString() : 'Not recorded'} />
         </Stack>
         {!!steps.length && (
           <>
             <Divider sx={{ my: 2 }} />
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>Steps</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>Wizard steps</Typography>
             <Stack direction="row" spacing={1} flexWrap="wrap">
               {steps.map((s, idx) => (
                 <Chip key={idx} size="small" label={typeof s === 'string' ? s : s?.label || `Step ${idx + 1}`} sx={{ mr: 0.5, mb: 0.5 }} />
@@ -313,7 +313,7 @@ function ModuleReviewDetails({ review }) {
 
       {!!slides.length && (
         <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>Slides ({slides.length})</Typography>
+          <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>Slides ({slides.length} files)</Typography>
           <Stack spacing={1}>
             {slides.map((slide, idx) => (
               <Box key={slide.key || idx} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1 }}>
@@ -328,7 +328,7 @@ function ModuleReviewDetails({ review }) {
       {!!questions.length && (
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>
-            Quiz ({questions.length} questions) · Pass mark {settings.passMark ?? 0}%
+            Quiz overview ({questions.length} questions) - pass mark {settings.passMark ?? 0}%
           </Typography>
           <Stack spacing={1}>
             {questions.map((q, idx) => (
@@ -346,7 +346,7 @@ function ModuleReviewDetails({ review }) {
 
       {!!fields.length && (
         <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>Custom Fields ({fields.length})</Typography>
+          <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>Custom data fields ({fields.length})</Typography>
           <Table size="small">
             <TableHead>
               <TableRow>

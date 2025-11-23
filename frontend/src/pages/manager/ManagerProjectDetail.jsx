@@ -30,7 +30,7 @@ export default function ManagerProjectDetail() {
       const found = (response.data || []).find((p) => p._id === projectId)
       setProject(found || null)
     } catch (e) {
-      setError(e?.response?.data?.error || 'Failed to load project')
+      setError(e?.response?.data?.error || 'Unable to load project details.')
       setProject(null)
     }
   }
@@ -63,7 +63,7 @@ export default function ManagerProjectDetail() {
     } catch (e) {
       setManagerAssignments([])
       if (e?.response?.status === 403) {
-        setError('Not authorized to view managers for this project.')
+        setError('Not authorised to view managers for this project.')
       }
     }
   }
@@ -107,7 +107,7 @@ export default function ManagerProjectDetail() {
   }
 
   if (error) return <Alert severity="error">{error}</Alert>
-  if (!project) return <Alert severity="info">Loading project...</Alert>
+  if (!project) return <Alert severity="info">Loading project overview...</Alert>
 
   const moduleStatus = moduleStatusChip(project.moduleStatus)
   const buttonColor = moduleStatus.color === 'default' ? 'primary' : moduleStatus.color
@@ -129,7 +129,7 @@ export default function ManagerProjectDetail() {
           )}
           <Divider />
           <Stack spacing={1}>
-            <Typography variant="subtitle2">Managers</Typography>
+            <Typography variant="subtitle2">Assigned managers</Typography>
             {managers.length
               ? (
                 <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -145,22 +145,22 @@ export default function ManagerProjectDetail() {
                 </Stack>
                 )
               : (
-                <Typography variant="body2" color="text.secondary">Managers not listed for this project.</Typography>
+                <Typography variant="body2" color="text.secondary">No managers have been listed for this project.</Typography>
                 )}
           </Stack>
           <Divider />
           <Card elevation={0} sx={{ borderRadius: 2, bgcolor: moduleStatus.color === 'error' ? 'rgba(244, 67, 54, 0.08)' : moduleStatus.color === 'warning' ? 'rgba(255, 152, 0, 0.08)' : moduleStatus.color === 'success' ? 'rgba(76, 175, 80, 0.08)' : 'rgba(0,0,0,0.04)' }}>
             <Stack direction="row" alignItems="center" spacing={2}>
               <LockIcon fontSize="small" color={moduleStatus.color === 'default' ? 'disabled' : moduleStatus.color} />
-              <Typography variant="body2">Module status: {moduleStatus.label}</Typography>
+              <Typography variant="body2">Induction module status: {moduleStatus.label}</Typography>
             </Stack>
           </Card>
           <Stack direction="row" spacing={1}>
-            <Button variant="contained" color={buttonColor} onClick={openModule} disabled={!moduleId}>Open Module</Button>
-            <Button variant="outlined" onClick={() => navigate(`/manager/projects/${projectId}/team`)}>Manage Team</Button>
+            <Button variant="contained" color={buttonColor} onClick={openModule} disabled={!moduleId}>Edit induction module</Button>
+            <Button variant="outlined" onClick={() => navigate(`/manager/projects/${projectId}/team`)}>Manage assigned workers</Button>
             <Chip label={moduleStatus.label} color={moduleStatus.color} />
           </Stack>
-          {!moduleId && <Alert severity="info">No module created for this project yet.</Alert>}
+          {!moduleId && <Alert severity="info">No induction module created for this project yet.</Alert>}
         </Stack>
       </CardContent>
     </Card>

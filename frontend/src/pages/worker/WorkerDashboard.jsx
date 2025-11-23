@@ -18,8 +18,8 @@ import { useNavigate } from 'react-router-dom'
 
 const statusPalette = {
   draft: { label: 'Draft', color: 'default' },
-  pending: { label: 'Pending review', color: 'warning' },
-  approved: { label: 'Ready', color: 'success' },
+  pending: { label: 'Awaiting approval', color: 'warning' },
+  approved: { label: 'Ready for induction', color: 'success' },
   declined: { label: 'Declined', color: 'error' },
   none: { label: 'Not configured', color: 'default' },
 }
@@ -76,7 +76,7 @@ export default function WorkerDashboard() {
     if (submission.status === 'pending') {
       return {
         chip: { label: 'Submission pending', color: 'warning' },
-        message: 'Submission pending review.',
+        message: 'Submission awaiting manager approval.',
         showButton: false,
         alert: null
       }
@@ -84,7 +84,7 @@ export default function WorkerDashboard() {
     if (submission.status === 'declined') {
       return {
         chip: { label: 'Submission declined', color: 'error' },
-        message: 'Your last submission was declined. Please review feedback and resubmit.',
+        message: 'Your last submission was declined. Review the feedback and submit again.',
         showButton: true,
         alert: submission.reviewReason ? `Reason: ${submission.reviewReason}` : 'No reason provided.'
       }
@@ -195,9 +195,9 @@ export default function WorkerDashboard() {
 
   return (
     <Stack spacing={3}>
-      <Typography variant="h5" sx={{ fontWeight: 700 }}>Worker Dashboard</Typography>
+      <Typography variant="h5" sx={{ fontWeight: 700 }}>Worker dashboard</Typography>
       {error && <Alert severity="error">{error}</Alert>}
-      {loading && <Alert severity="info">Loading...</Alert>}
+      {loading && <Alert severity="info">Loading your assigned projects...</Alert>}
 
       <Card elevation={1} sx={{ borderRadius: 2 }}>
         <CardContent>
@@ -226,19 +226,19 @@ export default function WorkerDashboard() {
       </Card>
 
       <Grid container spacing={2}>
-        <SummaryCard title="Assigned Projects" value={counts.total} />
-        <SummaryCard title="Induction Ready" value={counts.approved} color="success" />
-        <SummaryCard title="Pending Inductions" value={counts.pending} color="warning" />
+        <SummaryCard title="Assigned projects" value={counts.total} />
+        <SummaryCard title="Inductions approved" value={counts.approved} color="success" />
+        <SummaryCard title="Pending inductions" value={counts.pending} color="warning" />
       </Grid>
 
       <Card elevation={1} sx={{ borderRadius: 2 }}>
         <CardContent>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>My Projects</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Your assigned projects</Typography>
             <Chip size="small" label={projects.length} />
           </Stack>
           {!projects.length && !loading && (
-            <Alert severity="info">No projects assigned yet. Please contact your manager.</Alert>
+            <Alert severity="info">No projects assigned yet. Please contact your manager for an assignment.</Alert>
           )}
           <Grid container spacing={2}>
             {projects.map((p) => {
@@ -262,7 +262,7 @@ export default function WorkerDashboard() {
                         <Stack direction="row" spacing={1} alignItems="center">
                           <Chip size="small" label={chip.label} color={chip.color} />
                           <Divider orientation="vertical" flexItem />
-                          <Typography variant="caption" color="text.secondary">Induction module</Typography>
+                          <Typography variant="caption" color="text.secondary">Induction module status</Typography>
                         </Stack>
                         <Stack direction="row" spacing={1} alignItems="center">
                           <Chip size="small" label={submissionInfo.chip.label} color={submissionInfo.chip.color} variant="outlined" />
@@ -272,7 +272,7 @@ export default function WorkerDashboard() {
                           <Alert severity="warning" variant="outlined">{submissionInfo.alert}</Alert>
                         )}
                         <Stack spacing={0.5}>
-                          <Typography variant="subtitle2" color="text.secondary">Managers</Typography>
+                          <Typography variant="subtitle2" color="text.secondary">Project managers</Typography>
                           {managers.length ? (
                             managers.map((m) => (
                               <Box key={m.id}>
@@ -287,7 +287,7 @@ export default function WorkerDashboard() {
                         </Stack>
                         {submissionInfo.showButton && (
                           <Button variant="contained" size="small" onClick={() => navigate('/wizard')}>
-                            Open Wizard
+                            Start induction
                           </Button>
                         )}
                       </Stack>

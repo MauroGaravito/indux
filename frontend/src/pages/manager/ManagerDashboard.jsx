@@ -5,9 +5,9 @@ import { useAuthStore } from '../../store/auth.js'
 import { useNavigate } from 'react-router-dom'
 
 const metricDefinitions = [
-  { label: 'Assigned Projects', key: 'projects' },
-  { label: 'Pending Submissions', key: 'submissions' },
-  { label: 'Modules Pending Review', key: 'modules' },
+  { label: 'Assigned projects', key: 'projects' },
+  { label: 'Pending submissions', key: 'submissions' },
+  { label: 'Modules pending review', key: 'modules' },
 ]
 
 export default function ManagerDashboard() {
@@ -42,7 +42,7 @@ export default function ManagerDashboard() {
         setMetrics((prev) => ({ ...prev, modules: modules.reduce((acc, val) => acc + val, 0) }))
       } catch (e) {
         if (!isCancelled) {
-          setError(e?.response?.data?.error || 'Unable to load metrics.')
+          setError(e?.response?.data?.error || 'Unable to load WHS metrics.')
         }
       }
     }
@@ -53,7 +53,7 @@ export default function ManagerDashboard() {
 
   return (
     <Stack spacing={3}>
-      <Typography variant="h4" sx={{ fontWeight: 700 }}>Manager Dashboard</Typography>
+      <Typography variant="h4" sx={{ fontWeight: 700 }}>Project dashboard</Typography>
       {error && <Alert severity="warning">{error}</Alert>}
       <Grid container spacing={2}>
         {metricDefinitions.map((metric) => (
@@ -71,11 +71,11 @@ export default function ManagerDashboard() {
       </Grid>
       <Card elevation={1} sx={{ borderRadius: 2 }}>
         <CardContent>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Quick Actions</Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Quick actions</Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1 }}>
-            <Button variant="contained" onClick={() => navigate('/manager/projects')}>Go to my Projects</Button>
-            <Button variant="outlined" onClick={() => navigate('/manager/projects/1/team')}>See Team</Button>
-            <Button variant="text" onClick={() => navigate('/review')}>Review Queue</Button>
+            <Button variant="contained" onClick={() => navigate('/manager/projects')}>View assigned projects</Button>
+            <Button variant="outlined" onClick={() => navigate('/manager/projects/1/team')}>View assigned workers</Button>
+            <Button variant="text" onClick={() => navigate('/review')}>Pending approvals</Button>
           </Stack>
         </CardContent>
       </Card>

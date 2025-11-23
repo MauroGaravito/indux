@@ -45,9 +45,9 @@ export default function Settings() {
       else resp = await api.post('/brand-config', body)
       const cfg = resp.data
       setId(cfg?._id || id)
-      setStatus({ kind: 'success', msg: 'Brand settings saved successfully.' })
+      setStatus({ kind: 'success', msg: 'Branding settings saved successfully.' })
     } catch (e) {
-      setStatus({ kind: 'error', msg: 'Failed to save brand settings.' })
+      setStatus({ kind: 'error', msg: 'Failed to save branding settings.' })
     }
   }
 
@@ -67,7 +67,7 @@ export default function Settings() {
   return (
     <Card elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 3 }}>
       <CardContent>
-        <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Brand Settings</Typography>
+        <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Branding settings</Typography>
 
         {status.kind === 'success' && <Alert severity="success" sx={{ mb: 2 }}>{status.msg}</Alert>}
         {status.kind === 'error' && <Alert severity="error" sx={{ mb: 2 }}>{status.msg}</Alert>}
@@ -75,26 +75,26 @@ export default function Settings() {
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
             <Stack spacing={2} sx={{ maxWidth: 520 }}>
-              <TextField label="Company Name" value={companyName} onChange={(e)=> setCompanyName(e.target.value)} />
+              <TextField label="Company name" value={companyName} onChange={(e)=> setCompanyName(e.target.value)} />
               <TextField label="Logo URL" value={logoUrl} onChange={(e)=> setLogoUrl(e.target.value)} />
 
               {/* Colors */}
               <Stack direction="row" spacing={2} alignItems="center">
                 <Stack spacing={0.5}>
-                  <Typography variant="caption" color="text.secondary">Primary Color</Typography>
+                  <Typography variant="caption" color="text.secondary">Primary colour</Typography>
                   <input type="color" value={primaryColor} onChange={(e)=> setPrimaryColor(e.target.value)} style={{ height: 40, width: 64, border: 'none', background: 'transparent' }} />
                 </Stack>
                 <Stack spacing={0.5}>
-                  <Typography variant="caption" color="text.secondary">Secondary Color</Typography>
+                  <Typography variant="caption" color="text.secondary">Secondary colour</Typography>
                   <input type="color" value={secondaryColor} onChange={(e)=> setSecondaryColor(e.target.value)} style={{ height: 40, width: 64, border: 'none', background: 'transparent' }} />
                 </Stack>
               </Stack>
 
-              <AsyncButton variant="contained" onClick={save} disabled={!companyName}>Save Changes</AsyncButton>
+              <AsyncButton variant="contained" onClick={save} disabled={!companyName}>Save branding</AsyncButton>
             </Stack>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2" color="text.secondary">Preview</Typography>
+            <Typography variant="subtitle2" color="text.secondary">Brand preview</Typography>
             <Preview />
           </Grid>
         </Grid>

@@ -54,7 +54,7 @@ export default function Users() {
   return (
     <Card elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 3 }}>
       <CardContent>
-        <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Users</Typography>
+        <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>User directory</Typography>
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -74,16 +74,16 @@ export default function Users() {
                 <TableCell>{r.disabled ? <Chip size="small" color="warning" label="Disabled"/> : <Chip size="small" color="success" label="Active"/>}</TableCell>
                 <TableCell align="right">
                   <Stack direction="row" spacing={1} justifyContent="flex-end">
-                    <Button size="small" variant="outlined" onClick={()=> toggle(r)}>{r.disabled ? 'Enable' : 'Disable'}</Button>
-                    <Button size="small" variant="outlined" onClick={()=> openEdit(r)}>Edit</Button>
-                    <Button size="small" color="error" variant="outlined" onClick={()=> removeUser(r)}>Delete</Button>
+                    <Button size="small" variant="outlined" onClick={()=> toggle(r)}>{r.disabled ? 'Enable user' : 'Disable user'}</Button>
+                    <Button size="small" variant="outlined" onClick={()=> openEdit(r)}>Edit details</Button>
+                    <Button size="small" color="error" variant="outlined" onClick={()=> removeUser(r)}>Remove user</Button>
                   </Stack>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-        <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>Add User</Typography>
+        <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>Add new user</Typography>
         <Stack direction={{ xs:'column', sm:'row' }} spacing={1}>
           <TextField size="small" label="Email" value={newUser.email} onChange={e=> setNewUser({ ...newUser, email: e.target.value })} />
           <TextField size="small" label="Name" value={newUser.name} onChange={e=> setNewUser({ ...newUser, name: e.target.value })} />
@@ -97,12 +97,12 @@ export default function Users() {
           <TextField size="small" label="Phone" value={newUser.phone} onChange={e=> setNewUser({ ...newUser, phone: e.target.value })} />
           <TextField size="small" label="Company Name" value={newUser.companyName} onChange={e=> setNewUser({ ...newUser, companyName: e.target.value })} />
           <TextField size="small" label="Avatar URL" value={newUser.avatarUrl} onChange={e=> setNewUser({ ...newUser, avatarUrl: e.target.value })} />
-          <Button variant="contained" onClick={add}>Create</Button>
+          <Button variant="contained" onClick={add}>Create user</Button>
         </Stack>
       </CardContent>
 
       <Dialog open={!!editUser} onClose={closeEdit} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit User</DialogTitle>
+        <DialogTitle>Edit user</DialogTitle>
         <DialogContent dividers>
           {editUser && (
             <Stack spacing={1} sx={{ mt: 1 }}>
@@ -123,7 +123,7 @@ export default function Users() {
         </DialogContent>
         <DialogActions>
           <Button onClick={closeEdit}>Cancel</Button>
-          <Button variant="contained" onClick={saveEdit}>Save</Button>
+          <Button variant="contained" onClick={saveEdit}>Save changes</Button>
         </DialogActions>
       </Dialog>
     </Card>

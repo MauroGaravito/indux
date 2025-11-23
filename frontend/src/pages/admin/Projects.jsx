@@ -199,8 +199,8 @@ export default function Projects() {
   }
 
   const projectTabs = useMemo(() => ([
-    { label: 'Project Info', icon: <InfoIcon /> },
-    { label: 'Assignments', icon: <AssignmentIndIcon /> }
+    { label: 'Project details', icon: <InfoIcon /> },
+    { label: 'Assigned managers', icon: <AssignmentIndIcon /> }
   ]), [])
 
   return (
@@ -209,7 +209,7 @@ export default function Projects() {
       <Grid item xs={12} md={4}>
         <Stack spacing={2}>
           <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-            <CardHeader title={<Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Projects</Typography>} />
+            <CardHeader title={<Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Project register</Typography>} />
             <CardContent>
               <List sx={{ mb: 1 }}>
                 {projects.map(p => {
@@ -223,15 +223,15 @@ export default function Projects() {
                     </ListItemButton>
                   )
                 })}
-                {!projects.length && <Typography variant="body2" sx={{ opacity: 0.7, px: 2, py: 1 }}>No projects yet.</Typography>}
+                {!projects.length && <Typography variant="body2" sx={{ opacity: 0.7, px: 2, py: 1 }}>No active projects yet.</Typography>}
               </List>
               <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Create Project</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>Add new project</Typography>
               <Stack spacing={1}>
-                <TextField size="small" label="Name" value={newProject.name} onChange={e => setNewProject({ ...newProject, name: e.target.value })} />
-                <TextField size="small" label="Description" value={newProject.description} onChange={e => setNewProject({ ...newProject, description: e.target.value })} />
+                <TextField size="small" label="Project name" value={newProject.name} onChange={e => setNewProject({ ...newProject, name: e.target.value })} />
+                <TextField size="small" label="Short description" value={newProject.description} onChange={e => setNewProject({ ...newProject, description: e.target.value })} />
                 <AsyncButton variant="contained" startIcon={<AddCircleOutlineIcon />} onClick={createProject} disabled={!newProject.name}>
-                  Add
+                  Add project
                 </AsyncButton>
               </Stack>
             </CardContent>
@@ -239,7 +239,7 @@ export default function Projects() {
 
           {user?.role === 'admin' && (
             <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-              <CardHeader title={<Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Archived Projects</Typography>} />
+              <CardHeader title={<Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Archived projects</Typography>} />
               <CardContent>
                 <List sx={{ mb: 1 }}>
                   {archivedProjects.map((p) => (
@@ -249,7 +249,7 @@ export default function Projects() {
                       </ListItemIcon>
                       <ListItemText primary={p.name} secondary={p.status} />
                       <Button size="small" variant="outlined" onClick={() => restoreProject(p._id)}>
-                        Restore
+                        Restore project
                       </Button>
                     </ListItemButton>
                   ))}
@@ -267,32 +267,32 @@ export default function Projects() {
             {selectedId ? (
               <>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-                  <Typography variant="h6">Project</Typography>
+                  <Typography variant="h6">Project overview</Typography>
                   <Chip label={projectForm.status || 'draft'} />
                   <Box sx={{ flex: 1 }} />
                   {projectForm.status !== 'archived' && (
-                    <Button color="error" variant="outlined" onClick={archiveProject}>Archive</Button>
+                    <Button color="error" variant="outlined" onClick={archiveProject}>Archive project</Button>
                   )}
-                  <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveProject}>Save Project</AsyncButton>
+                  <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveProject}>Save project</AsyncButton>
                 </Stack>
 
                 {/* Modules Section */}
                 <Box sx={{ mb: 3, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
                   <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-                    <Typography variant="subtitle1">Modules for this Project</Typography>
+                    <Typography variant="subtitle1">Induction modules for this project</Typography>
                   </Stack>
                   {module ? (
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" justifyContent="space-between">
                       <Stack spacing={0.5}>
-                        <Typography variant="body1">Induction Module</Typography>
+                        <Typography variant="body1">Induction module</Typography>
                         <Typography variant="body2" color="text.secondary">Status: {module.reviewStatus || 'draft'}</Typography>
                       </Stack>
-                      <Button variant="contained" onClick={openModule} sx={{ textTransform: 'none' }}>Open</Button>
+                      <Button variant="contained" onClick={openModule} sx={{ textTransform: 'none' }}>Open module</Button>
                     </Stack>
                   ) : (
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">No modules yet.</Typography>
-                      <Button variant="contained" onClick={createModule} sx={{ textTransform: 'none' }}>Create Induction Module</Button>
+                      <Typography variant="body2" color="text.secondary">No induction module has been created.</Typography>
+                      <Button variant="contained" onClick={createModule} sx={{ textTransform: 'none' }}>Create induction module</Button>
                     </Stack>
                   )}
                 </Box>
@@ -310,26 +310,26 @@ export default function Projects() {
                 <Box sx={{ mt: 2 }} hidden={tab !== 1}>
                   <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                     <GroupIcon color="action" />
-                    <Typography variant="subtitle2">Assigned Users</Typography>
+                    <Typography variant="subtitle2">Assigned managers</Typography>
                     <Box sx={{ flex: 1 }} />
-                    <Button variant="contained" onClick={openAssign} sx={{ textTransform: 'none' }}>Assign User</Button>
+                    <Button variant="contained" onClick={openAssign} sx={{ textTransform: 'none' }}>Assign manager</Button>
                   </Stack>
                   <List>
                     {assignments.map((a) => (
                       <ListItemButton key={a._id} sx={{ borderRadius: 1 }}>
                         <ListItemIcon sx={{ minWidth: 36 }}><GroupIcon /></ListItemIcon>
                         <ListItemText primary={`${a?.user?.name || a?.user} - ${a.role}`} secondary={a?.user?.email || ''} />
-                        <Button color="error" onClick={() => removeAssignment(a._id)}>Remove</Button>
+                        <Button color="error" onClick={() => removeAssignment(a._id)}>Remove manager</Button>
                       </ListItemButton>
                     ))}
                   </List>
                   {!assignments.length && (
-                    <Typography variant="body2" sx={{ opacity: 0.7 }}>No users assigned to this project.</Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.7 }}>No managers assigned to this project.</Typography>
                   )}
                 </Box>
               </>
             ) : (
-              <Typography variant="body2" sx={{ mt: 2, opacity: 0.7 }}>Select a project to edit.</Typography>
+              <Typography variant="body2" sx={{ mt: 2, opacity: 0.7 }}>Select a project to view details.</Typography>
             )}
           </CardContent>
         </Card>
@@ -338,7 +338,7 @@ export default function Projects() {
 
     {/* Assign User Modal */}
     <Dialog open={assignOpen} onClose={closeAssign} maxWidth="sm" fullWidth>
-      <CardHeader title={<Typography variant="subtitle1">Assign manager to project</Typography>} />
+      <CardHeader title={<Typography variant="subtitle1">Assign project manager</Typography>} />
       <CardContent>
         <Stack spacing={2}>
           <TextField
@@ -355,7 +355,7 @@ export default function Projects() {
             ))}
           </TextField>
           <Typography variant="caption" color="text.secondary">
-            This modal assigns managers to projects; worker assignments happen via the Manager team view.
+            This assigns project managers. Worker assignments are handled in the Manager team view.
           </Typography>
         </Stack>
       </CardContent>

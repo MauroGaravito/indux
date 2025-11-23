@@ -27,7 +27,7 @@ export default function WorkerHistory() {
       const { data } = await api.get('/workers/me/submissions')
       setHistory(data?.submissions || [])
     } catch (e) {
-      setError(e?.response?.data?.error || 'Failed to load submissions')
+      setError(e?.response?.data?.error || 'Unable to load your submission history.')
       setHistory([])
     } finally {
       setLoading(false)
@@ -46,15 +46,15 @@ export default function WorkerHistory() {
       const { url } = await presignGet(key)
       window.open(url, '_blank', 'noopener,noreferrer')
     } catch {
-      setError('Could not download certificate')
+      setError('Unable to download certificate.')
     }
   }
 
   return (
     <Stack spacing={3}>
-      <Typography variant="h5" sx={{ fontWeight: 700 }}>History & Certificates</Typography>
+      <Typography variant="h5" sx={{ fontWeight: 700 }}>Induction history & certificates</Typography>
       {error && <Alert severity="error">{error}</Alert>}
-      {loading && <Alert severity="info">Loading history...</Alert>}
+      {loading && <Alert severity="info">Loading your induction history...</Alert>}
       {!loading && !history.length && (
         <Alert severity="info">You have no submissions yet.</Alert>
       )}
@@ -73,11 +73,11 @@ export default function WorkerHistory() {
                     <Chip size="small" label={chip.label} color={chip.color} />
                   </Stack>
                   {projectAddress && <Typography variant="body2" color="text.secondary">{projectAddress}</Typography>}
-                  <Typography variant="body2" color="text.secondary">Module: {sub.moduleId}</Typography>
-                  <Typography variant="caption" color="text.secondary">Submitted: {created}</Typography>
+                  <Typography variant="body2" color="text.secondary">Induction module ID: {sub.moduleId}</Typography>
+                  <Typography variant="caption" color="text.secondary">Submitted on: {created}</Typography>
                   {sub.certificateKey && (
                     <Button variant="outlined" size="small" sx={{ alignSelf: 'flex-start' }} onClick={() => downloadCertificate(sub.certificateKey)}>
-                      Download Certificate
+                      View certificate
                     </Button>
                   )}
                 </Stack>
