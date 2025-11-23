@@ -40,22 +40,35 @@ router.post('/modules/:moduleId/submissions', requireAuth, requireRole('worker')
     return res.status(409).json({ error: 'Submission already approved' });
   }
   if (existing && existing.status === 'pending') {
-    await Submission.findByIdAndDelete(existing._id);
+    // We'll update this submission in place below
   }
 
   const payload = parsed.data;
-  const sub = await Submission.create({
-    moduleId,
-    projectId: project._id,
-    userId: req.user!.sub,
-    status: 'pending',
-    payload: payload.payload,
-    uploads: payload.uploads,
-    quiz: payload.quiz,
-    signatureDataUrl: payload.signatureDataUrl,
-  });
+  let submission;
+  if (existing && existing.status === 'pending') {
+    existing.payload = payload.payload;
+    existing.uploads = payload.uploads;
+    existing.quiz = payload.quiz;
+    existing.signatureDataUrl = payload.signatureDataUrl;
+    existing.status = 'pending';
+    existing.reviewReason = undefined;
+    existing.reviewedBy = undefined;
+    existing.certificateKey = undefined;
+    submission = await existing.save();
+  } else {
+    submission = await Submission.create({
+      moduleId,
+      projectId: project._id,
+      userId: req.user!.sub,
+      status: 'pending',
+      payload: payload.payload,
+      uploads: payload.uploads,
+      quiz: payload.quiz,
+      signatureDataUrl: payload.signatureDataUrl,
+    });
+  }
 
-  res.status(201).json(sub);
+  res.status(201).json(submission);
 });
 
 router.get('/modules/:moduleId/submissions/my', requireAuth, requireRole('worker'), async (req, res) => {
