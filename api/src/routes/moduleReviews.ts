@@ -9,11 +9,15 @@ import { Assignment } from '../models/Assignment.js';
 
 const router = Router();
 
-router.post('/modules/:moduleId/reviews', requireAuth, requireRole('admin'), async (req, res) => {
+router.post('/modules/:moduleId/reviews', requireAuth, requireRole('admin', 'manager'), async (req, res) => {
   const moduleId = req.params.moduleId;
   if (!Types.ObjectId.isValid(moduleId)) return res.status(400).json({ error: 'Invalid module id' });
   const mod = await InductionModule.findById(moduleId);
   if (!mod) return res.status(404).json({ error: 'Module not found' });
+  if (req.user!.role === 'manager') {
+    const assignment = await Assignment.findOne({ user: req.user!.sub, project: mod.projectId, role: 'manager' });
+    if (!assignment) return res.status(403).json({ error: 'Not assigned to project' });
+  }
 
   // Reviewable status
   if (mod.reviewStatus && !['draft', 'declined'].includes(mod.reviewStatus)) {
