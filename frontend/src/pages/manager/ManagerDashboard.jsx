@@ -74,7 +74,7 @@ export default function ManagerDashboard() {
           <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Quick actions</Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1 }}>
             <Button variant="contained" onClick={() => navigate('/manager/projects')}>View assigned projects</Button>
-            <Button variant="outlined" onClick={() => navigate('/manager/projects/1/team')}>View assigned workers</Button>
+            <Button variant="outlined" onClick={() => navigate('/manager/projects')}>Manage project teams</Button>
             <Button variant="text" onClick={() => navigate('/review')}>Pending approvals</Button>
           </Stack>
         </CardContent>
