@@ -69,8 +69,30 @@ export async function seedAll() {
   if (fieldCount === 0) {
     await InductionModuleField.insertMany([
       { moduleId: module._id, key: 'fullName', label: 'Full Name', type: 'text', required: true, order: 1, step: 'personal' },
-      { moduleId: module._id, key: 'dob', label: 'Date of Birth', type: 'date', required: true, order: 2, step: 'personal' },
+      { moduleId: module._id, key: 'email', label: 'Email', type: 'text', required: true, order: 2, step: 'personal' },
       { moduleId: module._id, key: 'phone', label: 'Phone', type: 'text', required: false, order: 3, step: 'personal' },
+      { moduleId: module._id, key: 'position', label: 'Position', type: 'text', required: false, order: 4, step: 'personal' },
+      { moduleId: module._id, key: 'companyName', label: 'Company Name', type: 'text', required: false, order: 5, step: 'personal' },
+      {
+        moduleId: module._id,
+        key: 'medicalCondition',
+        label: 'Medical Condition',
+        type: 'select',
+        required: true,
+        order: 6,
+        step: 'personal',
+        options: ['Yes', 'No'],
+      },
+      {
+        moduleId: module._id,
+        key: 'medicalConditionDetails',
+        label: 'Medical Condition Details',
+        type: 'textarea',
+        required: false,
+        order: 7,
+        step: 'personal',
+        visibleIf: { fieldKey: 'medicalCondition', equals: 'Yes' },
+      },
     ]);
     console.log('Seeded induction fields');
   }

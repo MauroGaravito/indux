@@ -11,6 +11,10 @@ export interface IInductionModuleField extends Document {
   order: number;
   step: string;
   options?: string[];
+  visibleIf?: {
+    fieldKey: string;
+    equals: string | number | boolean;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,6 +29,10 @@ const FieldSchema = new Schema<IInductionModuleField>(
     order: { type: Number, default: 0 },
     step: { type: String, default: 'personal' },
     options: { type: [String] },
+    visibleIf: {
+      fieldKey: { type: String, trim: true },
+      equals: { type: Schema.Types.Mixed },
+    },
   },
   { timestamps: true }
 );

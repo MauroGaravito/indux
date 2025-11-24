@@ -18,6 +18,20 @@ const DEFAULT_USER_FIELDS = [
   { key: 'phone', label: 'Phone', type: 'text', required: false },
   { key: 'position', label: 'Position', type: 'text', required: false },
   { key: 'companyName', label: 'Company Name', type: 'text', required: false },
+  {
+    key: 'medicalCondition',
+    label: 'Medical Condition',
+    type: 'select',
+    required: true,
+    options: ['Yes', 'No'],
+  },
+  {
+    key: 'medicalConditionDetails',
+    label: 'Medical Condition Details',
+    type: 'textarea',
+    required: false,
+    visibleIf: { fieldKey: 'medicalCondition', equals: 'Yes' },
+  },
 ];
 
 // Create or return an induction module for a project
@@ -111,6 +125,7 @@ router.put('/modules/:moduleId', requireAuth, requireRole('admin', 'manager'), a
       order: f.order ?? 0,
       step: f.step || 'personal',
       options: f.options || undefined,
+      visibleIf: f.visibleIf || undefined,
     }));
     if (docs.length) {
       await InductionModuleField.insertMany(docs);

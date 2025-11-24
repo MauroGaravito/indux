@@ -105,6 +105,13 @@ export const InductionModuleConfigStrictSchema = z.object({
   settings: ModuleSettingsSchema,
 });
 
+const ModuleFieldVisibleIfSchema = z
+  .object({
+    fieldKey: z.string().min(1),
+    equals: z.union([z.string(), z.number(), z.boolean()]),
+  })
+  .strict();
+
 export const ModuleFieldStrictSchema = z.object({
   key: z.string().min(1),
   label: z.string().min(1),
@@ -113,6 +120,7 @@ export const ModuleFieldStrictSchema = z.object({
   order: z.number().optional(),
   step: z.string().optional(),
   options: z.array(z.string()).optional(),
+  visibleIf: ModuleFieldVisibleIfSchema.optional(),
 });
 
 export const ModuleFieldCreateSchema = z.object({
@@ -124,6 +132,7 @@ export const ModuleFieldCreateSchema = z.object({
   order: z.number().default(0),
   step: z.string().default('personal'),
   options: z.array(z.string()).optional(),
+  visibleIf: ModuleFieldVisibleIfSchema.optional(),
 });
 
 export const ModuleFieldUpdateSchema = ModuleFieldCreateSchema.partial().omit({ moduleId: true });

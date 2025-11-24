@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react'
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Alert,
@@ -144,6 +144,20 @@ export default function InductionWizard() {
     return Array.isArray(fields) ? [...fields].sort((a, b) => (a.order || 0) - (b.order || 0)) : []
   }, [fields])
 
+  const isFieldVisible = useCallback(
+    (field) => {
+      if (!field?.visibleIf) return true
+      const targetValue = personalValues[field.visibleIf.fieldKey]
+      return targetValue === field.visibleIf.equals
+    },
+    [personalValues]
+  )
+
+  const visiblePersonalFields = useMemo(
+    () => personalFields.filter((field) => isFieldVisible(field)),
+    [personalFields, isFieldVisible]
+  )
+
   const quizQuestions = useMemo(() => moduleConfig?.quiz?.questions || [], [moduleConfig])
   const canFinishQuiz = useMemo(
     () => quizQuestions.length > 0 && quizQuestions.every((_, idx) => answers[idx] !== undefined && answers[idx] !== null),
@@ -246,7 +260,7 @@ export default function InductionWizard() {
   const prevStep = () => setStep((s) => Math.max(0, s - 1))
 
   const validatePersonal = () =>
-    personalFields.every((f) => {
+    visiblePersonalFields.every((f) => {
       if (!f.required) return true
       const val = personalValues[f.key]
       return val != null && val !== ''
@@ -264,7 +278,7 @@ export default function InductionWizard() {
     try {
       setStatus('submitting')
 
-      const uploads = personalFields
+      const uploads = visiblePersonalFields
         .filter((f) => f.type === 'file')
         .map((f) => ({ type: f.type, key: personalValues[f.key] }))
         .filter((u) => u.key)
@@ -358,7 +372,7 @@ export default function InductionWizard() {
             Personal Details
           </Typography>
           <Grid container spacing={2}>
-            {personalFields.map((f) => (
+            {visiblePersonalFields.map((f) => (
               <Grid item xs={12} sm={f.type === 'textarea' ? 12 : 6} key={f.key}>
                 <DynamicField
                   field={f}
