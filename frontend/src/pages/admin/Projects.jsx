@@ -48,9 +48,12 @@ export default function Projects() {
   const [projectForm, setProjectForm] = useState({ name: '', description: '', address: '', status: 'draft' })
   const [tab, setTab] = useState(0)
   const [assignments, setAssignments] = useState([])
-  const [users, setUsers] = useState([])
+  const [managerUsers, setManagerUsers] = useState([])
   const [assignOpen, setAssignOpen] = useState(false)
   const [assignUserId, setAssignUserId] = useState('')
+  const [assignWorkerOpen, setAssignWorkerOpen] = useState(false)
+  const [assignWorkerId, setAssignWorkerId] = useState('')
+  const [workerUsers, setWorkerUsers] = useState([])
   const [newProject, setNewProject] = useState({ name: '', description: '' })
   const [module, setModule] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
@@ -167,9 +170,9 @@ export default function Projects() {
     setAssignOpen(true)
     try {
       const r = await api.get('/users')
-      setUsers((r.data || []).filter((u) => u.role === 'manager'))
+      setManagerUsers((r.data || []).filter((u) => u.role === 'manager'))
     } catch {
-      setUsers([])
+      setManagerUsers([])
     }
   }
   const closeAssign = () => setAssignOpen(false)
@@ -182,6 +185,32 @@ export default function Projects() {
   }
   const removeAssignment = async (id) => {
     await api.delete(`/assignments/${id}`)
+    await loadAssignments(selectedId)
+  }
+
+  const openAssignWorker = async () => {
+    setAssignWorkerOpen(true)
+    try {
+      const r = await api.get('/users')
+      const existingWorkerIds = new Set(
+        assignments
+          .filter((a) => a.role === 'worker')
+          .map((a) => String(a?.user?._id || a?.user))
+      )
+      const options = (r.data || [])
+        .filter((u) => u.role === 'worker')
+        .filter((u) => !existingWorkerIds.has(String(u._id)))
+      setWorkerUsers(options)
+    } catch {
+      setWorkerUsers([])
+    }
+  }
+  const closeAssignWorker = () => setAssignWorkerOpen(false)
+  const doAssignWorker = async () => {
+    if (!selectedId || !assignWorkerId) return
+    await api.post('/assignments', { user: assignWorkerId, project: selectedId, role: 'worker' })
+    setAssignWorkerId('')
+    setAssignWorkerOpen(false)
     await loadAssignments(selectedId)
   }
 
@@ -200,8 +229,12 @@ export default function Projects() {
 
   const projectTabs = useMemo(() => ([
     { label: 'Project details', icon: <InfoIcon /> },
-    { label: 'Assigned managers', icon: <AssignmentIndIcon /> }
+    { label: 'Assigned managers', icon: <AssignmentIndIcon /> },
+    { label: 'Assigned workers', icon: <GroupIcon /> }
   ]), [])
+
+  const managerAssignments = useMemo(() => assignments.filter((a) => a.role === 'manager'), [assignments])
+  const workerAssignments = useMemo(() => assignments.filter((a) => a.role === 'worker'), [assignments])
 
   return (
     <>
@@ -315,7 +348,7 @@ export default function Projects() {
                     <Button variant="contained" onClick={openAssign} sx={{ textTransform: 'none' }}>Assign manager</Button>
                   </Stack>
                   <List>
-                    {assignments.map((a) => (
+                    {managerAssignments.map((a) => (
                       <ListItemButton key={a._id} sx={{ borderRadius: 1 }}>
                         <ListItemIcon sx={{ minWidth: 36 }}><GroupIcon /></ListItemIcon>
                         <ListItemText primary={`${a?.user?.name || a?.user} - ${a.role}`} secondary={a?.user?.email || ''} />
@@ -323,8 +356,29 @@ export default function Projects() {
                       </ListItemButton>
                     ))}
                   </List>
-                  {!assignments.length && (
+                  {!managerAssignments.length && (
                     <Typography variant="body2" sx={{ opacity: 0.7 }}>No managers assigned to this project.</Typography>
+                  )}
+                </Box>
+
+                <Box sx={{ mt: 2 }} hidden={tab !== 2}>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                    <GroupIcon color="action" />
+                    <Typography variant="subtitle2">Assigned workers</Typography>
+                    <Box sx={{ flex: 1 }} />
+                    <Button variant="contained" onClick={openAssignWorker} sx={{ textTransform: 'none' }}>Assign worker</Button>
+                  </Stack>
+                  <List>
+                    {workerAssignments.map((a) => (
+                      <ListItemButton key={a._id} sx={{ borderRadius: 1 }}>
+                        <ListItemIcon sx={{ minWidth: 36 }}><GroupIcon /></ListItemIcon>
+                        <ListItemText primary={`${a?.user?.name || a?.user}`} secondary={a?.user?.email || ''} />
+                        <Button color="error" onClick={() => removeAssignment(a._id)}>Remove worker</Button>
+                      </ListItemButton>
+                    ))}
+                  </List>
+                  {!workerAssignments.length && (
+                    <Typography variant="body2" sx={{ opacity: 0.7 }}>No workers assigned to this project.</Typography>
                   )}
                 </Box>
               </>
@@ -348,7 +402,7 @@ export default function Projects() {
             onChange={(e) => setAssignUserId(e.target.value)}
             helperText="Only users with the manager role are listed"
           >
-            {users.map((u) => (
+            {managerUsers.map((u) => (
               <MenuItem key={u._id} value={u._id}>
                 {u.name} ({u.email})
               </MenuItem>
@@ -362,6 +416,30 @@ export default function Projects() {
       <Stack direction="row" spacing={1} sx={{ px: 2, pb: 2, justifyContent: 'flex-end' }}>
         <Button onClick={closeAssign}>Cancel</Button>
         <AsyncButton variant="contained" disabled={!assignUserId} onClick={doAssign}>Assign</AsyncButton>
+      </Stack>
+    </Dialog>
+    <Dialog open={assignWorkerOpen} onClose={closeAssignWorker} maxWidth="sm" fullWidth>
+      <CardHeader title={<Typography variant="subtitle1">Assign worker to project</Typography>} />
+      <CardContent>
+        <Stack spacing={2}>
+          <TextField
+            select
+            label="Worker"
+            value={assignWorkerId}
+            onChange={(e) => setAssignWorkerId(e.target.value)}
+            helperText="Only unassigned workers are listed"
+          >
+            {workerUsers.map((u) => (
+              <MenuItem key={u._id} value={u._id}>
+                {u.name} ({u.email})
+              </MenuItem>
+            ))}
+          </TextField>
+        </Stack>
+      </CardContent>
+      <Stack direction="row" spacing={1} sx={{ px: 2, pb: 2, justifyContent: 'flex-end' }}>
+        <Button onClick={closeAssignWorker}>Cancel</Button>
+        <AsyncButton variant="contained" disabled={!assignWorkerId} onClick={doAssignWorker}>Assign</AsyncButton>
       </Stack>
     </Dialog>
     <Snackbar open={!!errorMsg} autoHideDuration={4000} onClose={() => setErrorMsg('')}>
