@@ -115,7 +115,7 @@ const ModuleFieldVisibleIfSchema = z
 export const ModuleFieldStrictSchema = z.object({
   key: z.string().min(1),
   label: z.string().min(1),
-  type: z.enum(['text', 'number', 'date', 'select', 'file', 'textarea', 'boolean']),
+  type: z.enum(['text', 'number', 'date', 'select', 'file', 'photo', 'textarea', 'boolean']),
   required: z.boolean().optional(),
   order: z.number().optional(),
   step: z.string().optional(),
@@ -127,7 +127,7 @@ export const ModuleFieldCreateSchema = z.object({
   moduleId: z.string().min(1),
   key: z.string().min(1),
   label: z.string().min(1),
-  type: z.enum(['text', 'number', 'date', 'select', 'file', 'textarea', 'boolean']).default('text'),
+  type: z.enum(['text', 'number', 'date', 'select', 'file', 'photo', 'textarea', 'boolean']).default('text'),
   required: z.boolean().default(false),
   order: z.number().default(0),
   step: z.string().default('personal'),

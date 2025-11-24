@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
-export type FieldType = 'text' | 'number' | 'date' | 'select' | 'file' | 'textarea' | 'boolean';
+export type FieldType = 'text' | 'number' | 'date' | 'select' | 'file' | 'photo' | 'textarea' | 'boolean';
 
 export interface IInductionModuleField extends Document {
   moduleId: Types.ObjectId;
@@ -24,7 +24,7 @@ const FieldSchema = new Schema<IInductionModuleField>(
     moduleId: { type: Schema.Types.ObjectId, ref: 'InductionModule', required: true, index: true },
     key: { type: String, required: true, trim: true },
     label: { type: String, required: true, trim: true },
-    type: { type: String, enum: ['text', 'number', 'date', 'select', 'file', 'textarea', 'boolean'], default: 'text' },
+    type: { type: String, enum: ['text', 'number', 'date', 'select', 'file', 'photo', 'textarea', 'boolean'], default: 'text' },
     required: { type: Boolean, default: false },
     order: { type: Number, default: 0 },
     step: { type: String, default: 'personal' },

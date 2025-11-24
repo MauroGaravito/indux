@@ -41,6 +41,38 @@ const createSubmissionGate = (overrides = {}) => ({
 
 function DynamicField({ field, value, onChange }) {
   const [progress, setProgress] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    if (field?.type !== 'photo') {
+      setPhotoPreview(null)
+      return () => {
+        cancelled = true
+      }
+    }
+    if (!value) {
+      setPhotoPreview(null)
+      return () => {
+        cancelled = true
+      }
+    }
+    ;(async () => {
+      try {
+        const { url } = await presignGet(value)
+        if (!cancelled) {
+          setPhotoPreview(url)
+        }
+      } catch {
+        if (!cancelled) {
+          setPhotoPreview(null)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [field?.type, value])
 
   if (field?.type === 'textarea') {
     return (
@@ -104,6 +136,50 @@ function DynamicField({ field, value, onChange }) {
         </Button>
         {progress != null && <LinearProgress variant="determinate" value={progress} />}
         {value && <Chip label={`Uploaded: ${value}`} size="small" />}
+      </Stack>
+    )
+  }
+
+  if (field?.type === 'photo') {
+    return (
+      <Stack spacing={1}>
+        <Typography variant="body2">{field.label}</Typography>
+        <Button variant="outlined" component="label">
+          Capture photo
+          <input
+            hidden
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={async (e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              let localPreview
+              try {
+                localPreview = URL.createObjectURL(file)
+                setPhotoPreview(localPreview)
+                const { key } = await uploadFile('worker-uploads/', file, { onProgress: setProgress })
+                onChange(key)
+              } finally {
+                if (localPreview) {
+                  URL.revokeObjectURL(localPreview)
+                }
+                setProgress(null)
+              }
+            }}
+          />
+        </Button>
+        {progress != null && <LinearProgress variant="determinate" value={progress} />}
+        {photoPreview ? (
+          <Box
+            component="img"
+            src={photoPreview}
+            alt="Uploaded photo preview"
+            sx={{ width: '100%', maxWidth: 240, borderRadius: 1, border: '1px solid', borderColor: 'divider' }}
+          />
+        ) : (
+          value && <Chip label={`Uploaded: ${value}`} size="small" />
+        )}
       </Stack>
     )
   }
@@ -279,7 +355,7 @@ export default function InductionWizard() {
       setStatus('submitting')
 
       const uploads = visiblePersonalFields
-        .filter((f) => f.type === 'file')
+        .filter((f) => ['file', 'photo'].includes(f.type))
         .map((f) => ({ type: f.type, key: personalValues[f.key] }))
         .filter((u) => u.key)
 

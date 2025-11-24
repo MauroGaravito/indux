@@ -21,6 +21,7 @@ const typeOptions = [
   { value: 'date', label: 'Date' },
   { value: 'select', label: 'Select' },
   { value: 'file', label: 'File' },
+  { value: 'photo', label: 'Photo' },
   { value: 'textarea', label: 'Textarea' },
   { value: 'boolean', label: 'Boolean' },
 ]
