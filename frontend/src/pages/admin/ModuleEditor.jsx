@@ -62,8 +62,9 @@ export default function ModuleEditor({ mode = 'admin' }) {
 
   const moduleStatus = module?.reviewStatus || 'draft';
   const isManagerMode = mode === 'manager';
-  const canEditModule = !isManagerMode || ['draft', 'declined'].includes(moduleStatus);
-  const isReadOnly = isManagerMode && !canEditModule;
+  const editableStatuses = ['draft', 'pending', 'declined'];
+  const canEditModule = !isManagerMode || editableStatuses.includes(moduleStatus);
+  const isReadOnly = isManagerMode && !editableStatuses.includes(moduleStatus);
   const isManagerOfProject = useMemo(() => {
     if (!isManagerMode || !user?.id) return false;
     return assignments.some((a) => String(a?.user?._id || a?.user) === String(user.id) && a.role === 'manager');
