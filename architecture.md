@@ -24,11 +24,33 @@ Assignment (user ↔ project, role = manager | worker)
 ### Models
 - **Project** – `{ _id, name, description, address?, status (draft|active|archived), createdBy?, updatedBy?, createdAt, updatedAt }`
 - **InductionModule** – `{ _id, projectId, type='induction', reviewStatus (draft|pending|approved|declined), config { steps, slides[{ key, title?, fileKey, thumbKey?, order }], quiz{ questions[{ question, options[], answerIndex }] }, settings{ passMark, randomizeQuestions, allowRetry } }, createdBy?, updatedBy?, timestamps }`
-- **InductionModuleField** – `{ _id, moduleId, key, label, type(text|number|date|select|file|textarea|boolean), required, order, step, options? }`
+- **InductionModuleField** – `{ _id, moduleId, key, label, type(text|number|date|select|file|photo|textarea|boolean), required, order, step, options?, visibleIf? }`
 - **ModuleReview** – `{ _id, moduleId, projectId, type='induction', data snapshot, status (pending|approved|declined), reason?, requestedBy, reviewedBy?, timestamps }`
 - **Submission** – `{ _id, moduleId, projectId, userId, status (pending|approved|declined), payload, uploads[{ key, type }], quiz { answers, score, passed }, signatureDataUrl?, certificateKey?, reviewedBy?, reviewReason?, timestamps }`
 - **Assignment** – `{ user, project, role ('manager'|'worker'), assignedBy?, createdAt, updatedAt }` (unique per user + project).
 - **User** – `{ email, name, password (hashed), role (admin|manager|worker), disabled?, position?, phone?, companyName?, avatarUrl? }`
+
+### Default Induction Fields
+When a module is first created it is seeded with:
+1. Full Name
+2. Email
+3. Phone
+4. Position
+5. Company Name
+6. Medical Condition (select Yes/No)
+7. Medical Condition Details (textarea, `visibleIf: { fieldKey: 'medicalCondition', equals: 'Yes' }`)
+
+These defaults are only a starting point—admins/managers can edit labels, steps, type, order, required flags, and conditional logic as needed.
+
+### Conditional Fields (`visibleIf`)
+Fields can include:
+```
+visibleIf: {
+  fieldKey: string
+  equals: string
+}
+```
+The worker wizard hides conditional fields until the criteria is satisfied and hidden inputs never block submission. Any field type may use `visibleIf`.
 
 ## REST Endpoints (Grouped)
 
@@ -99,7 +121,7 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 1. **Create Project** – Admin UI or `POST /projects`.
 2. **Seed Module** – `POST /projects/:projectId/modules/induction` plus personal data fields.
 3. **Configure Content** – Module Editor (admin mode) updates fields, slides, quiz, and settings while module is draft.
-4. **Assign Managers** – Admin Projects modal or `POST /assignments` links managers to projects.
+4. **Assign Managers & Workers** – Admin Projects provides dedicated tabs for both roles; `POST /assignments` seeds manager/worker links so managers can see their pool and workers can access the wizard.
 5. **Monitor Reviews** – Review Queue lists module reviews and worker submissions; admins can approve/decline or override.
 6. **Branding & Users** – Admin Settings and Users screens manage organisational metadata and accounts.
 
@@ -114,7 +136,7 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 ### Worker Pipeline
 1. **Worker Dashboard** – Uses `/assignments/user/:id` to show assigned projects, manager contacts, and submission status.
 2. **Induction Wizard** – Steps driven by module config/fields. Wizard checks `/modules/:moduleId/submissions/my` to prevent duplicate pending/approved submissions.
-3. **Uploads** – Files pass through `POST /uploads/presign`; wizard stores the resulting keys in submission payloads.
+3. **Uploads** – `file` and `photo` inputs pass through `POST /uploads/presign`; photos open the camera (mobile) or webcam/file picker (desktop), preview immediately, and store the resulting keys in submission payloads.
 4. **Slides Viewer** – Workers now pass the slide’s name and extension to `/slides-viewer` so PDFs render via pdf.js (matching admin/manager behaviour).
 5. **Submission** – `POST /modules/:moduleId/submissions` stores or updates pending submissions safely.
 6. **Review Decision** – Managers/admins approve or decline; approved submissions trigger certificate generation.
@@ -126,6 +148,8 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 3. **Approved** – Locked for managers; workers can submit if assigned.
 4. **Declined** – Re-opened for edits; managers re-submit for review when ready.
 
+Managers retain edit access for states `draft`, `pending`, and `declined`; only `approved` modules are read-only outside of admin overrides.
+
 ### Submission Lifecycle & Certificates
 - **Pending** – Worker submission stored; new pending submissions overwrite the existing record to avoid data loss.
 - **Approved** – Certificate generated (`certs/{projectId}/{moduleId}/{submissionId}.pdf`) and stored in MinIO. Worker sees “Induction approved” and can download immediately.
@@ -136,12 +160,18 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 - Manager endpoints verify `{ user: req.user.id, project: projectId, role: 'manager' }` before allowing module edits, approvals, team management, or downloads.
 - Worker endpoints verify `{ user: req.user.id, project: projectId, role: 'worker' }` before exposing module data or allowing submissions.
 - Admins bypass assignment checks but still require authentication.
+- Admin Projects now exposes **Assigned managers** and **Assigned workers** tabs so admins can seed both roles directly; managers can only invite workers that already exist in their pool (`GET /assignments/manager/:id/team`).
 
 ## Upload System & MinIO
 - **Presigned PUT** (`POST /uploads/presign`) – Generates unique keys under prefixes like `slides/` or `worker-uploads/`.
 - **Presigned GET** (`POST /uploads/presign-get`) – Validates that the requester owns the file via module or submission context before issuing a download URL.
 - **Streaming** (`GET /uploads/stream`) – Streams objects via the API after the same ownership checks, helping browsers preview files without exposing public URLs.
 - **Storage Layout** – Slides, thumbnails, maps, worker uploads, and certificates each have dedicated prefixes; certificates follow `certs/{project}/{module}/{submission}.pdf`.
+
+### Photo Capture & Retrieval
+- `photo` fields set `accept="image/*"` and `capture="environment"` so phones open the rear camera while desktop users get the webcam/file picker.
+- The wizard uploads photos via the same presigned PUT pipeline, shows a thumbnail preview, and records `{ key, type: 'photo' }` in submissions.
+- Reviewers/workers request presigned GET URLs or use `/uploads/stream` to view the stored image without exposing public buckets.
 
 ## Certificate Generation
 1. During `POST /submissions/:id/approve`, the API fetches submission + project + module.
