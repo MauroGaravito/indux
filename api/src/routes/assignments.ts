@@ -23,7 +23,8 @@ async function resolveModuleAssignments(projectId: string, modulesInput: unknown
     return new Types.ObjectId(value as string);
   });
   const uniqueIds = Array.from(new Set(normalized.map((id) => id.toString()))).map((id) => new Types.ObjectId(id));
-  const count = await InductionModule.countDocuments({ _id: { $in: uniqueIds }, project: projectId });
+  const projectObjectId = new Types.ObjectId(projectId);
+  const count = await InductionModule.countDocuments({ _id: { $in: uniqueIds }, projectId: projectObjectId });
   if (count !== uniqueIds.length) {
     throw new Error('MODULE_PROJECT_MISMATCH');
   }
