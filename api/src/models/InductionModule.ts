@@ -91,6 +91,6 @@ const ModuleSchema = new Schema<IInductionModule>(
   { timestamps: true }
 );
 
-ModuleSchema.index({ projectId: 1, type: 1 }, { unique: true });
+ModuleSchema.index({ projectId: 1, type: 1 });
 
 export const InductionModule = mongoose.model<IInductionModule>('InductionModule', ModuleSchema);
