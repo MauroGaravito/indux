@@ -33,3 +33,9 @@
 2. Locked down module review approvals to admin-only in both backend and frontend; managers now see read-only states for approved/pending modules.
 3. Updated Review Queue so managers assigned to a project can approve or decline worker submissions while module approvals remain admin-only.
 4. Documented the submission approval split and empty-state behavior in `README.md` and `architecture.md`.
+
+## 16 December 2025
+1. Introduced reusable **Induction Templates**: backend model, admin-only CRUD endpoints, and a new admin UI surface (list + editor) that reuses the module editor in template mode.
+2. Updated project module creation to support blank modules or deep clones from templates, including automatic field/config seeding. Projects can now host multiple modules, and the UI (admin + manager) includes selectors and creation dialogs.
+3. Added assignment guardrails so managers must be assigned to a project before creating modules or listing submissions; admins bypass as usual.
+4. Refreshed documentation (`README.md`, `architecture.md`) and frontend empty states to reflect multi-module support, template workflows, and the new security rules.

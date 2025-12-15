@@ -139,15 +139,15 @@ export default function ManagerProjectDetail() {
     }
   }
 
-  if (error) return <Alert severity="error">{error}</Alert>
-  if (!project) return <Alert severity="info">Loading project overview...</Alert>
-
   const selectedModule = useMemo(
     () => modules.find((m) => String(m._id) === String(selectedModuleId)),
     [modules, selectedModuleId]
   )
   const moduleStatus = moduleStatusChip(selectedModule?.reviewStatus)
   const buttonColor = moduleStatus.color === 'default' ? 'primary' : moduleStatus.color
+
+  if (error) return <Alert severity="error">{error}</Alert>
+  if (!project) return <Alert severity="info">Loading project overview...</Alert>
 
   return (
     <Card elevation={2} sx={{ borderRadius: 3 }}>
