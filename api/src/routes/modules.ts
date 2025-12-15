@@ -97,18 +97,28 @@ router.put('/modules/:moduleId', requireAuth, requireRole('admin', 'manager'), a
   // Even in draft mode, avoid throwing; if parsing fails, fall back to raw body
   const body = parsed.success ? parsed.data : (req.body as any);
 
+  if (typeof (req.body as any)?.reviewStatus !== 'undefined') {
+    return res.status(400).json({ error: 'reviewStatus can only be changed via admin review' });
+  }
+
   const mod = await InductionModule.findById(moduleId);
   if (!mod) return res.status(404).json({ error: 'Not found' });
   if (req.user!.role === 'manager') {
     const assignment = await Assignment.findOne({ user: req.user!.sub, project: mod.projectId, role: 'manager' });
     if (!assignment) return res.status(403).json({ error: 'Forbidden' });
-    if (!['draft', 'declined', 'pending'].includes(mod.reviewStatus || 'draft')) {
+    const status = mod.reviewStatus || 'draft';
+    if (status === 'pending') {
+      return res.status(403).json({ error: 'Module is pending admin approval and cannot be edited' });
+    }
+    if (status === 'approved') {
+      return res.status(403).json({ error: 'Module is approved and cannot be edited' });
+    }
+    if (!['draft', 'declined'].includes(status)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
   }
 
   if (body?.config) mod.config = body.config as any;
-  if (body?.reviewStatus) mod.reviewStatus = body.reviewStatus;
   mod.updatedBy = req.user?.sub as any;
   await mod.save();
 

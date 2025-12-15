@@ -62,9 +62,10 @@ export default function ModuleEditor({ mode = 'admin' }) {
 
   const moduleStatus = module?.reviewStatus || 'draft';
   const isManagerMode = mode === 'manager';
-  const editableStatuses = ['draft', 'pending', 'declined'];
-  const canEditModule = !isManagerMode || editableStatuses.includes(moduleStatus);
-  const isReadOnly = isManagerMode && !editableStatuses.includes(moduleStatus);
+  const managerEditableStatuses = ['draft', 'declined'];
+  const canEditModule = !isManagerMode || managerEditableStatuses.includes(moduleStatus);
+  const isReadOnly = isManagerMode && !managerEditableStatuses.includes(moduleStatus);
+  const isPendingAdminApproval = isManagerMode && moduleStatus === 'pending';
   const isManagerOfProject = useMemo(() => {
     if (!isManagerMode || !user?.id) return false;
     return assignments.some((a) => String(a?.user?._id || a?.user) === String(user.id) && a.role === 'manager');
@@ -84,8 +85,12 @@ export default function ModuleEditor({ mode = 'admin' }) {
     declined: 'error.dark',
   };
   const bannerTextColor = bannerTextColors[moduleStatus] || 'text.primary';
-  const bannerLabel = isReadOnly ? 'Read-only Mode' : 'Manager Editing Mode';
+  const bannerLabel = isPendingAdminApproval ? 'Pending admin approval' : isReadOnly ? 'Read-only Mode' : 'Manager Editing Mode';
   const BannerIcon = isReadOnly ? LockIcon : EditIcon;
+  const readOnlyHelperText = isPendingAdminApproval
+    ? 'The module is pending admin approval and cannot be edited until an administrator decides.'
+    : 'Updates are disabled while the module is approved.';
+  const reviewActionLabel = isManagerMode ? 'Request admin approval' : 'Send module for review';
 
   const normalizeConfig = (cfg) => ({
     steps: Array.isArray(cfg?.steps) ? cfg.steps : defaultConfig.steps,
@@ -361,9 +366,10 @@ export default function ModuleEditor({ mode = 'admin' }) {
             {bannerLabel}
           </Typography>
           <Chip label={`Status: ${moduleStatus}`} size="small" color={moduleStatus === 'pending' ? 'warning' : moduleStatus === 'approved' ? 'success' : moduleStatus === 'declined' ? 'error' : 'default'} />
+          {isPendingAdminApproval && <Chip label="Pending admin approval" size="small" color="warning" />}
           {isReadOnly && (
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              Updates are disabled while the module is approved.
+              {readOnlyHelperText}
             </Typography>
           )}
         </Box>
@@ -380,12 +386,13 @@ export default function ModuleEditor({ mode = 'admin' }) {
           <Typography variant="h6">Induction module configuration</Typography>
           <Chip label={`Project: ${projectName || projectId}`} />
             <Chip label={`Status: ${moduleStatus}`} color={moduleStatus === 'approved' ? 'success' : moduleStatus === 'pending' ? 'warning' : 'default'} />
+            {isPendingAdminApproval && <Chip label="Pending admin approval" color="warning" />}
             {isReadOnly && <Chip label="Read-only" color="info" />}
             <Box sx={{ flex: 1 }} />
             {showActions && (
               <>
                 <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveModule}>Save changes</AsyncButton>
-                <AsyncButton startIcon={<SendIcon />} variant="contained" color="secondary" onClick={sendForReview}>Send module for review</AsyncButton>
+                <AsyncButton startIcon={<SendIcon />} variant="contained" color="secondary" onClick={sendForReview}>{reviewActionLabel}</AsyncButton>
               </>
             )}
           </Stack>

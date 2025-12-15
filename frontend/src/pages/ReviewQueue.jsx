@@ -46,6 +46,8 @@ export default function ReviewQueue() {
   const [declineKind, setDeclineKind] = useState('submission')
   const [declineReason, setDeclineReason] = useState('Not adequate')
 
+  const isAdmin = user?.role === 'admin'
+
   const loadContext = async () => {
     const projResp = await api.get('/projects')
     const loadedModules = []
@@ -107,10 +109,27 @@ export default function ReviewQueue() {
   const openDecline = (kind, id) => { setDeclineKind(kind); setDeclineId(id); setDeclineOpen(true) }
   const closeDecline = () => setDeclineOpen(false)
 
-  const approveSubmission = async (id) => { await api.post(`/submissions/${id}/approve`); await loadAll() }
-  const declineSubmission = async () => { if(!declineId) return; await api.post(`/submissions/${declineId}/decline`, { reason: declineReason }); closeDecline(); await loadAll() }
-  const approveReview = async (rev) => { await api.post(`/modules/${rev.moduleId}/reviews/${rev._id}/approve`); await loadAll() }
-  const declineReview = async (rev) => { await api.post(`/modules/${rev.moduleId}/reviews/${rev._id}/decline`, { reason: declineReason }); await loadAll() }
+  const approveSubmission = async (id) => {
+    if (!isAdmin) return
+    await api.post(`/submissions/${id}/approve`)
+    await loadAll()
+  }
+  const declineSubmission = async () => {
+    if (!isAdmin || !declineId) return
+    await api.post(`/submissions/${declineId}/decline`, { reason: declineReason })
+    closeDecline()
+    await loadAll()
+  }
+  const approveReview = async (rev) => {
+    if (!isAdmin) return
+    await api.post(`/modules/${rev.moduleId}/reviews/${rev._id}/approve`)
+    await loadAll()
+  }
+  const declineReview = async (rev) => {
+    if (!isAdmin) return
+    await api.post(`/modules/${rev.moduleId}/reviews/${rev._id}/decline`, { reason: declineReason })
+    await loadAll()
+  }
 
   return (
     <Stack spacing={2}>
@@ -143,8 +162,8 @@ export default function ReviewQueue() {
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                       <Button size="small" onClick={() => openView('submission', 'Submission details', s)}>Open details</Button>
-                      <AsyncButton size="small" color="success" variant="contained" onClick={() => approveSubmission(s._id)}>Approve submission</AsyncButton>
-                      <Button size="small" color="error" onClick={() => openDecline('submission', s._id)}>Decline submission</Button>
+                      {isAdmin && (<AsyncButton size="small" color="success" variant="contained" onClick={() => approveSubmission(s._id)}>Approve submission</AsyncButton>)}
+                      {isAdmin && (<Button size="small" color="error" onClick={() => openDecline('submission', s._id)}>Decline submission</Button>)}
                     </Stack>
                   </TableCell>
                 </TableRow>
@@ -152,6 +171,7 @@ export default function ReviewQueue() {
             </TableBody>
           </Table>
           {!submissions.length && <Alert severity="info" sx={{ mt: 2 }}>No pending submission reviews to action.</Alert>}
+          {!isAdmin && <Alert severity="info" sx={{ mt: 2 }}>Only admins can approve or decline submissions.</Alert>}
         </Paper>
       )}
 
@@ -178,8 +198,8 @@ export default function ReviewQueue() {
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                       <Button size="small" onClick={() => openView('moduleReview', 'Module review snapshot', r)}>Open snapshot</Button>
-                      <AsyncButton size="small" color="success" variant="contained" onClick={() => approveReview(r)}>Approve module</AsyncButton>
-                      <Button size="small" color="error" onClick={() => { setDeclineReason('Not adequate'); setDeclineKind('review'); setDeclineId(r._id); setDeclineOpen(true); }}>Decline module</Button>
+                      {isAdmin && (<AsyncButton size="small" color="success" variant="contained" onClick={() => approveReview(r)}>Approve module</AsyncButton>)}
+                      {isAdmin && (<Button size="small" color="error" onClick={() => { setDeclineReason('Not adequate'); setDeclineKind('review'); setDeclineId(r._id); setDeclineOpen(true); }}>Decline module</Button>)}
                     </Stack>
                   </TableCell>
                 </TableRow>
@@ -187,6 +207,7 @@ export default function ReviewQueue() {
             </TableBody>
           </Table>
           {!reviews.length && <Alert severity="info" sx={{ mt: 2 }}>No module review requests at the moment.</Alert>}
+          {!isAdmin && <Alert severity="info" sx={{ mt: 2 }}>Only admins can approve or decline module reviews.</Alert>}
         </Paper>
       )}
 

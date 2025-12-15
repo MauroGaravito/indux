@@ -69,11 +69,20 @@ router.post('/modules/:moduleId/reviews', requireAuth, requireRole('admin', 'man
 router.get('/modules/:moduleId/reviews', requireAuth, requireRole('manager', 'admin'), async (req, res) => {
   const moduleId = req.params.moduleId;
   if (!Types.ObjectId.isValid(moduleId)) return res.status(400).json({ error: 'Invalid module id' });
+
+  const module = await InductionModule.findById(moduleId).lean();
+  if (!module) return res.status(404).json({ error: 'Module not found' });
+
+  if (req.user!.role === 'manager') {
+    const assignment = await Assignment.findOne({ user: req.user!.sub, project: module.projectId, role: 'manager' });
+    if (!assignment) return res.status(403).json({ error: 'Not assigned to project' });
+  }
+
   const reviews = await ModuleReview.find({ moduleId }).sort({ createdAt: -1 });
   res.json(reviews);
 });
 
-router.post('/modules/:moduleId/reviews/:reviewId/approve', requireAuth, requireRole('manager', 'admin'), async (req, res) => {
+router.post('/modules/:moduleId/reviews/:reviewId/approve', requireAuth, requireRole('admin'), async (req, res) => {
   const { moduleId, reviewId } = req.params;
   if (!Types.ObjectId.isValid(moduleId) || !Types.ObjectId.isValid(reviewId)) {
     return res.status(400).json({ error: 'Invalid id' });
@@ -81,11 +90,6 @@ router.post('/modules/:moduleId/reviews/:reviewId/approve', requireAuth, require
   const review = await ModuleReview.findById(reviewId);
   if (!review) return res.status(404).json({ error: 'Not found' });
   if (String(review.moduleId) !== moduleId) return res.status(400).json({ error: 'Review does not belong to module' });
-  if (req.user!.role === 'manager') {
-    const assignment = await Assignment.findOne({ user: req.user!.sub, project: review.projectId, role: 'manager' });
-    if (!assignment) return res.status(403).json({ error: 'Not assigned to project' });
-  }
-
   review.status = 'approved';
   review.reviewedBy = req.user!.sub as any;
   await review.save();
@@ -95,7 +99,7 @@ router.post('/modules/:moduleId/reviews/:reviewId/approve', requireAuth, require
   res.json({ ok: true });
 });
 
-router.post('/modules/:moduleId/reviews/:reviewId/decline', requireAuth, requireRole('manager', 'admin'), async (req, res) => {
+router.post('/modules/:moduleId/reviews/:reviewId/decline', requireAuth, requireRole('admin'), async (req, res) => {
   const { moduleId, reviewId } = req.params;
   if (!Types.ObjectId.isValid(moduleId) || !Types.ObjectId.isValid(reviewId)) {
     return res.status(400).json({ error: 'Invalid id' });
@@ -103,11 +107,6 @@ router.post('/modules/:moduleId/reviews/:reviewId/decline', requireAuth, require
   const review = await ModuleReview.findById(reviewId);
   if (!review) return res.status(404).json({ error: 'Not found' });
   if (String(review.moduleId) !== moduleId) return res.status(400).json({ error: 'Review does not belong to module' });
-  if (req.user!.role === 'manager') {
-    const assignment = await Assignment.findOne({ user: req.user!.sub, project: review.projectId, role: 'manager' });
-    if (!assignment) return res.status(403).json({ error: 'Not assigned to project' });
-  }
-
   review.status = 'declined';
   review.reason = (req.body && req.body.reason) || 'Not specified';
   review.reviewedBy = req.user!.sub as any;
