@@ -304,8 +304,8 @@ export default function ModuleEditor({ mode = 'admin' }) {
     const errors = [];
 
     // Module status
-    if (module?.reviewStatus && !['draft', 'declined'].includes(module.reviewStatus)) {
-      errors.push('Module status must be draft or declined to request a new review.');
+    if (module?.reviewStatus === 'approved') {
+      errors.push('Module status must be draft, pending, or declined to request a new review.');
     }
 
     // Fields
