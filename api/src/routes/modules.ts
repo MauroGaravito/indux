@@ -289,7 +289,7 @@ router.put(
 
       const status = mod.reviewStatus || 'draft';
 
-      if (['pending', 'approved'].includes(status)) {
+      if (status === 'approved') {
         return res
           .status(403)
           .json({ error: 'Module cannot be edited in its current state' });

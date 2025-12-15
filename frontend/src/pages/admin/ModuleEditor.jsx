@@ -86,7 +86,7 @@ export default function ModuleEditor({ mode = 'admin' }) {
   const isManagerMode = mode === 'manager';
   const isTemplateMode = mode === 'template';
   const moduleStatus = module?.reviewStatus || 'draft';
-  const managerEditableStatuses = ['draft', 'declined'];
+  const managerEditableStatuses = ['draft', 'declined', 'pending'];
   const canEditModule = isTemplateMode ? true : (!isManagerMode || managerEditableStatuses.includes(moduleStatus));
   const isReadOnly = isTemplateMode ? false : (isManagerMode && !managerEditableStatuses.includes(moduleStatus));
   const isPendingAdminApproval = !isTemplateMode && isManagerMode && moduleStatus === 'pending';
@@ -116,9 +116,8 @@ export default function ModuleEditor({ mode = 'admin' }) {
   const bannerTextColor = bannerTextColors[moduleStatus] || 'text.primary';
   const bannerLabel = isPendingAdminApproval ? 'Pending admin approval' : isReadOnly ? 'Read-only Mode' : 'Manager Editing Mode';
   const BannerIcon = isReadOnly ? LockIcon : EditIcon;
-  const readOnlyHelperText = isPendingAdminApproval
-    ? 'The module is pending admin approval and cannot be edited until an administrator decides.'
-    : 'Updates are disabled while the module is approved.';
+  const readOnlyHelperText = 'Updates are disabled while the module is approved.';
+  const pendingHelperText = 'Module sent to admin. You can keep editing until it is approved.';
   const reviewActionLabel = isManagerMode ? 'Request admin approval' : 'Send module for review';
 
   const normalizeConfig = (cfg) => ({
@@ -473,11 +472,11 @@ export default function ModuleEditor({ mode = 'admin' }) {
             alignItems: 'center',
             gap: 1,
           }}
-        >
-          <BannerIcon fontSize="small" sx={{ color: bannerTextColor }} />
-          <Typography variant="body2" sx={{ fontWeight: 600, color: bannerTextColor }}>
-            {bannerLabel}
-          </Typography>
+          >
+            <BannerIcon fontSize="small" sx={{ color: bannerTextColor }} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: bannerTextColor }}>
+              {bannerLabel}
+            </Typography>
           <Chip label={`Status: ${moduleStatus}`} size="small" color={moduleStatus === 'pending' ? 'warning' : moduleStatus === 'approved' ? 'success' : moduleStatus === 'declined' ? 'error' : 'default'} />
           {isPendingAdminApproval && <Chip label="Pending admin approval" size="small" color="warning" />}
           {isReadOnly && (
@@ -485,7 +484,12 @@ export default function ModuleEditor({ mode = 'admin' }) {
               {readOnlyHelperText}
             </Typography>
           )}
-        </Box>
+            {isPendingAdminApproval && !isReadOnly && (
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {pendingHelperText}
+              </Typography>
+            )}
+          </Box>
       )}
       <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <CardContent>
