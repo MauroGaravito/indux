@@ -9,8 +9,8 @@ INDUX is a project-centric Work Health & Safety (WHS) induction platform for Aus
    - Assigns managers and workers to each project and oversees reviews.
 2. **Manager**
    - Edits modules while they are in `draft`, `declined`, or `pending`.
-   - Sends modules for review and processes pending approvals.
-   - Reviews worker submissions and manages allocated workers.
+   - Sends modules for review and tracks status, but only admins can approve or decline module reviews. Pending modules now show a banner when waiting for admin approval.
+   - Approves/declines worker submissions for projects they manage and manages allocated workers from the same dashboard.
 3. **Worker**
    - Sees only assigned projects on the Worker Dashboard.
    - Completes the Induction Wizard (personal data, uploads, slides, quiz, signature).
@@ -27,7 +27,7 @@ INDUX is a project-centric Work Health & Safety (WHS) induction platform for Aus
 3. **Approved** - Locked for managers, open for worker submissions.
 4. **Declined** - Reopens for edits and can re-enter the review pipeline.
 
-Worker submissions mirror this process: pending + approved (certificate generated) or declined (worker resubmits). Certificates are produced during approval and stored securely.
+Worker submissions mirror this process: pending + approved (certificate generated) or declined (worker resubmits). Certificates are produced during approval and stored securely. Managers can approve or decline submissions as long as they are assigned to the project; admins retain override control.
 
 ## Induction Field Defaults & Customisation
 Every project receives a WHS-ready personal data pack when its induction module is created:
@@ -64,7 +64,7 @@ visibleIf: {
 The wizard hides fields until the condition is met and hidden fields never block submission. Medical Condition Details is preconfigured with `visibleIf: { fieldKey: 'medicalCondition', equals: 'Yes' }`, and the same structure can be applied to any custom field.
 
 ## Manager Editing Behaviour
-Managers may edit induction modules (fields, slides, quiz, settings) whenever `reviewStatus` is `draft`, `pending`, or `declined`. Only `approved` modules become read-only in manager mode. Admins may edit at any stage but usually keep approved modules locked for audit purposes.
+Managers may edit induction modules (fields, slides, quiz, settings) whenever `reviewStatus` is `draft`, `pending`, or `declined`. Only `approved` modules become read-only in manager mode. Admins may edit at any stage but usually keep approved modules locked for audit purposes. When a project does not yet have an induction module, the editor surfaces a dedicated empty state instead of an error so admins/managers can create the first module without leaving the page.
 
 ## Assignment Workflow & Worker Pools
 - Admins assign **managers** and **workers** via Admin -> Projects. The detail panel now includes distinct tabs for **Assigned managers** and **Assigned workers** so admins can seed both roles in one place.
@@ -91,7 +91,7 @@ See `architecture.md` for the full endpoint catalogue.
 
 ## Frontend Experience
 - **Admin Dashboard** - Project register, module editor, user directory, branding, Pending Approvals, and the Assigned Workers tab per project.
-- **Manager Console** - Assigned projects overview, module editor (manager mode), project detail, team management, and Pending Approvals.
+- **Manager Console** - Assigned projects overview, module editor (manager mode), project detail, team management, and Pending Approvals. Managers can act on worker submissions they own but module approvals remain admin-only.
 - **Worker Dashboard** - Assigned projects, submission status, manager contacts, and certificate access.
 - **Induction Wizard** - Guided worker experience across project selection, personal data (with conditional fields), uploads, slides viewer, quiz, signature, and submission. Photo fields open the camera, upload to MinIO via the same presigned pipeline, and render a thumbnail preview for confidence.
 - **History & Certificates** - Secure record of submissions with certificate downloads.

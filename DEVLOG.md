@@ -27,3 +27,9 @@
 4. Updated manager editing rules so modules remain editable while in `draft`, `pending`, or `declined`, reserving read-only mode for `approved` states.
 5. Delivered the Admin -> Projects "Assigned Workers" tab and clarified that admins must seed worker assignments before managers can manage their teams.
 6. Enhanced the worker wizard to bundle photo uploads into submissions, refresh previews, and respect conditional visibility without blocking submission.
+
+## 15 December 2025
+1. Added a dedicated empty state to the module editor so admins/managers can create an induction module after a 404 (no more error toast); the axios interceptor suppresses notifications for this expected 404.
+2. Locked down module review approvals to admin-only in both backend and frontend; managers now see read-only states for approved/pending modules.
+3. Updated Review Queue so managers assigned to a project can approve or decline worker submissions while module approvals remain admin-only.
+4. Documented the submission approval split and empty-state behavior in `README.md` and `architecture.md`.

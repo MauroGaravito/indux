@@ -130,7 +130,7 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 2. **Project Register** – `ManagerProjects` lists each project with module status, quick actions, and descriptions.
 3. **Project Detail** – `ManagerProjectDetail` displays summary, assigned managers, and module state with buttons to edit the module or manage workers.
 4. **Module Editing** – `ManagerModuleEditor` wraps the admin editor; editing allowed if assignment exists and module status is draft/declined/pending.
-5. **Pending Approvals** – Review Queue (Submission Reviews + Module Review Requests) filtered by assignments.
+5. **Pending Approvals** – Review Queue (Submission Reviews + Module Review Requests) filtered by assignments. Managers can approve/decline worker submissions for projects they manage, but module approvals remain admin-only.
 6. **Team Management** – `ManagerTeam` uses `/assignments/project/:projectId` and `/assignments/manager/:id/team` to manage worker rosters.
 
 ### Worker Pipeline
@@ -148,12 +148,14 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 3. **Approved** – Locked for managers; workers can submit if assigned.
 4. **Declined** – Re-opened for edits; managers re-submit for review when ready.
 
-Managers retain edit access for states `draft`, `pending`, and `declined`; only `approved` modules are read-only outside of admin overrides.
+Managers retain edit access for states `draft`, `pending`, and `declined`; only `approved` modules are read-only outside of admin overrides. When a project has no induction module yet, the admin/manager editor now presents a dedicated empty state and CTA instead of surfacing a raw 404/toast.
 
 ### Submission Lifecycle & Certificates
 - **Pending** – Worker submission stored; new pending submissions overwrite the existing record to avoid data loss.
 - **Approved** – Certificate generated (`certs/{projectId}/{moduleId}/{submissionId}.pdf`) and stored in MinIO. Worker sees “Induction approved” and can download immediately.
 - **Declined** – Submission carries a decline reason; worker resubmits via the wizard.
+
+Managers assigned to the project can approve or decline submissions directly (admins continue to have override access). Module approvals, however, remain restricted to admins.
 
 ## Assignments & Access Control
 - Stored in `assignments` with a unique `(user, project)` constraint.
