@@ -13,6 +13,7 @@ import {
   Typography
 } from '@mui/material'
 import api from '../../utils/api.js'
+import { fetchProjectModules } from '../../utils/modules.js'
 import { useAuthStore } from '../../store/auth.js'
 import { useNavigate } from 'react-router-dom'
 
@@ -28,7 +29,7 @@ export default function WorkerDashboard() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
   const [assignments, setAssignments] = useState([])
-  const [moduleStatuses, setModuleStatuses] = useState({})
+  const [projectModules, setProjectModules] = useState({})
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [submissionMap, setSubmissionMap] = useState({})
@@ -46,11 +47,12 @@ export default function WorkerDashboard() {
   const buildSubmissionMap = (subs = []) => {
     const map = {}
     subs.forEach((sub) => {
-      const pid = sub.projectId || sub.project?.id
-      if (!pid) return
-      const existing = map[pid]
+      const moduleId = sub.moduleId || sub.module?._id
+      if (!moduleId) return
+      const key = String(moduleId)
+      const existing = map[key]
       if (!existing || new Date(sub.createdAt) > new Date(existing.createdAt)) {
-        map[pid] = sub
+        map[key] = sub
       }
     })
     return map
@@ -130,17 +132,17 @@ export default function WorkerDashboard() {
       const list = (r.data || []).filter((a) => a.role === 'worker' && a.project && a.project.status !== 'archived')
       setAssignments(list)
 
-      const statusMap = {}
+      const modulesMap = {}
       await Promise.all(list.map(async (entry) => {
         const pid = entry.project._id || entry.project
         try {
-          const modRes = await api.get(`/projects/${pid}/modules/induction`)
-          statusMap[pid] = modRes.data?.module?.reviewStatus || 'draft'
+          const mods = await fetchProjectModules(pid)
+          modulesMap[pid] = mods
         } catch {
-          statusMap[pid] = 'none'
+          modulesMap[pid] = []
         }
       }))
-      setModuleStatuses(statusMap)
+      setProjectModules(modulesMap)
 
       const historyRes = await api.get('/workers/me/submissions')
       const submissions = historyRes.data?.submissions || []
@@ -150,7 +152,7 @@ export default function WorkerDashboard() {
     } catch (e) {
       setError(e?.response?.data?.error || 'Failed to load data')
       setAssignments([])
-      setModuleStatuses({})
+      setProjectModules({})
       setSubmissionMap({})
       setProjectManagers({})
     } finally {
@@ -162,11 +164,11 @@ export default function WorkerDashboard() {
 
   const projects = useMemo(() => assignments.map((a) => a.project), [assignments])
   const counts = useMemo(() => {
-    const total = projects.length
-    const approved = projects.filter((p) => (moduleStatuses[p._id] || moduleStatuses[String(p._id)]) === 'approved').length
-    const pending = total - approved
-    return { total, approved, pending }
-  }, [projects, moduleStatuses])
+    const modules = Object.values(projectModules).flat()
+    const approved = modules.filter((m) => m.reviewStatus === 'approved').length
+    const pending = modules.length - approved
+    return { total: projects.length, approved, pending }
+  }, [projects, projectModules])
 
   const moduleChip = (status) => {
     const key = status || 'none'
@@ -242,12 +244,9 @@ export default function WorkerDashboard() {
           )}
           <Grid container spacing={2}>
             {projects.map((p) => {
-              const status = moduleStatuses[p._id] || moduleStatuses[String(p._id)] || 'none'
-              const chip = moduleChip(status)
               const pid = p._id || String(p._id)
-              const submission = submissionMap[pid] || submissionMap[String(pid)]
-              const submissionInfo = getSubmissionInfo(submission)
               const managers = projectManagers[pid] || []
+              const modules = projectModules[pid] || []
               return (
                 <Grid item xs={12} md={6} key={p._id}>
                   <Card variant="outlined" sx={{ borderRadius: 2 }}>
@@ -259,18 +258,44 @@ export default function WorkerDashboard() {
                         </Stack>
                         {p.address && <Typography variant="body2" color="text.secondary">{p.address}</Typography>}
                         <Typography variant="body2" color="text.secondary">{p.description || 'No description provided.'}</Typography>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Chip size="small" label={chip.label} color={chip.color} />
-                          <Divider orientation="vertical" flexItem />
-                          <Typography variant="caption" color="text.secondary">Induction module status</Typography>
+                        <Stack spacing={1}>
+                          <Typography variant="subtitle2">Induction modules</Typography>
+                          {modules.length ? (
+                            modules.map((mod) => {
+                              const chip = moduleChip(mod.reviewStatus)
+                              const submission = submissionMap[String(mod._id)] || submissionMap[mod._id]
+                              const submissionInfo = getSubmissionInfo(submission)
+                              return (
+                                <Box key={mod._id} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1 }}>
+                                  <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{mod.name || 'Induction module'}</Typography>
+                                    <Chip size="small" label={chip.label} color={chip.color} />
+                                  </Stack>
+                                  <Typography variant="body2" color="text.secondary">Status: {chip.label}</Typography>
+                                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                                    <Chip size="small" label={submissionInfo.chip.label} color={submissionInfo.chip.color} variant="outlined" />
+                                    <Typography variant="body2" color="text.secondary">{submissionInfo.message}</Typography>
+                                  </Stack>
+                                  {submissionInfo.alert && (
+                                    <Alert severity="warning" variant="outlined" sx={{ mt: 1 }}>{submissionInfo.alert}</Alert>
+                                  )}
+                                  {submissionInfo.showButton && chip.color === 'success' && (
+                                    <Button
+                                      variant="contained"
+                                      size="small"
+                                      sx={{ mt: 1 }}
+                                      onClick={() => navigate(`/wizard?projectId=${pid}&moduleId=${mod._id}`)}
+                                    >
+                                      Start induction
+                                    </Button>
+                                  )}
+                                </Box>
+                              )
+                            })
+                          ) : (
+                            <Alert severity="info" variant="outlined">No induction modules available for this project.</Alert>
+                          )}
                         </Stack>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Chip size="small" label={submissionInfo.chip.label} color={submissionInfo.chip.color} variant="outlined" />
-                          <Typography variant="body2" color="text.secondary">{submissionInfo.message}</Typography>
-                        </Stack>
-                        {submissionInfo.alert && (
-                          <Alert severity="warning" variant="outlined">{submissionInfo.alert}</Alert>
-                        )}
                         <Stack spacing={0.5}>
                           <Typography variant="subtitle2" color="text.secondary">Project managers</Typography>
                           {managers.length ? (
@@ -285,11 +310,6 @@ export default function WorkerDashboard() {
                             <Typography variant="caption" color="text.secondary">No manager info available.</Typography>
                           )}
                         </Stack>
-                        {submissionInfo.showButton && (
-                          <Button variant="contained" size="small" onClick={() => navigate('/wizard')}>
-                            Start induction
-                          </Button>
-                        )}
                       </Stack>
                     </CardContent>
                   </Card>

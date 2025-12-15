@@ -34,6 +34,7 @@ import AsyncButton from '../../components/AsyncButton.jsx'
 import ProjectInfoSection from '../../components/admin/ProjectInfoSection.jsx'
 import { useTheme } from '@mui/material/styles'
 import { useAuthStore } from '../../store/auth.js'
+import { fetchProjectModules } from '../../utils/modules.js'
 
 export default function Projects() {
   const theme = useTheme()
@@ -55,7 +56,8 @@ export default function Projects() {
   const [assignWorkerId, setAssignWorkerId] = useState('')
   const [workerUsers, setWorkerUsers] = useState([])
   const [newProject, setNewProject] = useState({ name: '', description: '' })
-  const [module, setModule] = useState(null)
+  const [modules, setModules] = useState([])
+  const [modulesLoading, setModulesLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
   const loadProjects = async () => {
@@ -80,17 +82,19 @@ export default function Projects() {
     }
   }
 
-  const loadModule = async (projectId) => {
-    if (!projectId) return setModule(null)
+  const loadModulesForProject = async (projectId) => {
+    if (!projectId) {
+      setModules([])
+      return
+    }
+    setModulesLoading(true)
     try {
-      const r = await api.get(`/projects/${projectId}/modules/induction`)
-      setModule(r.data?.module || null)
-    } catch (e) {
-      if (e?.response?.status === 404) {
-        setModule(null)
-      } else {
-        setModule(null)
-      }
+      const list = await fetchProjectModules(projectId)
+      setModules(list)
+    } catch {
+      setModules([])
+    } finally {
+      setModulesLoading(false)
     }
   }
 
@@ -113,12 +117,12 @@ export default function Projects() {
     const p = projects.find((x) => x._id === id)
     if (p) {
       setProjectForm({ name: p.name || '', description: p.description || '', address: p.address || '', status: p.status || 'draft' })
-      await Promise.all([loadAssignments(id), loadModule(id)])
+      await Promise.all([loadAssignments(id), loadModulesForProject(id)])
       if (id) navigate(`/admin/projects/${id}`, { replace: true })
     } else {
       setProjectForm({ name: '', description: '', address: '', status: 'draft' })
       setAssignments([])
-      setModule(null)
+      setModules([])
       navigate('/admin/projects', { replace: true })
     }
   }
@@ -144,7 +148,7 @@ export default function Projects() {
     setSelectedId('')
     setProjectForm({ name: '', description: '', address: '', status: 'draft' })
     setAssignments([])
-    setModule(null)
+    setModules([])
     await loadProjects()
     navigate('/admin/projects', { replace: true })
   }
@@ -160,7 +164,7 @@ export default function Projects() {
       setSelectedId('')
       setProjectForm({ name: '', description: '', address: '', status: 'draft' })
       setAssignments([])
-      setModule(null)
+      setModules([])
     } catch (e) {
       setErrorMsg(e?.response?.data?.error || 'Failed to restore project')
     }
@@ -218,13 +222,15 @@ export default function Projects() {
     if (!selectedId) return
     const r = await api.post(`/projects/${selectedId}/modules/induction`, {})
     const mod = r.data
-    setModule(mod)
-    navigate(`/admin/projects/${selectedId}/modules/induction/${mod._id}`)
+    await loadModulesForProject(selectedId)
+    if (mod?._id) {
+      navigate(`/admin/projects/${selectedId}/modules/induction/${mod._id}`)
+    }
   }
 
-  const openModule = () => {
-    if (!selectedId || !module?._id) return
-    navigate(`/admin/projects/${selectedId}/modules/induction/${module._id}`)
+  const openModule = (moduleId) => {
+    if (!selectedId || !moduleId) return
+    navigate(`/admin/projects/${selectedId}/modules/induction/${moduleId}`)
   }
 
   const projectTabs = useMemo(() => ([
@@ -314,18 +320,27 @@ export default function Projects() {
                   <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
                     <Typography variant="subtitle1">Induction modules for this project</Typography>
                   </Stack>
-                  {module ? (
+                  {modulesLoading && (
+                    <Alert severity="info" sx={{ mb: 1 }}>Loading induction modules...</Alert>
+                  )}
+                  {!modulesLoading && modules.length === 0 && (
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" justifyContent="space-between">
-                      <Stack spacing={0.5}>
-                        <Typography variant="body1">Induction module</Typography>
-                        <Typography variant="body2" color="text.secondary">Status: {module.reviewStatus || 'draft'}</Typography>
-                      </Stack>
-                      <Button variant="contained" onClick={openModule} sx={{ textTransform: 'none' }}>Open module</Button>
-                    </Stack>
-                  ) : (
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">No induction module has been created.</Typography>
+                      <Typography variant="body2" color="text.secondary">No induction modules have been created.</Typography>
                       <Button variant="contained" onClick={createModule} sx={{ textTransform: 'none' }}>Create induction module</Button>
+                    </Stack>
+                  )}
+                  {!modulesLoading && modules.length > 0 && (
+                    <Stack spacing={1.5}>
+                      {modules.map((mod) => (
+                        <Stack key={mod._id} direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" justifyContent="space-between" sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
+                          <Stack spacing={0.5}>
+                            <Typography variant="body1">{mod.name || 'Induction module'}</Typography>
+                            <Typography variant="body2" color="text.secondary">Status: {mod.reviewStatus || 'draft'}</Typography>
+                          </Stack>
+                          <Button variant="contained" onClick={() => openModule(mod._id)} sx={{ textTransform: 'none' }}>Open module</Button>
+                        </Stack>
+                      ))}
+                      <Button variant="outlined" onClick={createModule} sx={{ alignSelf: 'flex-start', textTransform: 'none' }}>Create another induction module</Button>
                     </Stack>
                   )}
                 </Box>

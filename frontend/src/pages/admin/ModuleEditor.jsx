@@ -31,6 +31,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import api from '../../utils/api.js';
+import { fetchProjectModules, fetchModuleDetail } from '../../utils/modules.js';
 import AsyncButton from '../../components/AsyncButton.jsx';
 import PersonalDetailsSection from '../../components/admin/PersonalDetailsSection.jsx';
 import SlidesSection from '../../components/admin/SlidesSection.jsx';
@@ -47,11 +48,13 @@ const defaultConfig = {
 };
 
 export default function ModuleEditor({ mode = 'admin' }) {
-  const { projectId, moduleId } = useParams();
+  const { projectId, moduleId, templateId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
 
   const [projectName, setProjectName] = useState('');
+  const [modules, setModules] = useState([]);
+  const [modulesLoading, setModulesLoading] = useState(false);
   const [module, setModule] = useState(null);
   const [moduleConfig, setModuleConfig] = useState(defaultConfig);
   const [fields, setFields] = useState([]);
@@ -65,18 +68,19 @@ export default function ModuleEditor({ mode = 'admin' }) {
   const [creatingModule, setCreatingModule] = useState(false);
   const [moduleLoadError, setModuleLoadError] = useState('');
 
-  const moduleStatus = module?.reviewStatus || 'draft';
   const isManagerMode = mode === 'manager';
+  const isTemplateMode = mode === 'template';
+  const moduleStatus = module?.reviewStatus || 'draft';
   const managerEditableStatuses = ['draft', 'declined'];
-  const canEditModule = !isManagerMode || managerEditableStatuses.includes(moduleStatus);
-  const isReadOnly = isManagerMode && !managerEditableStatuses.includes(moduleStatus);
-  const isPendingAdminApproval = isManagerMode && moduleStatus === 'pending';
+  const canEditModule = isTemplateMode ? true : (!isManagerMode || managerEditableStatuses.includes(moduleStatus));
+  const isReadOnly = isTemplateMode ? false : (isManagerMode && !managerEditableStatuses.includes(moduleStatus));
+  const isPendingAdminApproval = !isTemplateMode && isManagerMode && moduleStatus === 'pending';
   const isManagerOfProject = useMemo(() => {
-    if (!isManagerMode || !user?.id) return false;
+    if (!isManagerMode || !user?.id || isTemplateMode) return false;
     return assignments.some((a) => String(a?.user?._id || a?.user) === String(user.id) && a.role === 'manager');
-  }, [assignments, isManagerMode, user]);
-  const canCreateModule = mode === 'admin' || (isManagerMode && isManagerOfProject);
-  const showActions = canEditModule && (!isManagerMode || isManagerOfProject);
+  }, [assignments, isManagerMode, isTemplateMode, user]);
+  const canCreateModule = !isTemplateMode && (mode === 'admin' || (isManagerMode && isManagerOfProject));
+  const showActions = isTemplateMode ? true : (canEditModule && (!isManagerMode || isManagerOfProject));
   const bannerPalette = {
     draft: 'rgba(0, 0, 0, 0.04)',
     pending: 'rgba(255, 152, 0, 0.16)',
@@ -118,45 +122,69 @@ export default function ModuleEditor({ mode = 'admin' }) {
     loadProject();
   }, [projectId]);
 
-  const loadModule = async () => {
+  const loadModules = async () => {
+    if (!projectId) {
+      setModules([]);
+      setIsModuleMissing(true);
+      return;
+    }
+    setModulesLoading(true);
     try {
-      const r = await api.get(`/projects/${projectId}/modules/induction`);
-      const mod = r.data?.module;
-      if (!mod || (moduleId && mod._id !== moduleId)) {
-        setModule(null);
-        setIsModuleMissing(false);
-        setModuleLoadError('');
-        return;
-      }
-      setModule(mod);
-      setModuleConfig(normalizeConfig(mod.config));
-      setFields(r.data.fields || []);
-      setIsModuleMissing(false);
+      const list = await fetchProjectModules(projectId);
+      setModules(list);
+      const hasModules = list.length > 0;
+      setIsModuleMissing(!hasModules);
       setModuleLoadError('');
-    } catch (err) {
-      const status = err?.response?.status;
-      if (status === 404) {
-        setModule(null);
-        setModuleConfig(defaultConfig);
-        setFields([]);
-        setIsModuleMissing(true);
-        setModuleLoadError('');
-        setSubmitError('');
-        return;
+      if (!moduleId && hasModules) {
+        const firstModuleId = list[0]._id;
+        if (firstModuleId) {
+          const target =
+            mode === 'manager'
+              ? `/manager/projects/${projectId}/module/${firstModuleId}`
+              : `/admin/projects/${projectId}/modules/induction/${firstModuleId}`;
+          navigate(target, { replace: true });
+        }
       }
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'Failed to load induction modules';
+      setModules([]);
+      setIsModuleMissing(true);
+      setModuleLoadError(typeof msg === 'string' ? msg : 'Failed to load induction modules');
+    } finally {
+      setModulesLoading(false);
+    }
+  };
+
+  const loadModuleDetails = async (targetModuleId) => {
+    if (!targetModuleId) {
       setModule(null);
       setModuleConfig(defaultConfig);
       setFields([]);
+      return;
+    }
+    try {
+      const detail = await fetchModuleDetail(targetModuleId);
+      setModule(detail.module);
+      setModuleConfig(normalizeConfig(detail.module?.config));
+      setFields(detail.fields || []);
       setIsModuleMissing(false);
+      setModuleLoadError('');
+    } catch (err) {
+      setModule(null);
+      setModuleConfig(defaultConfig);
+      setFields([]);
       const msg = err?.response?.data?.error || err?.message || 'Failed to load induction module';
       setModuleLoadError(typeof msg === 'string' ? msg : 'Failed to load induction module');
     }
   };
 
-  const loadReviews = async () => {
-    if (!moduleId) return;
+  const loadReviews = async (targetModuleId) => {
+    if (!targetModuleId) {
+      setReviews([]);
+      return;
+    }
     try {
-      const r = await api.get(`/modules/${moduleId}/reviews`);
+      const r = await api.get(`/modules/${targetModuleId}/reviews`);
       setReviews(r.data || []);
     } catch {
       setReviews([]);
@@ -179,14 +207,13 @@ export default function ModuleEditor({ mode = 'admin' }) {
     try {
       const response = await api.post(`/projects/${projectId}/modules/induction`, {});
       const created = response.data;
+      await loadModules();
       if (created?._id) {
         const target =
           mode === 'manager'
             ? `/manager/projects/${projectId}/module/${created._id}`
             : `/admin/projects/${projectId}/modules/induction/${created._id}`;
         navigate(target, { replace: true });
-      } else {
-        await loadModule();
       }
     } catch (e) {
       const msg = e?.response?.data?.error || e?.message || 'Failed to create induction module';
@@ -197,10 +224,14 @@ export default function ModuleEditor({ mode = 'admin' }) {
   };
 
   useEffect(() => {
-    loadModule();
-    loadReviews();
+    loadModules();
     loadAssignments();
-  }, [projectId, moduleId]);
+  }, [projectId]);
+
+  useEffect(() => {
+    loadModuleDetails(moduleId);
+    loadReviews(moduleId);
+  }, [moduleId]);
 
   const saveModule = async () => {
     if (!canEditModule) return;
@@ -614,5 +645,3 @@ function ValidationDialog({ open, onClose, messages }) {
     }
     return candidate
   }
-
-

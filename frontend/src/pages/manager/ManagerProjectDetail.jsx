@@ -9,20 +9,26 @@ import {
   Chip,
   Divider,
   Stack,
+  TextField,
   Typography
 } from '@mui/material'
 import LocationOnIcon from '@mui/icons-material/LocationOn'
 import LockIcon from '@mui/icons-material/Lock'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../../utils/api.js'
+import AsyncButton from '../../components/AsyncButton.jsx'
+import { fetchProjectModules } from '../../utils/modules.js'
 
 export default function ManagerProjectDetail() {
   const { projectId } = useParams()
   const navigate = useNavigate()
   const [project, setProject] = useState(null)
-  const [moduleId, setModuleId] = useState('')
+  const [modules, setModules] = useState([])
+  const [modulesLoading, setModulesLoading] = useState(false)
+  const [selectedModuleId, setSelectedModuleId] = useState('')
   const [error, setError] = useState('')
   const [managerAssignments, setManagerAssignments] = useState([])
+  const [createLoading, setCreateLoading] = useState(false)
 
   const loadProject = async () => {
     try {
@@ -35,16 +41,29 @@ export default function ManagerProjectDetail() {
     }
   }
 
-  const loadModule = async () => {
+  const loadModules = async () => {
+    if (!projectId) {
+      setModules([])
+      setSelectedModuleId('')
+      return
+    }
+    setModulesLoading(true)
     try {
-      const res = await api.get(`/projects/${projectId}/modules/induction`)
-      const mod = res.data?.module
-      if (mod) {
-        setModuleId(mod._id)
-        setProject((prev) => (prev ? { ...prev, moduleStatus: mod.reviewStatus } : prev))
+      const list = await fetchProjectModules(projectId)
+      setModules(list)
+      if (list.length) {
+        setSelectedModuleId((prev) => (prev && list.some((m) => String(m._id) === String(prev)) ? prev : list[0]._id))
+      } else {
+        setSelectedModuleId('')
       }
-    } catch {
-      setModuleId('')
+    } catch (e) {
+      setModules([])
+      setSelectedModuleId('')
+      if (e?.response?.status === 403) {
+        setError('Not authorised to view modules for this project.')
+      }
+    } finally {
+      setModulesLoading(false)
     }
   }
 
@@ -70,7 +89,7 @@ export default function ManagerProjectDetail() {
 
   useEffect(() => {
     loadProject()
-    loadModule()
+    loadModules()
     loadManagers()
   }, [projectId])
 
@@ -102,14 +121,36 @@ export default function ManagerProjectDetail() {
     return palette[status] || { label: status || 'Draft', color: 'default' }
   }
 
-  const openModule = () => {
-    if (moduleId) navigate(`/manager/projects/${projectId}/module/${moduleId}`)
+  const openModule = (targetModuleId) => {
+    const idToOpen = targetModuleId || selectedModuleId
+    if (idToOpen) navigate(`/manager/projects/${projectId}/module/${idToOpen}`)
+  }
+
+  const createModule = async () => {
+    if (!projectId) return
+    setCreateLoading(true)
+    try {
+      const res = await api.post(`/projects/${projectId}/modules/induction`, {})
+      const mod = res.data
+      await loadModules()
+      if (mod?._id) {
+        navigate(`/manager/projects/${projectId}/module/${mod._id}`)
+      }
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Unable to create induction module.')
+    } finally {
+      setCreateLoading(false)
+    }
   }
 
   if (error) return <Alert severity="error">{error}</Alert>
   if (!project) return <Alert severity="info">Loading project overview...</Alert>
 
-  const moduleStatus = moduleStatusChip(project.moduleStatus)
+  const selectedModule = useMemo(
+    () => modules.find((m) => String(m._id) === String(selectedModuleId)),
+    [modules, selectedModuleId]
+  )
+  const moduleStatus = moduleStatusChip(selectedModule?.reviewStatus)
   const buttonColor = moduleStatus.color === 'default' ? 'primary' : moduleStatus.color
 
   return (
@@ -149,18 +190,63 @@ export default function ManagerProjectDetail() {
                 )}
           </Stack>
           <Divider />
+          <Stack spacing={1}>
+            <Typography variant="subtitle2">Induction modules</Typography>
+            {modulesLoading && <Alert severity="info">Loading induction modules...</Alert>}
+            {!modulesLoading && modules.length === 0 && (
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center">
+                <Typography variant="body2" color="text.secondary">No induction modules configured for this project.</Typography>
+                <AsyncButton variant="contained" onClick={createModule} loading={createLoading}>
+                  Create induction module
+                </AsyncButton>
+              </Stack>
+            )}
+            {!modulesLoading && modules.length > 0 && (
+              <Stack spacing={1}>
+                <TextField
+                  select
+                  label="Select module"
+                  value={selectedModuleId}
+                  onChange={(e) => setSelectedModuleId(e.target.value)}
+                  helperText="Choose which module to edit or review"
+                  SelectProps={{ native: true }}
+                >
+                  {modules.map((mod) => (
+                    <option key={mod._id} value={mod._id}>
+                      {mod.name || 'Induction module'} ({moduleStatusChip(mod.reviewStatus).label})
+                    </option>
+                  ))}
+                </TextField>
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  {modules.map((mod) => {
+                    const info = moduleStatusChip(mod.reviewStatus)
+                    return <Chip key={mod._id} size="small" label={`${mod.name || 'Module'} - ${info.label}`} color={info.color === 'default' ? 'default' : info.color} />
+                  })}
+                </Stack>
+              </Stack>
+            )}
+          </Stack>
           <Card elevation={0} sx={{ borderRadius: 2, bgcolor: moduleStatus.color === 'error' ? 'rgba(244, 67, 54, 0.08)' : moduleStatus.color === 'warning' ? 'rgba(255, 152, 0, 0.08)' : moduleStatus.color === 'success' ? 'rgba(76, 175, 80, 0.08)' : 'rgba(0,0,0,0.04)' }}>
             <Stack direction="row" alignItems="center" spacing={2}>
               <LockIcon fontSize="small" color={moduleStatus.color === 'default' ? 'disabled' : moduleStatus.color} />
-              <Typography variant="body2">Induction module status: {moduleStatus.label}</Typography>
+              <Typography variant="body2">
+                {selectedModule ? `Selected module status: ${moduleStatus.label}` : 'No induction modules available yet.'}
+              </Typography>
             </Stack>
           </Card>
-          <Stack direction="row" spacing={1}>
-            <Button variant="contained" color={buttonColor} onClick={openModule} disabled={!moduleId}>Edit induction module</Button>
-            <Button variant="outlined" onClick={() => navigate(`/manager/projects/${projectId}/team`)}>Manage assigned workers</Button>
-            <Chip label={moduleStatus.label} color={moduleStatus.color} />
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            <Button variant="contained" color={buttonColor} onClick={() => openModule(selectedModuleId)} disabled={!selectedModuleId}>
+              Edit selected module
+            </Button>
+            <AsyncButton variant="outlined" onClick={createModule} loading={createLoading}>
+              Create new module
+            </AsyncButton>
+            <Button variant="outlined" onClick={() => navigate(`/manager/projects/${projectId}/team`)}>
+              Manage assigned workers
+            </Button>
+            {selectedModule && <Chip label={moduleStatus.label} color={moduleStatus.color} />}
           </Stack>
-          {!moduleId && <Alert severity="info">No induction module created for this project yet.</Alert>}
+          {!selectedModuleId && !modulesLoading && <Alert severity="info">No induction module selected.</Alert>}
         </Stack>
       </CardContent>
     </Card>

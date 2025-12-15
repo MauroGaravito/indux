@@ -72,9 +72,14 @@ export default function ReviewQueue() {
     for (const p of projResp.data || []) {
       try {
         const r = await api.get(`/projects/${p._id}/modules/induction`)
-        loadedModules.push({ project: p, module: r.data.module })
+        const list = Array.isArray(r.data?.modules) ? r.data.modules : []
+        list.forEach((mod) => {
+          if (mod?._id) {
+            loadedModules.push({ project: p, module: mod })
+          }
+        })
       } catch (_) {
-        // no module
+        // no modules for this project
       }
     }
     setModules(loadedModules)
@@ -242,7 +247,7 @@ export default function ReviewQueue() {
               {reviews.map((r) => (
                 <TableRow key={r._id}>
                   <TableCell>{r.project?.name || ''}</TableCell>
-                  <TableCell>{r.type}</TableCell>
+                  <TableCell>{r.module?.name || r.type}</TableCell>
                   <TableCell><StatusChip status={r.status} /></TableCell>
                   <TableCell>{r.requestedBy}</TableCell>
                   <TableCell align="right">

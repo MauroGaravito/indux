@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react'
 import { Card, CardContent, Chip, Grid, Stack, Typography, Button, Alert, Divider, Box } from '@mui/material'
 import api from '../../utils/api.js'
+import { fetchProjectModules } from '../../utils/modules.js'
 import { useAuthStore } from '../../store/auth.js'
 import { useNavigate } from 'react-router-dom'
-import AsyncButton from '../../components/AsyncButton.jsx'
 
 export default function ManagerProjects() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
   const [assignments, setAssignments] = useState([])
-  const [moduleStatuses, setModuleStatuses] = useState({})
+  const [projectModules, setProjectModules] = useState({})
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -21,22 +21,23 @@ export default function ManagerProjects() {
       const r = await api.get(`/assignments/user/${user.id}`)
       const list = (r.data || []).filter((a) => a.role === 'manager' && a.project && a.project.status !== 'archived')
       setAssignments(list)
-      const statuses = {}
+      const modulesMap = {}
       await Promise.all(
         list.map(async (entry) => {
           const pid = entry.project._id || entry.project
           try {
-            const mod = await api.get(`/projects/${pid}/modules/induction`)
-            statuses[pid] = mod.data?.module?.reviewStatus || 'draft'
+            const mods = await fetchProjectModules(pid)
+            modulesMap[pid] = mods
           } catch {
-            statuses[pid] = 'draft'
+            modulesMap[pid] = []
           }
         })
       )
-      setModuleStatuses(statuses)
+      setProjectModules(modulesMap)
     } catch (e) {
       setError(e?.response?.data?.error || 'Unable to load assigned projects.')
       setAssignments([])
+      setProjectModules({})
     } finally {
       setLoading(false)
     }
@@ -44,13 +45,13 @@ export default function ManagerProjects() {
 
   useEffect(() => { loadProjects() }, [user])
 
-  const openModule = async (projectId) => {
-    try {
-      const r = await api.get(`/projects/${projectId}/modules/induction`)
-      const modId = r?.data?.module?._id
-      if (modId) navigate(`/manager/projects/${projectId}/module/${modId}`)
-    } catch (e) {
-      setError('Induction module not found for this project.')
+  const openModule = (projectId, moduleId) => {
+    const modules = projectModules[projectId] || []
+    const target = moduleId || (modules[0]?._id)
+    if (target) {
+      navigate(`/manager/projects/${projectId}/module/${target}`)
+    } else {
+      navigate(`/manager/projects/${projectId}`)
     }
   }
 
@@ -73,8 +74,7 @@ export default function ManagerProjects() {
       {loading && <Alert severity="info">Loading assigned projects...</Alert>}
       <Grid container spacing={2}>
         {projects.map((p) => {
-          const moduleStatus = moduleStatuses[p._id] || moduleStatuses[String(p._id)] || 'draft'
-          const moduleChip = statusLabel(moduleStatus)
+          const modules = projectModules[p._id] || projectModules[String(p._id)] || []
           return (
             <Grid item xs={12} md={6} key={p._id}>
               <Card elevation={2} sx={{ borderRadius: 3, minHeight: 220 }}>
@@ -92,15 +92,29 @@ export default function ManagerProjects() {
                     <Typography variant="body2" color="text.secondary">
                       {p.description || 'No project description provided.'}
                     </Typography>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <Chip label={moduleChip.label} color={moduleChip.color} />
-                      <Divider orientation="vertical" flexItem />
-                      <Chip label="Induction module status" size="small" variant="outlined" />
+                    <Stack spacing={1}>
+                      <Typography variant="subtitle2">Induction modules</Typography>
+                      {modules.length ? (
+                        modules.map((mod) => {
+                          const chip = statusLabel(mod.reviewStatus)
+                          return (
+                            <Stack key={mod._id} direction="row" alignItems="center" spacing={1}>
+                              <Chip label={chip.label} color={chip.color} size="small" />
+                              <Typography variant="body2" sx={{ flex: 1 }}>{mod.name || 'Induction module'}</Typography>
+                              <Button size="small" variant="outlined" onClick={() => openModule(p._id, mod._id)}>Open</Button>
+                            </Stack>
+                          )
+                        })
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">No induction modules yet.</Typography>
+                      )}
                     </Stack>
                     <Box sx={{ flex: 1 }} />
                     <Stack direction="row" spacing={1} flexWrap="wrap">
                       <Button size="small" variant="text" onClick={() => navigate(`/manager/projects/${p._id}`)}>Project overview</Button>
-                      <AsyncButton size="small" variant="contained" onClick={() => openModule(p._id)}>Edit induction module</AsyncButton>
+                      <Button size="small" variant="contained" onClick={() => openModule(p._id)}>
+                        {modules.length ? 'Open first module' : 'Go to project'}
+                      </Button>
                       <Button size="small" variant="outlined" onClick={() => navigate(`/manager/projects/${p._id}/team`)}>Manage assigned workers</Button>
                     </Stack>
                   </Stack>

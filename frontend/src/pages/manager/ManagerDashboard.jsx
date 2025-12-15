@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Grid, Card, CardContent, Typography, Stack, Button, Alert } from '@mui/material'
 import api from '../../utils/api.js'
+import { fetchProjectModules } from '../../utils/modules.js'
 import { useAuthStore } from '../../store/auth.js'
 import { useNavigate } from 'react-router-dom'
 
@@ -27,19 +28,32 @@ export default function ManagerDashboard() {
         if (isCancelled) return
         setMetrics((prev) => ({ ...prev, projects: list.length }))
 
-        const modules = await Promise.all(
+        const modulesForAssignments = []
+        await Promise.all(
           list.map(async (entry) => {
             const pid = entry.project._id || entry.project
             try {
-              const mod = await api.get(`/projects/${pid}/modules/induction`)
-              return mod.data?.module?.reviewStatus === 'pending' ? 1 : 0
+              const mods = await fetchProjectModules(pid)
+              modulesForAssignments.push(...mods)
             } catch {
-              return 0
+              // ignore
             }
           })
         )
+        let pendingModules = 0
+        let pendingSubmissions = 0
+        for (const mod of modulesForAssignments) {
+          if (!mod?._id) continue
+          if (mod.reviewStatus === 'pending') pendingModules += 1
+          try {
+            const pending = await api.get(`/modules/${mod._id}/submissions`, { params: { status: 'pending' } })
+            pendingSubmissions += (pending.data || []).length
+          } catch {
+            // ignore
+          }
+        }
         if (isCancelled) return
-        setMetrics((prev) => ({ ...prev, modules: modules.reduce((acc, val) => acc + val, 0) }))
+        setMetrics((prev) => ({ ...prev, modules: pendingModules, submissions: pendingSubmissions }))
       } catch (e) {
         if (!isCancelled) {
           setError(e?.response?.data?.error || 'Unable to load WHS metrics.')

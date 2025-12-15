@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Alert,
   Box,
@@ -28,6 +28,7 @@ import SignaturePad from '../components/SignaturePad.jsx'
 import { useAuthStore } from '../store/auth.js'
 import api from '../utils/api.js'
 import { uploadFile, presignGet } from '../utils/upload.js'
+import { fetchProjectModules, fetchModuleDetail } from '../utils/modules.js'
 import AsyncButton from '../components/AsyncButton.jsx'
 
 const stepsLabels = ['Project', 'Personal', 'Slides', 'Test', 'Sign', 'Submit']
@@ -37,6 +38,11 @@ const createSubmissionGate = (overrides = {}) => ({
   message: '',
   severity: 'info',
   ...overrides
+})
+const createEmptyModuleConfig = () => ({
+  slides: [],
+  quiz: { questions: [] },
+  settings: { passMark: 80, randomizeQuestions: false, allowRetry: true }
 })
 
 function DynamicField({ field, value, onChange }) {
@@ -192,12 +198,16 @@ function DynamicField({ field, value, onChange }) {
 export default function InductionWizard() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
+  const [searchParams] = useSearchParams()
 
   const [projects, setProjects] = useState([])
   const [project, setProject] = useState(null)
   const [module, setModule] = useState(null)
+  const [projectModules, setProjectModules] = useState([])
+  const [selectedModuleId, setSelectedModuleId] = useState('')
+  const [modulesLoading, setModulesLoading] = useState(false)
   const [fields, setFields] = useState([])
-  const [moduleConfig, setModuleConfig] = useState({ slides: [], quiz: { questions: [] }, settings: { passMark: 80, randomizeQuestions: false, allowRetry: true } })
+  const [moduleConfig, setModuleConfig] = useState(() => createEmptyModuleConfig())
   const [step, setStep] = useState(0)
   const [personalValues, setPersonalValues] = useState({})
   const [answers, setAnswers] = useState([])
@@ -210,11 +220,26 @@ export default function InductionWizard() {
   const [projectBlockedMessage, setProjectBlockedMessage] = useState('')
   const [submissionGate, setSubmissionGate] = useState(createSubmissionGate())
   const moduleApproved = module?.reviewStatus === 'approved'
+  const resetModuleContext = () => {
+    setModule(null)
+    setFields([])
+    setModuleConfig(createEmptyModuleConfig())
+    setSelectedModuleId('')
+  }
 
   useEffect(() => {
     if (!user) return
     api.get('/projects').then((r) => setProjects(r.data || [])).catch(() => setProjects([]))
   }, [user])
+
+  useEffect(() => {
+    const projectIdParam = searchParams.get('projectId')
+    if (projectIdParam) {
+      const moduleIdParam = searchParams.get('moduleId') || ''
+      selectProject(projectIdParam, moduleIdParam)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const personalFields = useMemo(() => {
     return Array.isArray(fields) ? [...fields].sort((a, b) => (a.order || 0) - (b.order || 0)) : []
@@ -292,15 +317,31 @@ export default function InductionWizard() {
     }
   }
 
-  const selectProject = async (id) => {
+  const loadModuleDetail = async (moduleId) => {
+    if (!moduleId) {
+      resetModuleContext()
+      setSubmissionGate(createSubmissionGate())
+      return
+    }
+    try {
+      const detail = await fetchModuleDetail(moduleId)
+      setModule(detail.module)
+      setFields(detail.fields || [])
+      setModuleConfig(detail.module?.config || createEmptyModuleConfig())
+      await checkSubmissionStatus(moduleId)
+    } catch {
+      resetModuleContext()
+      setSubmissionGate(createSubmissionGate())
+    }
+  }
+
+  const selectProject = async (id, preferredModuleId = '') => {
     const p = projects.find((x) => x._id === id)
     setProject(p || null)
     setProjectBlocked(false)
     setProjectBlockedMessage('')
     setStep(0)
-    setModule(null)
-    setFields([])
-    setModuleConfig({ slides: [], quiz: { questions: [] }, settings: { passMark: 80, randomizeQuestions: false, allowRetry: true } })
+    resetModuleContext()
     setPersonalValues({})
     setAnswers([])
     setScore(null)
@@ -308,22 +349,29 @@ export default function InductionWizard() {
     setSignature(null)
     setStatus('idle')
     setSubmissionGate(createSubmissionGate())
-    if (!id) return
+    if (!id) {
+      setProjectModules([])
+      return
+    }
     if (p?.status === 'archived') {
       setProjectBlocked(true)
       setProjectBlockedMessage('This project is archived and cannot accept submissions.')
       return
     }
+    setModulesLoading(true)
     try {
-      const r = await api.get(`/projects/${id}/modules/induction`)
-      setModule(r.data.module)
-      setFields(r.data.fields || [])
-      setModuleConfig(r.data.module?.config || { slides: [], quiz: { questions: [] }, settings: { passMark: 80, randomizeQuestions: false, allowRetry: true } })
-      if (r.data.module?._id) {
-        await checkSubmissionStatus(r.data.module._id)
-      }
+      const modules = await fetchProjectModules(id)
+      setProjectModules(modules)
+      const requested = preferredModuleId ? modules.find((m) => String(m._id) === String(preferredModuleId)) : null
+      const defaultModule = requested || modules.find((m) => m.reviewStatus === 'approved') || modules[0]
+      const nextModuleId = defaultModule?._id || ''
+      setSelectedModuleId(nextModuleId)
+      await loadModuleDetail(nextModuleId)
     } catch {
-      setModule(null)
+      setProjectModules([])
+      resetModuleContext()
+    } finally {
+      setModulesLoading(false)
     }
   }
 
@@ -419,6 +467,35 @@ export default function InductionWizard() {
               </option>
             ))}
           </TextField>
+          {project && (
+            <Stack spacing={1} sx={{ mt: 2 }}>
+              <Typography variant="subtitle2">Select induction module</Typography>
+              <TextField
+                fullWidth
+                select
+                SelectProps={{ native: true }}
+                value={selectedModuleId}
+                onChange={(e) => {
+                  const value = e.target.value
+                  setSelectedModuleId(value)
+                  loadModuleDetail(value)
+                }}
+                disabled={modulesLoading || !projectModules.length}
+                helperText={projectModules.length ? 'Pick which induction to complete' : 'No induction modules available.'}
+              >
+                <option value="">Select module</option>
+              {projectModules.map((mod) => (
+                <option key={mod._id} value={mod._id}>
+                  {mod.name || 'Induction module'} ({mod.reviewStatus})
+                </option>
+              ))}
+            </TextField>
+            {modulesLoading && <LinearProgress />}
+            {!modulesLoading && !projectModules.length && (
+              <Alert severity="info">This project does not yet have induction modules configured.</Alert>
+            )}
+          </Stack>
+        )}
           <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
             <Button variant="contained" onClick={nextStep} disabled={!project || !module || !moduleApproved || projectBlocked || submissionGate.blocked}>
               Next step

@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react'
 import { Alert, Button, Card, CardHeader, CardContent, Stack, TextField, Typography, MenuItem, Divider } from '@mui/material'
 import api from '../utils/api.js'
+import { fetchProjectModules, fetchModuleDetail } from '../utils/modules.js'
 import { useAuthStore } from '../store/auth.js'
 import ProjectInfoSection from '../components/admin/ProjectInfoSection.jsx'
 import PersonalDetailsSection from '../components/admin/PersonalDetailsSection.jsx'
@@ -55,19 +56,20 @@ export default function AdminConsole() {
 
   const loadModule = async (projectId) => {
     try {
-      const r = await api.get(`/projects/${projectId}/modules/induction`)
-      setModule(r.data.module)
-      setModuleConfig(normalizeConfig(r.data.module?.config))
-      setFields(r.data.fields || [])
-    } catch (e) {
-      if (e?.response?.status === 404) {
+      const modules = await fetchProjectModules(projectId)
+      if (!modules.length) {
         const created = await api.post(`/projects/${projectId}/modules/induction`, {})
         setModule(created.data)
         setModuleConfig(normalizeConfig(created.data?.config))
         setFields([])
-      } else {
-        setModule(null); setModuleConfig(defaultConfig); setFields([])
+        return
       }
+      const detail = await fetchModuleDetail(modules[0]._id)
+      setModule(detail.module)
+      setModuleConfig(normalizeConfig(detail.module?.config))
+      setFields(detail.fields || [])
+    } catch (e) {
+      setModule(null); setModuleConfig(defaultConfig); setFields([])
     }
   }
 

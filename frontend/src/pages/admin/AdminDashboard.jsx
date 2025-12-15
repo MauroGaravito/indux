@@ -1,6 +1,7 @@
 ﻿import React from 'react'
 import { Grid, Card, CardContent, Typography, Box, LinearProgress } from '@mui/material'
 import api from '../../utils/api.js'
+import { fetchProjectModules } from '../../utils/modules.js'
 
 const Stat = ({ label, value }) => (
   <Card elevation={0} sx={{ border: '1px solid #E5E7EB', borderRadius: 3 }}>
@@ -32,17 +33,18 @@ export default function AdminDashboard() {
         let pendingModuleReviews = 0
         for (const p of projects) {
           try {
-            const modResp = await api.get(`/projects/${p._id}/modules/induction`)
-            const mod = modResp.data.module
-            if (!mod?._id) continue
-            const [approved, pending, reviews] = await Promise.all([
-              api.get(`/modules/${mod._id}/submissions`, { params: { status: 'approved' } }).catch(() => ({ data: [] })),
-              api.get(`/modules/${mod._id}/submissions`, { params: { status: 'pending' } }).catch(() => ({ data: [] })),
-              api.get(`/modules/${mod._id}/reviews`).catch(() => ({ data: [] }))
-            ])
-            approvedSubs += (approved.data || []).length
-            pendingSubs += (pending.data || []).length
-            pendingModuleReviews += (reviews.data || []).filter((r) => r.status === 'pending').length
+            const modules = await fetchProjectModules(p._id)
+            for (const mod of modules) {
+              if (!mod?._id) continue
+              const [approved, pending, reviews] = await Promise.all([
+                api.get(`/modules/${mod._id}/submissions`, { params: { status: 'approved' } }).catch(() => ({ data: [] })),
+                api.get(`/modules/${mod._id}/submissions`, { params: { status: 'pending' } }).catch(() => ({ data: [] })),
+                api.get(`/modules/${mod._id}/reviews`).catch(() => ({ data: [] }))
+              ])
+              approvedSubs += (approved.data || []).length
+              pendingSubs += (pending.data || []).length
+              pendingModuleReviews += (reviews.data || []).filter((r) => r.status === 'pending').length
+            }
           } catch (_) {}
         }
 
