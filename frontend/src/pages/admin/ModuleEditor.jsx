@@ -28,6 +28,8 @@ import SaveIcon from '@mui/icons-material/Save';
 import SendIcon from '@mui/icons-material/Send';
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import GroupIcon from '@mui/icons-material/Group';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import api from '../../utils/api.js';
 import AsyncButton from '../../components/AsyncButton.jsx';
 import PersonalDetailsSection from '../../components/admin/PersonalDetailsSection.jsx';
@@ -59,6 +61,9 @@ export default function ModuleEditor({ mode = 'admin' }) {
   const [validationOpen, setValidationOpen] = useState(false);
   const [validationMessages, setValidationMessages] = useState([]);
   const [submitError, setSubmitError] = useState('');
+  const [isModuleMissing, setIsModuleMissing] = useState(false);
+  const [creatingModule, setCreatingModule] = useState(false);
+  const [moduleLoadError, setModuleLoadError] = useState('');
 
   const moduleStatus = module?.reviewStatus || 'draft';
   const isManagerMode = mode === 'manager';
@@ -70,6 +75,7 @@ export default function ModuleEditor({ mode = 'admin' }) {
     if (!isManagerMode || !user?.id) return false;
     return assignments.some((a) => String(a?.user?._id || a?.user) === String(user.id) && a.role === 'manager');
   }, [assignments, isManagerMode, user]);
+  const canCreateModule = mode === 'admin' || (isManagerMode && isManagerOfProject);
   const showActions = canEditModule && (!isManagerMode || isManagerOfProject);
   const bannerPalette = {
     draft: 'rgba(0, 0, 0, 0.04)',
@@ -118,15 +124,32 @@ export default function ModuleEditor({ mode = 'admin' }) {
       const mod = r.data?.module;
       if (!mod || (moduleId && mod._id !== moduleId)) {
         setModule(null);
+        setIsModuleMissing(false);
+        setModuleLoadError('');
         return;
       }
       setModule(mod);
       setModuleConfig(normalizeConfig(mod.config));
       setFields(r.data.fields || []);
-    } catch {
+      setIsModuleMissing(false);
+      setModuleLoadError('');
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 404) {
+        setModule(null);
+        setModuleConfig(defaultConfig);
+        setFields([]);
+        setIsModuleMissing(true);
+        setModuleLoadError('');
+        setSubmitError('');
+        return;
+      }
       setModule(null);
       setModuleConfig(defaultConfig);
       setFields([]);
+      setIsModuleMissing(false);
+      const msg = err?.response?.data?.error || err?.message || 'Failed to load induction module';
+      setModuleLoadError(typeof msg === 'string' ? msg : 'Failed to load induction module');
     }
   };
 
@@ -146,6 +169,30 @@ export default function ModuleEditor({ mode = 'admin' }) {
       setAssignments(r.data || []);
     } catch {
       setAssignments([]);
+    }
+  };
+
+  const handleCreateModule = async () => {
+    if (!canCreateModule || !projectId) return;
+    setSubmitError('');
+    setCreatingModule(true);
+    try {
+      const response = await api.post(`/projects/${projectId}/modules/induction`, {});
+      const created = response.data;
+      if (created?._id) {
+        const target =
+          mode === 'manager'
+            ? `/manager/projects/${projectId}/module/${created._id}`
+            : `/admin/projects/${projectId}/modules/induction/${created._id}`;
+        navigate(target, { replace: true });
+      } else {
+        await loadModule();
+      }
+    } catch (e) {
+      const msg = e?.response?.data?.error || e?.message || 'Failed to create induction module';
+      setSubmitError(typeof msg === 'string' ? msg : 'Failed to create induction module');
+    } finally {
+      setCreatingModule(false);
     }
   };
 
@@ -329,18 +376,33 @@ export default function ModuleEditor({ mode = 'admin' }) {
     </Grid>
   );
 
+  if (isModuleMissing) {
+    return (
+      <EmptyInductionModuleState
+        canCreate={canCreateModule}
+        onCreate={handleCreateModule}
+        creating={creatingModule}
+        errorMessage={submitError}
+      />
+    );
+  }
+
   if (!module) {
     return (
       <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <CardContent>
           <Stack spacing={2}>
             <Stack direction="row" spacing={1} alignItems="center">
-              <Button startIcon={<ArrowBackIcon />} component={RouterLink} to="/admin/projects">
+              <Button startIcon={<ArrowBackIcon />} component={RouterLink} to={mode === 'manager' ? '/manager/projects' : '/admin/projects'}>
                 Back to Projects
               </Button>
-              <Typography variant="h6">Induction module not found</Typography>
+              <Typography variant="h6">Induction module not available</Typography>
             </Stack>
-            <Alert severity="warning">No induction module exists for this project. Create one from the Projects page.</Alert>
+            {moduleLoadError ? (
+              <Alert severity="error">{moduleLoadError}</Alert>
+            ) : (
+              <Alert severity="warning">Unable to retrieve the induction module. Try reloading or contact an administrator.</Alert>
+            )}
           </Stack>
         </CardContent>
       </Card>
@@ -473,6 +535,35 @@ export default function ModuleEditor({ mode = 'admin' }) {
       </Card>
       <ValidationDialog open={validationOpen} onClose={() => setValidationOpen(false)} messages={validationMessages} />
     </>
+  );
+}
+
+function EmptyInductionModuleState({ canCreate, onCreate, creating, errorMessage }) {
+  return (
+    <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+      <CardContent>
+        <Stack spacing={2} alignItems="center" textAlign="center">
+          <DescriptionOutlinedIcon color="action" sx={{ fontSize: 48 }} />
+          <Typography variant="h6">No induction module yet</Typography>
+          <Typography variant="body2" color="text.secondary">This project doesn’t have an induction module created yet.</Typography>
+          {errorMessage && (
+            <Alert severity="error">{errorMessage}</Alert>
+          )}
+          {canCreate ? (
+            <AsyncButton
+              startIcon={<AddCircleOutlineIcon />}
+              variant="contained"
+              onClick={onCreate}
+              disabled={creating}
+            >
+              ➕ Create induction module
+            </AsyncButton>
+          ) : (
+            <Typography variant="body2" color="text.secondary">Waiting for an admin to create the induction module.</Typography>
+          )}
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
 
