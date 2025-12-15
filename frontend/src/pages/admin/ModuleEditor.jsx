@@ -48,6 +48,16 @@ const defaultConfig = {
   settings: { passMark: 80, randomizeQuestions: false, allowRetry: true },
 };
 
+const normalizeId = (value) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') {
+    if (value._id) return normalizeId(value._id);
+    if (typeof value.toString === 'function') return value.toString();
+  }
+  return String(value);
+};
+
 export default function ModuleEditor({ mode = 'admin' }) {
   const params = useParams();
   if (mode === 'template') {
@@ -80,10 +90,14 @@ export default function ModuleEditor({ mode = 'admin' }) {
   const canEditModule = isTemplateMode ? true : (!isManagerMode || managerEditableStatuses.includes(moduleStatus));
   const isReadOnly = isTemplateMode ? false : (isManagerMode && !managerEditableStatuses.includes(moduleStatus));
   const isPendingAdminApproval = !isTemplateMode && isManagerMode && moduleStatus === 'pending';
+  const currentUserId = useMemo(() => normalizeId(user?.id || user?._id || user?.userId || user?.sub), [user]);
   const isManagerOfProject = useMemo(() => {
-    if (!isManagerMode || !user?.id || isTemplateMode) return false;
-    return assignments.some((a) => String(a?.user?._id || a?.user) === String(user.id) && a.role === 'manager');
-  }, [assignments, isManagerMode, isTemplateMode, user]);
+    if (!isManagerMode || !currentUserId || isTemplateMode) return false;
+    return assignments.some((a) => {
+      const assignmentUserId = normalizeId(a?.user?._id || a?.user);
+      return assignmentUserId && assignmentUserId === currentUserId && a.role === 'manager';
+    });
+  }, [assignments, currentUserId, isManagerMode, isTemplateMode]);
   const canCreateModule = !isTemplateMode && (mode === 'admin' || (isManagerMode && isManagerOfProject));
   const showActions = isTemplateMode ? true : (canEditModule && (!isManagerMode || isManagerOfProject));
   const bannerPalette = {
