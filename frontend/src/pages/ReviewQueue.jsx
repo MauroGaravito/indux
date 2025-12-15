@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   Button,
@@ -42,11 +42,29 @@ export default function ReviewQueue() {
   const [viewMode, setViewMode] = useState('json')
   const [viewJson, setViewJson] = useState(null)
   const [declineOpen, setDeclineOpen] = useState(false)
-  const [declineId, setDeclineId] = useState(null)
+  const [declineTarget, setDeclineTarget] = useState(null)
   const [declineKind, setDeclineKind] = useState('submission')
   const [declineReason, setDeclineReason] = useState('Not adequate')
 
   const isAdmin = user?.role === 'admin'
+  const isManager = user?.role === 'manager'
+
+  const managedProjectIds = useMemo(() => {
+    const ids = new Set()
+    modules.forEach((entry) => {
+      const projectId = entry?.project?._id || entry?.project
+      if (projectId) ids.add(String(projectId))
+    })
+    return ids
+  }, [modules])
+
+  const canManageSubmission = (submission) => {
+    if (isAdmin) return true
+    if (!isManager) return false
+    const projectId = submission?.project?._id || submission?.projectId || submission?.project
+    if (!projectId) return false
+    return managedProjectIds.has(String(projectId))
+  }
 
   const loadContext = async () => {
     const projResp = await api.get('/projects')
@@ -106,17 +124,28 @@ export default function ReviewQueue() {
     setViewOpen(true)
   }
   const closeView = () => setViewOpen(false)
-  const openDecline = (kind, id) => { setDeclineKind(kind); setDeclineId(id); setDeclineOpen(true) }
-  const closeDecline = () => setDeclineOpen(false)
+  const openDecline = (kind, target, defaultReason = 'Not adequate') => {
+    setDeclineKind(kind)
+    setDeclineTarget(target)
+    setDeclineReason(defaultReason)
+    setDeclineOpen(true)
+  }
+  const closeDecline = () => {
+    setDeclineOpen(false)
+    setDeclineTarget(null)
+  }
 
-  const approveSubmission = async (id) => {
-    if (!isAdmin) return
-    await api.post(`/submissions/${id}/approve`)
+  const approveSubmission = async (submission) => {
+    if (!submission || !canManageSubmission(submission)) return
+    await api.post(`/submissions/${submission._id}/approve`)
     await loadAll()
   }
-  const declineSubmission = async () => {
-    if (!isAdmin || !declineId) return
-    await api.post(`/submissions/${declineId}/decline`, { reason: declineReason })
+  const declineSubmission = async (submission) => {
+    if (!submission || !canManageSubmission(submission)) {
+      closeDecline()
+      return
+    }
+    await api.post(`/submissions/${submission._id}/decline`, { reason: declineReason })
     closeDecline()
     await loadAll()
   }
@@ -128,8 +157,27 @@ export default function ReviewQueue() {
   const declineReview = async (rev) => {
     if (!isAdmin) return
     await api.post(`/modules/${rev.moduleId}/reviews/${rev._id}/decline`, { reason: declineReason })
+    closeDecline()
     await loadAll()
   }
+
+  const handleDeclineConfirm = async () => {
+    if (declineKind === 'submission' && declineTarget) {
+      await declineSubmission(declineTarget)
+      return
+    }
+    if (declineKind === 'review' && declineTarget) {
+      await declineReview(declineTarget)
+      return
+    }
+    closeDecline()
+  }
+
+
+
+
+
+
 
   return (
     <Stack spacing={2}>
@@ -153,25 +201,27 @@ export default function ReviewQueue() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {submissions.map((s) => (
-                <TableRow key={s._id}>
-                  <TableCell>{s.project?.name || ''}</TableCell>
-                  <TableCell>{s.userId?.name || s.userId?.email || ''}</TableCell>
-                  <TableCell><StatusChip status={s.status} /></TableCell>
-                  <TableCell>{new Date(s.createdAt || s._createdAt || Date.now()).toLocaleString()}</TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      <Button size="small" onClick={() => openView('submission', 'Submission details', s)}>Open details</Button>
-                      {isAdmin && (<AsyncButton size="small" color="success" variant="contained" onClick={() => approveSubmission(s._id)}>Approve submission</AsyncButton>)}
-                      {isAdmin && (<Button size="small" color="error" onClick={() => openDecline('submission', s._id)}>Decline submission</Button>)}
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {submissions.map((s) => {
+                const canAct = canManageSubmission(s)
+                return (
+                  <TableRow key={s._id}>
+                    <TableCell>{s.project?.name || ''}</TableCell>
+                    <TableCell>{s.userId?.name || s.userId?.email || ''}</TableCell>
+                    <TableCell><StatusChip status={s.status} /></TableCell>
+                    <TableCell>{new Date(s.createdAt || s._createdAt || Date.now()).toLocaleString()}</TableCell>
+                    <TableCell align="right">
+                      <Stack direction="row" spacing={1} justifyContent="flex-end">
+                        <Button size="small" onClick={() => openView('submission', 'Submission details', s)}>Open details</Button>
+                        {canAct && (<AsyncButton size="small" color="success" variant="contained" onClick={() => approveSubmission(s)}>Approve submission</AsyncButton>)}
+                        {canAct && (<Button size="small" color="error" onClick={() => openDecline('submission', s)}>Decline submission</Button>)}
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
           {!submissions.length && <Alert severity="info" sx={{ mt: 2 }}>No pending submission reviews to action.</Alert>}
-          {!isAdmin && <Alert severity="info" sx={{ mt: 2 }}>Only admins can approve or decline submissions.</Alert>}
         </Paper>
       )}
 
@@ -199,7 +249,7 @@ export default function ReviewQueue() {
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                       <Button size="small" onClick={() => openView('moduleReview', 'Module review snapshot', r)}>Open snapshot</Button>
                       {isAdmin && (<AsyncButton size="small" color="success" variant="contained" onClick={() => approveReview(r)}>Approve module</AsyncButton>)}
-                      {isAdmin && (<Button size="small" color="error" onClick={() => { setDeclineReason('Not adequate'); setDeclineKind('review'); setDeclineId(r._id); setDeclineOpen(true); }}>Decline module</Button>)}
+                      {isAdmin && (<Button size="small" color="error" onClick={() => openDecline('review', r, 'Not adequate')}>Decline module</Button>)}
                     </Stack>
                   </TableCell>
                 </TableRow>
@@ -234,9 +284,7 @@ export default function ReviewQueue() {
           <Button onClick={closeDecline}>Cancel</Button>
           <AsyncButton
             color="error"
-            onClick={() => (declineKind === 'submission'
-              ? declineSubmission()
-              : (reviews.find(r => r._id === declineId) ? declineReview(reviews.find(r => r._id === declineId)) : closeDecline()))}
+            onClick={handleDeclineConfirm}
           >
             Confirm decline
           </AsyncButton>
