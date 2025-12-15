@@ -87,6 +87,12 @@ router.get('/modules/:moduleId/submissions/my', requireAuth, requireRole('worker
 router.get('/modules/:moduleId/submissions', requireAuth, requireRole('manager', 'admin'), async (req, res) => {
   const moduleId = req.params.moduleId;
   if (!Types.ObjectId.isValid(moduleId)) return res.status(400).json({ error: 'Invalid module id' });
+  const mod = await InductionModule.findById(moduleId);
+  if (!mod) return res.status(404).json({ error: 'Module not found' });
+  if (req.user!.role === 'manager') {
+    const assignment = await Assignment.findOne({ user: req.user!.sub, project: mod.projectId, role: 'manager' });
+    if (!assignment) return res.status(403).json({ error: 'Not assigned to project' });
+  }
   const statusRaw = (req.query?.status as string) || 'pending';
   const status = ['pending', 'approved', 'declined', 'all'].includes(statusRaw) ? statusRaw : 'pending';
   const filter = status === 'all' ? { moduleId } : { moduleId, status };

@@ -5,6 +5,7 @@ import { Project } from '../models/Project.js';
 import { InductionModule } from '../models/InductionModule.js';
 import { InductionModuleField } from '../models/InductionModuleField.js';
 import { Assignment } from '../models/Assignment.js';
+import { InductionTemplate } from '../models/InductionTemplate.js';
 import {
   InductionModuleCreateSchema,
   InductionModuleUpdateDraftSchema,
@@ -34,24 +35,62 @@ const DEFAULT_USER_FIELDS = [
   },
 ];
 
-// Create or return an induction module for a project
+async function seedModuleFields(moduleId: Types.ObjectId, sourceFields?: any[]) {
+  const fieldsSource = Array.isArray(sourceFields) && sourceFields.length ? sourceFields : DEFAULT_USER_FIELDS
+  const docs = fieldsSource.map((field: any, idx: number) => ({
+    key: field.key ?? `field${idx + 1}`,
+    label: field.label ?? `Field ${idx + 1}`,
+    type: field.type || 'text',
+    required: !!field.required,
+    order: typeof field.order === 'number' ? field.order : idx + 1,
+    step: field.step || 'personal',
+    options: field.options || undefined,
+    visibleIf: field.visibleIf || undefined,
+    moduleId,
+  }))
+  if (docs.length) {
+    await InductionModuleField.insertMany(docs)
+  }
+}
+
+async function ensureProjectAccess(userRole: string | undefined, userId: string | undefined, projectId: string, roleOverride?: 'manager' | 'worker') {
+  if (userRole === 'admin') return true
+  const role = roleOverride || (userRole === 'manager' ? 'manager' : userRole === 'worker' ? 'worker' : null)
+  if (!role || !userId) return false
+  const assignment = await Assignment.findOne({ user: userId, project: projectId, role })
+  return Boolean(assignment)
+}
+
+// Create a new induction module for a project (blank or from template)
 router.post('/projects/:projectId/modules/induction', requireAuth, requireRole('admin', 'manager'), async (req, res) => {
   const projectId = req.params.projectId;
   if (!Types.ObjectId.isValid(projectId)) return res.status(400).json({ error: 'Invalid project id' });
   const project = await Project.findById(projectId);
   if (!project) return res.status(404).json({ error: 'Project not found' });
+  if (req.user?.role === 'manager') {
+    const assigned = await Assignment.findOne({ user: req.user.sub, project: projectId, role: 'manager' });
+    if (!assigned) {
+      return res.status(403).json({ error: 'Manager must be assigned to the project to create modules.' });
+    }
+  }
 
   const parsed = InductionModuleCreateSchema.safeParse({ ...req.body, projectId });
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  let module = await InductionModule.findOne({ projectId, type: 'induction' });
-  if (module) return res.json(module);
+  let template: any = null;
+  if (parsed.data.templateId) {
+    if (!Types.ObjectId.isValid(parsed.data.templateId)) return res.status(400).json({ error: 'Invalid template id' });
+    template = await InductionTemplate.findById(parsed.data.templateId);
+    if (!template) return res.status(404).json({ error: 'Template not found' });
+  }
 
-  module = await InductionModule.create({
+  const module = await InductionModule.create({
     projectId,
     type: 'induction',
-    reviewStatus: parsed.data.reviewStatus ?? 'draft',
-    config: parsed.data.config ?? {
+    name: parsed.data.name?.trim() || template?.name || `${project.name} induction`,
+    description: parsed.data.description ?? template?.description,
+    reviewStatus: 'draft',
+    config: parsed.data.config ?? template?.config ?? {
       steps: [],
       slides: [],
       quiz: { questions: [] },
@@ -61,31 +100,30 @@ router.post('/projects/:projectId/modules/induction', requireAuth, requireRole('
     updatedBy: req.user?.sub,
   });
 
-  // Seed default personal data fields on first creation
-  const defaultFields = DEFAULT_USER_FIELDS.map((field, idx) => ({
-    ...field,
-    moduleId: module._id,
-    order: idx + 1,
-    step: 'personal',
-  }));
-  await InductionModuleField.insertMany(defaultFields);
+  await seedModuleFields(module._id as Types.ObjectId, template?.fields);
 
   res.status(201).json(module);
 });
 
-// Get induction module (with fields)
+// List induction modules for a project
 router.get('/projects/:projectId/modules/induction', requireAuth, async (req, res) => {
   const projectId = req.params.projectId;
   if (!Types.ObjectId.isValid(projectId)) return res.status(400).json({ error: 'Invalid project id' });
-  const module = await InductionModule.findOne({ projectId, type: 'induction' }).lean();
+  const allowed = await ensureProjectAccess(req.user?.role, req.user?.sub, projectId);
+  if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+  const modules = await InductionModule.find({ projectId, type: 'induction' }).sort({ createdAt: 1 }).lean();
+  res.json({ modules });
+});
+
+// Get module detail with fields
+router.get('/modules/:moduleId', requireAuth, async (req, res) => {
+  const moduleId = req.params.moduleId;
+  if (!Types.ObjectId.isValid(moduleId)) return res.status(400).json({ error: 'Invalid module id' });
+  const module = await InductionModule.findById(moduleId).lean();
   if (!module) return res.status(404).json({ error: 'Module not found' });
-  if (req.user?.role !== 'admin') {
-    const role = req.user?.role === 'manager' ? 'manager' : req.user?.role === 'worker' ? 'worker' : null;
-    if (!role) return res.status(403).json({ error: 'Forbidden' });
-    const assignment = await Assignment.findOne({ user: req.user!.sub, project: projectId, role });
-    if (!assignment) return res.status(403).json({ error: 'Forbidden' });
-  }
-  const fields = await InductionModuleField.find({ moduleId: module._id }).sort({ order: 1, createdAt: 1 }).lean();
+  const allowed = await ensureProjectAccess(req.user?.role, req.user?.sub, module.projectId.toString());
+  if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+  const fields = await InductionModuleField.find({ moduleId }).sort({ order: 1, createdAt: 1 }).lean();
   res.json({ module, fields });
 });
 
@@ -118,6 +156,8 @@ router.put('/modules/:moduleId', requireAuth, requireRole('admin', 'manager'), a
     }
   }
 
+  if (body?.name) mod.name = String(body.name);
+  if (typeof body?.description !== 'undefined') mod.description = body.description;
   if (body?.config) mod.config = body.config as any;
   mod.updatedBy = req.user?.sub as any;
   await mod.save();
