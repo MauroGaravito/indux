@@ -13,6 +13,13 @@ import { Assignment } from '../models/Assignment.js';
 
 const router = Router();
 
+const workerCanAccessModule = (assignment: any, moduleId: Types.ObjectId) => {
+  if (!assignment) return false;
+  if (!assignment.modules || assignment.modules.length === 0) return true;
+  const target = moduleId.toString();
+  return assignment.modules.some((id: Types.ObjectId) => id.toString() === target);
+};
+
 router.post('/modules/:moduleId/submissions', requireAuth, requireRole('worker'), async (req, res) => {
   const moduleId = req.params.moduleId;
   if (!Types.ObjectId.isValid(moduleId)) return res.status(400).json({ error: 'Invalid module id' });
@@ -34,6 +41,8 @@ router.post('/modules/:moduleId/submissions', requireAuth, requireRole('worker')
   // Ensure worker is assigned to the project
   const assigned = await Assignment.findOne({ user: req.user!.sub, project: project._id, role: 'worker' });
   if (!assigned) return res.status(403).json({ error: 'Not assigned to project' });
+  const allowed = workerCanAccessModule(assigned, mod._id as Types.ObjectId);
+  if (!allowed) return res.status(403).json({ error: 'Module not assigned to worker' });
 
   const existing = await Submission.findOne({ moduleId, userId: req.user!.sub, status: { $in: ['pending', 'approved'] } });
   if (existing && existing.status === 'approved') {
@@ -78,6 +87,8 @@ router.get('/modules/:moduleId/submissions/my', requireAuth, requireRole('worker
   if (!mod) return res.status(404).json({ error: 'Module not found' });
   const assigned = await Assignment.findOne({ user: req.user!.sub, project: mod.projectId, role: 'worker' });
   if (!assigned) return res.status(403).json({ error: 'Not assigned to project' });
+  const allowed = workerCanAccessModule(assigned, mod._id as Types.ObjectId);
+  if (!allowed) return res.status(403).json({ error: 'Module not assigned to worker' });
   const submission = await Submission.findOne({ moduleId, userId: req.user!.sub }).sort({ createdAt: -1 });
   if (!submission) return res.json({ submission: null });
   const { _id, status, updatedAt, reviewReason } = submission;

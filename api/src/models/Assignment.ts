@@ -7,6 +7,7 @@ export interface IAssignment extends Document {
   project: Types.ObjectId;
   role: AssignmentRole;
   assignedBy?: Types.ObjectId;
+  modules?: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -17,6 +18,7 @@ const AssignmentSchema = new Schema<IAssignment>(
     project: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
     role: { type: String, enum: ['manager', 'worker'], required: true },
     assignedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    modules: [{ type: Schema.Types.ObjectId, ref: 'InductionModule' }],
   },
   { timestamps: true }
 );
@@ -24,4 +26,3 @@ const AssignmentSchema = new Schema<IAssignment>(
 AssignmentSchema.index({ user: 1, project: 1 }, { unique: true });
 
 export const Assignment = mongoose.model<IAssignment>('Assignment', AssignmentSchema);
-

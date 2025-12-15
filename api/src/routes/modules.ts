@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { Types } from 'mongoose';
+import { Document, Types } from 'mongoose';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { Project } from '../models/Project.js';
 import { InductionModule } from '../models/InductionModule.js';
 import { InductionModuleField } from '../models/InductionModuleField.js';
-import { Assignment } from '../models/Assignment.js';
+import { Assignment, IAssignment } from '../models/Assignment.js';
 import { InductionTemplate } from '../models/InductionTemplate.js';
 import { ModuleReview } from '../models/ModuleReview.js';
 import { Submission } from '../models/Submission.js';
@@ -78,12 +78,14 @@ async function seedModuleFields(moduleId: Types.ObjectId, sourceFields?: any[]) 
   }
 }
 
+type AccessResult = true | false | (IAssignment & Document);
+
 async function ensureProjectAccess(
   userRole: string | undefined,
   userId: string | undefined,
   projectId: string,
   roleOverride?: 'manager' | 'worker',
-) {
+): Promise<AccessResult> {
   if (userRole === 'admin') return true;
 
   const role =
@@ -102,8 +104,15 @@ async function ensureProjectAccess(
     role,
   });
 
-  return Boolean(assignment);
+  return assignment || false;
 }
+
+const workerHasModuleAccess = (assignment: IAssignment | null, moduleId: Types.ObjectId) => {
+  if (!assignment) return false;
+  if (!assignment.modules || assignment.modules.length === 0) return true;
+  const target = moduleId.toString();
+  return assignment.modules.some((id) => id.toString() === target);
+};
 
 /* -------------------------------------------------------------------------- */
 /*                             CREATE INDUCTION MODULE                         */
@@ -196,15 +205,18 @@ router.get('/projects/:projectId/modules/induction', requireAuth, async (req, re
     return res.status(400).json({ error: 'Invalid project id' });
   }
 
-  const allowed = await ensureProjectAccess(
+  const access = await ensureProjectAccess(
     req.user?.role,
     req.user?.sub,
     projectId,
   );
 
-  if (!allowed) {
+  if (!access) {
     return res.status(403).json({ error: 'Forbidden' });
   }
+
+  const workerAssignment =
+    req.user?.role === 'worker' && access !== true ? (access as IAssignment) : null;
 
   const modules = await InductionModule.find({
     projectId,
@@ -213,7 +225,13 @@ router.get('/projects/:projectId/modules/induction', requireAuth, async (req, re
     .sort({ createdAt: 1 })
     .lean();
 
-  res.json({ modules });
+  let filteredModules = modules;
+  if (workerAssignment && workerAssignment.modules && workerAssignment.modules.length) {
+    const allowedSet = new Set(workerAssignment.modules.map((id) => id.toString()));
+    filteredModules = modules.filter((mod) => allowedSet.has(mod._id.toString()));
+  }
+
+  res.json({ modules: filteredModules });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -232,14 +250,24 @@ router.get('/modules/:moduleId', requireAuth, async (req, res) => {
     return res.status(404).json({ error: 'Module not found' });
   }
 
-  const allowed = await ensureProjectAccess(
+  const access = await ensureProjectAccess(
     req.user?.role,
     req.user?.sub,
     module.projectId.toString(),
   );
 
-  if (!allowed) {
+  if (!access) {
     return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const workerAssignment =
+    req.user?.role === 'worker' && access !== true ? (access as IAssignment) : null;
+
+  if (req.user?.role === 'worker') {
+    const canView = workerHasModuleAccess(workerAssignment, module._id as Types.ObjectId);
+    if (!canView) {
+      return res.status(403).json({ error: 'Module not assigned to worker' });
+    }
   }
 
   const fields = await InductionModuleField.find({ moduleId })

@@ -35,6 +35,7 @@ import ProjectInfoSection from '../../components/admin/ProjectInfoSection.jsx'
 import { useTheme } from '@mui/material/styles'
 import { useAuthStore } from '../../store/auth.js'
 import CreateModuleDialog from '../../components/admin/CreateModuleDialog.jsx'
+import WorkerModuleAssignmentDialog from '../../components/WorkerModuleAssignmentDialog.jsx'
 import { fetchProjectModules } from '../../utils/modules.js'
 
 export default function Projects() {
@@ -62,6 +63,10 @@ export default function Projects() {
   const [errorMsg, setErrorMsg] = useState('')
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false)
   const [moduleActionLoading, setModuleActionLoading] = useState(false)
+  const [moduleAssignmentDialogOpen, setModuleAssignmentDialogOpen] = useState(false)
+  const [moduleAssignmentTarget, setModuleAssignmentTarget] = useState(null)
+  const [moduleAssignmentInitial, setModuleAssignmentInitial] = useState([])
+  const [moduleAssignmentSaving, setModuleAssignmentSaving] = useState(false)
 
   const loadProjects = async () => {
     try {
@@ -250,11 +255,47 @@ export default function Projects() {
     }
   }
 
+  const openWorkerModuleDialog = (assignment) => {
+    setModuleAssignmentTarget(assignment)
+    const seed = (assignment?.modules || []).map((id) => String(id))
+    setModuleAssignmentInitial(seed)
+    setModuleAssignmentDialogOpen(true)
+  }
+
+  const closeWorkerModuleDialog = () => {
+    if (moduleAssignmentSaving) return
+    setModuleAssignmentDialogOpen(false)
+    setModuleAssignmentTarget(null)
+    setModuleAssignmentInitial([])
+  }
+
+  const handleSaveWorkerModules = async (moduleIds) => {
+    if (!moduleAssignmentTarget) return
+    setModuleAssignmentSaving(true)
+    try {
+      await api.put(`/assignments/${moduleAssignmentTarget._id}/modules`, { modules: moduleIds })
+      closeWorkerModuleDialog()
+      if (selectedId) await loadAssignments(selectedId)
+    } catch (e) {
+      setErrorMsg(e?.response?.data?.error || 'Failed to update worker modules.')
+    } finally {
+      setModuleAssignmentSaving(false)
+    }
+  }
+
   const projectTabs = useMemo(() => ([
     { label: 'Project details', icon: <InfoIcon /> },
     { label: 'Assigned managers', icon: <AssignmentIndIcon /> },
     { label: 'Assigned workers', icon: <GroupIcon /> }
   ]), [])
+
+  const moduleNameMap = useMemo(() => {
+    const map = new Map()
+    modules.forEach((m) => {
+      map.set(String(m._id), m.name || 'Induction module')
+    })
+    return map
+  }, [modules])
 
   const managerAssignments = useMemo(() => assignments.filter((a) => a.role === 'manager'), [assignments])
   const workerAssignments = useMemo(() => assignments.filter((a) => a.role === 'worker'), [assignments])
@@ -407,21 +448,41 @@ export default function Projects() {
                 </Box>
 
                 <Box sx={{ mt: 2 }} hidden={tab !== 2}>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                    <GroupIcon color="action" />
-                    <Typography variant="subtitle2">Assigned workers</Typography>
-                    <Box sx={{ flex: 1 }} />
-                    <Button variant="contained" onClick={openAssignWorker} sx={{ textTransform: 'none' }}>Assign worker</Button>
-                  </Stack>
-                  <List>
-                    {workerAssignments.map((a) => (
-                      <ListItemButton key={a._id} sx={{ borderRadius: 1 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}><GroupIcon /></ListItemIcon>
-                        <ListItemText primary={`${a?.user?.name || a?.user}`} secondary={a?.user?.email || ''} />
-                        <Button color="error" onClick={() => removeAssignment(a._id)}>Remove worker</Button>
-                      </ListItemButton>
-                    ))}
-                  </List>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                  <GroupIcon color="action" />
+                  <Typography variant="subtitle2">Assigned workers</Typography>
+                  <Box sx={{ flex: 1 }} />
+                  <Button variant="contained" onClick={openAssignWorker} sx={{ textTransform: 'none' }}>Assign worker</Button>
+                </Stack>
+                <List>
+                  {workerAssignments.map((a) => (
+                    <ListItemButton key={a._id} sx={{ borderRadius: 1, alignItems: 'flex-start' }}>
+                      <ListItemIcon sx={{ minWidth: 36 }}><GroupIcon /></ListItemIcon>
+                      <ListItemText
+                        primary={`${a?.user?.name || a?.user}`}
+                        secondary={a?.user?.email || ''}
+                      />
+                      <Stack spacing={1} alignItems="flex-end">
+                        <Typography variant="caption" color="text.secondary">
+                          Assigned modules:{' '}
+                          {a.modules && a.modules.length
+                            ? (() => {
+                              const names = a.modules.map((id) => moduleNameMap.get(String(id)) || 'Induction module')
+                              const preview = names.slice(0, 3).join(', ')
+                              return names.length > 3 ? `${preview} (+${names.length - 3} more)` : preview
+                            })()
+                            : 'All modules'}
+                        </Typography>
+                        <Stack direction="row" spacing={1}>
+                          <Button variant="outlined" size="small" onClick={() => openWorkerModuleDialog(a)}>
+                            Assign modules
+                          </Button>
+                          <Button color="error" size="small" onClick={() => removeAssignment(a._id)}>Remove worker</Button>
+                        </Stack>
+                      </Stack>
+                    </ListItemButton>
+                  ))}
+                </List>
                   {!workerAssignments.length && (
                     <Typography variant="body2" sx={{ opacity: 0.7 }}>No workers assigned to this project.</Typography>
                   )}
@@ -495,6 +556,15 @@ export default function Projects() {
       open={moduleDialogOpen}
       onClose={() => setModuleDialogOpen(false)}
       onCreated={handleModuleCreated}
+    />
+    <WorkerModuleAssignmentDialog
+      open={moduleAssignmentDialogOpen}
+      workerName={moduleAssignmentTarget?.user?.name || ''}
+      modules={modules}
+      initialSelection={moduleAssignmentInitial}
+      onClose={closeWorkerModuleDialog}
+      onSubmit={handleSaveWorkerModules}
+      loading={moduleAssignmentSaving}
     />
     </>
   )

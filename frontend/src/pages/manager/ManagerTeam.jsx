@@ -17,6 +17,8 @@ import api from '../../utils/api.js'
 import { useParams } from 'react-router-dom'
 import { useAuthStore } from '../../store/auth.js'
 import AsyncButton from '../../components/AsyncButton.jsx'
+import { fetchProjectModules } from '../../utils/modules.js'
+import WorkerModuleAssignmentDialog from '../../components/WorkerModuleAssignmentDialog.jsx'
 
 export default function ManagerTeam() {
   const { projectId } = useParams()
@@ -26,6 +28,11 @@ export default function ManagerTeam() {
   const [selectedWorker, setSelectedWorker] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [modules, setModules] = useState([])
+  const [moduleDialogOpen, setModuleDialogOpen] = useState(false)
+  const [moduleDialogTarget, setModuleDialogTarget] = useState(null)
+  const [moduleDialogInitial, setModuleDialogInitial] = useState([])
+  const [moduleDialogSaving, setModuleDialogSaving] = useState(false)
 
   const loadAssignments = async () => {
     setError('')
@@ -49,9 +56,23 @@ export default function ManagerTeam() {
     }
   }
 
+  const loadModules = async () => {
+    if (!projectId) {
+      setModules([])
+      return
+    }
+    try {
+      const list = await fetchProjectModules(projectId)
+      setModules(list)
+    } catch {
+      setModules([])
+    }
+  }
+
   useEffect(() => {
     loadAssignments()
     loadWorkersPool()
+    loadModules()
   }, [projectId, user])
 
   const workers = useMemo(() => assignments.filter((a) => a.role === 'worker'), [assignments])
@@ -60,6 +81,12 @@ export default function ManagerTeam() {
     const alreadyIds = new Set(workers.map((w) => String(w.user?._id || w.user)))
     return workersPool.filter((w) => !alreadyIds.has(String(w.userId)))
   }, [workers, workersPool])
+
+  const moduleNameMap = useMemo(() => {
+    const map = new Map()
+    modules.forEach((m) => map.set(String(m._id), m.name || 'Induction module'))
+    return map
+  }, [modules])
 
   const addWorker = async () => {
     if (!selectedWorker) return
@@ -80,6 +107,33 @@ export default function ManagerTeam() {
     await loadAssignments()
   }
 
+  const openModuleDialog = (assignment) => {
+    setModuleDialogTarget(assignment)
+    setModuleDialogInitial((assignment?.modules || []).map((id) => String(id)))
+    setModuleDialogOpen(true)
+  }
+
+  const closeModuleDialog = () => {
+    if (moduleDialogSaving) return
+    setModuleDialogOpen(false)
+    setModuleDialogTarget(null)
+    setModuleDialogInitial([])
+  }
+
+  const saveModuleAssignments = async (moduleIds) => {
+    if (!moduleDialogTarget) return
+    setModuleDialogSaving(true)
+    try {
+      await api.put(`/assignments/${moduleDialogTarget._id}/modules`, { modules: moduleIds })
+      closeModuleDialog()
+      await loadAssignments()
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Unable to update module assignments.')
+    } finally {
+      setModuleDialogSaving(false)
+    }
+  }
+
   return (
     <Stack spacing={2}>
       <Typography variant="h5" sx={{ fontWeight: 700 }}>Assigned workers</Typography>
@@ -92,6 +146,14 @@ export default function ManagerTeam() {
             <Grid container spacing={2}>
               {workers.map((w) => {
                 const userData = w.user || {}
+                const assignedModules = (w.modules || []).map((id) => String(id))
+                const assignedLabel = assignedModules.length
+                  ? (() => {
+                      const names = assignedModules.map((id) => moduleNameMap.get(id) || 'Induction module')
+                      const preview = names.slice(0, 3).join(', ')
+                      return names.length > 3 ? `${preview} (+${names.length - 3} more)` : preview
+                    })()
+                  : 'All modules'
                 return (
                   <Grid item xs={12} md={6} key={w._id}>
                     <Box
@@ -117,8 +179,16 @@ export default function ManagerTeam() {
                         {userData.position && (
                           <Chip label={userData.position} size="small" sx={{ mt: 0.5 }} />
                         )}
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                          Assigned modules: {assignedLabel}
+                        </Typography>
                       </Box>
-                      <Button color="error" onClick={() => removeWorker(w._id)}>Remove worker</Button>
+                      <Stack spacing={1} alignItems="flex-end">
+                        <Button variant="outlined" size="small" onClick={() => openModuleDialog(w)}>
+                          Assign modules
+                        </Button>
+                        <Button color="error" size="small" onClick={() => removeWorker(w._id)}>Remove worker</Button>
+                      </Stack>
                     </Box>
                   </Grid>
                 )
@@ -146,6 +216,15 @@ export default function ManagerTeam() {
           </Stack>
         </CardContent>
       </Card>
+      <WorkerModuleAssignmentDialog
+        open={moduleDialogOpen}
+        workerName={moduleDialogTarget?.user?.name || ''}
+        modules={modules}
+        initialSelection={moduleDialogInitial}
+        onClose={closeModuleDialog}
+        onSubmit={saveModuleAssignments}
+        loading={moduleDialogSaving}
+      />
     </Stack>
   )
 }
