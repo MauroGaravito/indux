@@ -5,6 +5,7 @@ import { Project } from '../models/Project.js';
 import { InductionModule } from '../models/InductionModule.js';
 import { InductionModuleField } from '../models/InductionModuleField.js';
 import { Assignment } from '../models/Assignment.js';
+import { InductionTemplate } from '../models/InductionTemplate.js';
 import {
   InductionModuleCreateSchema,
   InductionModuleUpdateDraftSchema,
@@ -41,6 +42,16 @@ const DEFAULT_USER_FIELDS = [
 /* -------------------------------------------------------------------------- */
 /*                               HELPER METHODS                                */
 /* -------------------------------------------------------------------------- */
+
+const DEFAULT_MODULE_CONFIG = {
+  steps: [],
+  slides: [],
+  quiz: { questions: [] },
+  settings: { passMark: 80, randomizeQuestions: false, allowRetry: true },
+};
+
+const cloneConfig = (cfg?: any, fallback?: any) =>
+  JSON.parse(JSON.stringify(cfg ?? fallback ?? DEFAULT_MODULE_CONFIG));
 
 async function seedModuleFields(moduleId: Types.ObjectId, sourceFields?: any[]) {
   const fieldsSource =
@@ -135,28 +146,38 @@ router.post(
       return res.status(400).json({ error: parsed.error.flatten() });
     }
 
+    let template: any = null;
+    if (parsed.data.templateId) {
+      if (!Types.ObjectId.isValid(parsed.data.templateId)) {
+        return res.status(400).json({ error: 'Invalid template id' });
+      }
+      template = await InductionTemplate.findById(parsed.data.templateId);
+      if (!template) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+    }
+
     const module = await InductionModule.create({
       projectId,
       type: 'induction',
-      name: parsed.data.name?.trim() || `${project.name} induction`,
-      description: parsed.data.description,
+      name:
+        parsed.data.name?.trim() ||
+        template?.name ||
+        `${project.name} induction`,
+      description:
+        typeof parsed.data.description !== 'undefined'
+          ? parsed.data.description
+          : template?.description,
       reviewStatus: 'draft',
-      config:
-        parsed.data.config ?? {
-          steps: [],
-          slides: [],
-          quiz: { questions: [] },
-          settings: {
-            passMark: 80,
-            randomizeQuestions: false,
-            allowRetry: true,
-          },
-        },
+      config: cloneConfig(parsed.data.config, template?.config),
       createdBy: req.user?.sub,
       updatedBy: req.user?.sub,
     });
 
-    await seedModuleFields(module._id as Types.ObjectId);
+    await seedModuleFields(
+      module._id as Types.ObjectId,
+      template?.fields,
+    );
 
     res.status(201).json(module);
   },

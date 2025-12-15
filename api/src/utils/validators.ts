@@ -54,38 +54,60 @@ export const InductionModuleCreateSchema = z.object({
   projectId: z.string().min(1),
   name: z.string().min(1).optional(),
   description: z.string().optional(),
+  templateId: z.string().min(1).optional(),
   config: InductionModuleConfigSchema.optional(),
   reviewStatus: z.enum(['draft', 'pending', 'approved', 'declined']).optional(),
 });
 
-export const InductionModuleUpdateSchema = z.object({
-  name: z.string().min(1).optional(),
-  description: z.string().optional(),
-  config: InductionModuleConfigSchema.optional(),
-  reviewStatus: z.enum(['draft', 'pending', 'approved', 'declined']).optional(),
-}).strict();
+export const InductionModuleUpdateSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    config: InductionModuleConfigSchema.optional(),
+    reviewStatus: z.enum(['draft', 'pending', 'approved', 'declined']).optional(),
+  })
+  .strict();
 
 // Draft-friendly schema: allows empty/partial payloads (used on PUT save)
-export const InductionModuleUpdateDraftSchema = z.object({
-  name: z.string().optional(),
+export const InductionModuleUpdateDraftSchema = z
+  .object({
+    name: z.string().optional(),
+    description: z.string().optional(),
+    config: z
+      .object({
+        steps: z.array(z.string()).optional(),
+        slides: z.array(z.any()).optional(),
+        quiz: z.object({ questions: z.array(z.any()).optional() }).optional(),
+        settings: z
+          .object({
+            passMark: z.number().optional(),
+            randomizeQuestions: z.boolean().optional(),
+            allowRetry: z.boolean().optional(),
+          })
+          .optional(),
+      })
+      .partial()
+      .optional(),
+    reviewStatus: z.enum(['draft', 'pending', 'approved', 'declined']).optional(),
+  })
+  .strict()
+  .passthrough();
+
+export const InductionTemplateCreateSchema = z.object({
+  name: z.string().min(1),
   description: z.string().optional(),
-  config: z
-    .object({
-      steps: z.array(z.string()).optional(),
-      slides: z.array(z.any()).optional(),
-      quiz: z.object({ questions: z.array(z.any()).optional() }).optional(),
-      settings: z
-        .object({
-          passMark: z.number().optional(),
-          randomizeQuestions: z.boolean().optional(),
-          allowRetry: z.boolean().optional(),
-        })
-        .optional(),
-    })
-    .partial()
-    .optional(),
-  reviewStatus: z.enum(['draft', 'pending', 'approved', 'declined']).optional(),
-}).strict().passthrough();
+  config: InductionModuleConfigSchema.optional(),
+  fields: z.array(ModuleFieldStrictSchema).optional(),
+});
+
+export const InductionTemplateUpdateSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    config: InductionModuleConfigSchema.optional(),
+    fields: z.array(ModuleFieldStrictSchema).optional(),
+  })
+  .strict();
 
 // Strict schemas for review validation
 const SlideItemStrictSchema = z.object({

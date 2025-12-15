@@ -34,6 +34,7 @@ import AsyncButton from '../../components/AsyncButton.jsx'
 import ProjectInfoSection from '../../components/admin/ProjectInfoSection.jsx'
 import { useTheme } from '@mui/material/styles'
 import { useAuthStore } from '../../store/auth.js'
+import CreateModuleDialog from '../../components/admin/CreateModuleDialog.jsx'
 import { fetchProjectModules } from '../../utils/modules.js'
 
 export default function Projects() {
@@ -59,6 +60,7 @@ export default function Projects() {
   const [modules, setModules] = useState([])
   const [modulesLoading, setModulesLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [moduleDialogOpen, setModuleDialogOpen] = useState(false)
 
   const loadProjects = async () => {
     try {
@@ -218,13 +220,12 @@ export default function Projects() {
     await loadAssignments(selectedId)
   }
 
-  const createModule = async () => {
-    if (!selectedId) return
-    const r = await api.post(`/projects/${selectedId}/modules/induction`, {})
-    const mod = r.data
-    await loadModulesForProject(selectedId)
-    if (mod?._id) {
+  const handleModuleCreated = (mod) => {
+    setModuleDialogOpen(false)
+    if (mod?._id && selectedId) {
       navigate(`/admin/projects/${selectedId}/modules/induction/${mod._id}`)
+    } else if (selectedId) {
+      loadModulesForProject(selectedId)
     }
   }
 
@@ -326,7 +327,7 @@ export default function Projects() {
                   {!modulesLoading && modules.length === 0 && (
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" justifyContent="space-between">
                       <Typography variant="body2" color="text.secondary">No induction modules have been created.</Typography>
-                      <Button variant="contained" onClick={createModule} sx={{ textTransform: 'none' }}>Create induction module</Button>
+                      <Button variant="contained" onClick={() => setModuleDialogOpen(true)} sx={{ textTransform: 'none' }}>Create induction module</Button>
                     </Stack>
                   )}
                   {!modulesLoading && modules.length > 0 && (
@@ -340,7 +341,7 @@ export default function Projects() {
                           <Button variant="contained" onClick={() => openModule(mod._id)} sx={{ textTransform: 'none' }}>Open module</Button>
                         </Stack>
                       ))}
-                      <Button variant="outlined" onClick={createModule} sx={{ alignSelf: 'flex-start', textTransform: 'none' }}>Create another induction module</Button>
+                      <Button variant="outlined" onClick={() => setModuleDialogOpen(true)} sx={{ alignSelf: 'flex-start', textTransform: 'none' }}>Create another induction module</Button>
                     </Stack>
                   )}
                 </Box>
@@ -460,6 +461,12 @@ export default function Projects() {
     <Snackbar open={!!errorMsg} autoHideDuration={4000} onClose={() => setErrorMsg('')}>
       <Alert severity="error" onClose={() => setErrorMsg('')}>{errorMsg}</Alert>
     </Snackbar>
+    <CreateModuleDialog
+      projectId={selectedId}
+      open={moduleDialogOpen}
+      onClose={() => setModuleDialogOpen(false)}
+      onCreated={handleModuleCreated}
+    />
     </>
   )
 }

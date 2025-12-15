@@ -33,6 +33,7 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import api from '../../utils/api.js';
 import { fetchProjectModules, fetchModuleDetail } from '../../utils/modules.js';
 import AsyncButton from '../../components/AsyncButton.jsx';
+import CreateModuleDialog from '../../components/admin/CreateModuleDialog.jsx';
 import PersonalDetailsSection from '../../components/admin/PersonalDetailsSection.jsx';
 import SlidesSection from '../../components/admin/SlidesSection.jsx';
 import QuestionsSection from '../../components/admin/QuestionsSection.jsx';
@@ -48,7 +49,11 @@ const defaultConfig = {
 };
 
 export default function ModuleEditor({ mode = 'admin' }) {
-  const { projectId, moduleId, templateId } = useParams();
+  const params = useParams();
+  if (mode === 'template') {
+    return <TemplateModeEditor templateId={params.templateId} />;
+  }
+  const { projectId, moduleId } = params;
   const navigate = useNavigate();
   const { user } = useAuthStore();
 
@@ -65,8 +70,8 @@ export default function ModuleEditor({ mode = 'admin' }) {
   const [validationMessages, setValidationMessages] = useState([]);
   const [submitError, setSubmitError] = useState('');
   const [isModuleMissing, setIsModuleMissing] = useState(false);
-  const [creatingModule, setCreatingModule] = useState(false);
   const [moduleLoadError, setModuleLoadError] = useState('');
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const isManagerMode = mode === 'manager';
   const isTemplateMode = mode === 'template';
@@ -200,26 +205,22 @@ export default function ModuleEditor({ mode = 'admin' }) {
     }
   };
 
-  const handleCreateModule = async () => {
-    if (!canCreateModule || !projectId) return;
+  const handleCreateModule = () => {
+    if (!canCreateModule) return;
     setSubmitError('');
-    setCreatingModule(true);
-    try {
-      const response = await api.post(`/projects/${projectId}/modules/induction`, {});
-      const created = response.data;
-      await loadModules();
-      if (created?._id) {
-        const target =
-          mode === 'manager'
-            ? `/manager/projects/${projectId}/module/${created._id}`
-            : `/admin/projects/${projectId}/modules/induction/${created._id}`;
-        navigate(target, { replace: true });
-      }
-    } catch (e) {
-      const msg = e?.response?.data?.error || e?.message || 'Failed to create induction module';
-      setSubmitError(typeof msg === 'string' ? msg : 'Failed to create induction module');
-    } finally {
-      setCreatingModule(false);
+    setCreateDialogOpen(true);
+  };
+
+  const handleModuleCreated = (created) => {
+    setCreateDialogOpen(false);
+    if (created?._id) {
+      const target =
+        mode === 'manager'
+          ? `/manager/projects/${projectId}/module/${created._id}`
+          : `/admin/projects/${projectId}/modules/induction/${created._id}`;
+      navigate(target, { replace: true });
+    } else {
+      loadModules();
     }
   };
 
@@ -360,7 +361,7 @@ export default function ModuleEditor({ mode = 'admin' }) {
     }
     try {
       await api.post(`/modules/${moduleId}/reviews`);
-      await Promise.all([loadModule(), loadReviews()]);
+      await Promise.all([loadModuleDetails(moduleId), loadReviews(moduleId)]);
     } catch (e) {
       const msg = e?.response?.data?.error || e?.message || 'Failed to send for review';
       setSubmitError(typeof msg === 'string' ? msg : 'Failed to send for review');
@@ -412,7 +413,6 @@ export default function ModuleEditor({ mode = 'admin' }) {
       <EmptyInductionModuleState
         canCreate={canCreateModule}
         onCreate={handleCreateModule}
-        creating={creatingModule}
         errorMessage={submitError}
       />
     );
@@ -442,6 +442,12 @@ export default function ModuleEditor({ mode = 'admin' }) {
 
   return (
     <>
+      <CreateModuleDialog
+        projectId={projectId}
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        onCreated={handleModuleCreated}
+      />
       {isManagerMode && (
         <Box
           sx={{
@@ -569,7 +575,7 @@ export default function ModuleEditor({ mode = 'admin' }) {
   );
 }
 
-function EmptyInductionModuleState({ canCreate, onCreate, creating, errorMessage }) {
+function EmptyInductionModuleState({ canCreate, onCreate, errorMessage }) {
   return (
     <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
       <CardContent>
@@ -585,9 +591,8 @@ function EmptyInductionModuleState({ canCreate, onCreate, creating, errorMessage
               startIcon={<AddCircleOutlineIcon />}
               variant="contained"
               onClick={onCreate}
-              disabled={creating}
             >
-              ➕ Create induction module
+              Create induction module
             </AsyncButton>
           ) : (
             <Typography variant="body2" color="text.secondary">Waiting for an admin to create the induction module.</Typography>
@@ -620,6 +625,249 @@ function ValidationDialog({ open, onClose, messages }) {
       </DialogActions>
     </Dialog>
   );
+}
+
+function TemplateModeEditor({ templateId }) {
+  const navigate = useNavigate()
+  const [template, setTemplate] = useState(null)
+  const [moduleConfig, setModuleConfig] = useState(defaultConfig)
+  const [fields, setFields] = useState([])
+  const [meta, setMeta] = useState({ name: '', description: '' })
+  const [tab, setTab] = useState(0)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  const normalizeConfig = (cfg) => ({
+    steps: Array.isArray(cfg?.steps) ? cfg.steps : defaultConfig.steps,
+    slides: Array.isArray(cfg?.slides) ? cfg.slides : [],
+    quiz: cfg?.quiz && Array.isArray(cfg.quiz?.questions) ? { questions: cfg.quiz.questions } : { questions: [] },
+    settings: cfg?.settings ? { ...defaultConfig.settings, ...cfg.settings } : { ...defaultConfig.settings },
+  })
+
+  useEffect(() => {
+    async function loadTemplate() {
+      if (!templateId) {
+        setTemplate(null)
+        setLoading(false)
+        return
+      }
+      setLoading(true)
+      setError('')
+      try {
+        const resp = await api.get(`/induction-templates/${templateId}`)
+        const tpl = resp.data
+        setTemplate(tpl)
+        setMeta({ name: tpl.name || '', description: tpl.description || '' })
+        setModuleConfig(normalizeConfig(tpl.config))
+        setFields(Array.isArray(tpl.fields) ? tpl.fields : [])
+      } catch (e) {
+        setError(e?.response?.data?.error || 'Unable to load template')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadTemplate()
+  }, [templateId])
+
+  const sanitizeFields = () => {
+    const existingKeys = fields.map((f) => f.key).filter(Boolean)
+    return fields
+      .map((f, idx) => {
+        if (!f.key) {
+          const base = toCamelKey(f.label) || `field${idx + 1}`
+          const unique = makeUniqueKey(base, existingKeys)
+          existingKeys.push(unique)
+          return { ...f, key: unique }
+        }
+        return f
+      })
+      .filter((f) => f.key && f.label && f.type)
+  }
+
+  const buildConfigPayload = () => {
+    const validSlides = (moduleConfig?.slides || []).filter((s) => s?.fileKey)
+    const validQuestions = (moduleConfig?.quiz?.questions || []).filter((q) => {
+      const hasText = q?.question && String(q.question).trim()
+      const opts = Array.isArray(q?.options) ? q.options : []
+      const answerOk = typeof q?.answerIndex === 'number' && q.answerIndex >= 0 && q.answerIndex < opts.length
+      return hasText && opts.length >= 2 && answerOk
+    })
+    const settings = moduleConfig?.settings || {}
+    return {
+      steps: Array.isArray(moduleConfig?.steps) ? moduleConfig.steps : defaultConfig.steps,
+      slides: validSlides,
+      quiz: { questions: validQuestions },
+      settings: {
+        passMark: typeof settings.passMark === 'number' ? settings.passMark : 80,
+        randomizeQuestions: typeof settings.randomizeQuestions === 'boolean' ? settings.randomizeQuestions : false,
+        allowRetry: typeof settings.allowRetry === 'boolean' ? settings.allowRetry : true,
+      },
+    }
+  }
+
+  const saveTemplate = async () => {
+    if (!templateId) return
+    setSaving(true)
+    setError('')
+    try {
+      await api.put(`/induction-templates/${templateId}`, {
+        name: meta.name?.trim() || 'Untitled template',
+        description: meta.description,
+        config: buildConfigPayload(),
+        fields: sanitizeFields(),
+      })
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || 'Failed to save template')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!templateId) {
+    return (
+      <Card>
+        <CardContent>
+          <Alert severity="info">Select a template to edit.</Alert>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent>
+          <Alert severity="info">Loading template…</Alert>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (error && !template) {
+    return (
+      <Card>
+        <CardContent>
+          <Alert severity="error">{error}</Alert>
+          <Button sx={{ mt: 2 }} variant="outlined" component={RouterLink} to="/admin/templates">
+            Back to templates
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const tabLabels = ['Personal data fields', 'Slides & documents', 'Quiz & questions', 'Module settings']
+
+  return (
+    <>
+      <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <CardContent>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+            <Button startIcon={<ArrowBackIcon />} component={RouterLink} to="/admin/templates">
+              Back to templates
+            </Button>
+            <Typography variant="h6">Template configuration</Typography>
+            <Chip label="Template" color="info" />
+            <Box sx={{ flex: 1 }} />
+            <AsyncButton startIcon={<SaveIcon />} variant="contained" onClick={saveTemplate} loading={saving}>
+              Save template
+            </AsyncButton>
+          </Stack>
+
+          <Stack spacing={2} sx={{ mb: 2 }}>
+            <TextField
+              label="Template name"
+              value={meta.name}
+              onChange={(e) => setMeta((prev) => ({ ...prev, name: e.target.value }))}
+            />
+            <TextField
+              label="Description"
+              value={meta.description}
+              onChange={(e) => setMeta((prev) => ({ ...prev, description: e.target.value }))}
+              multiline
+              minRows={2}
+            />
+          </Stack>
+
+          <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: '1px solid #eee' }}>
+            {tabLabels.map((label) => (
+              <Tab key={label} label={label} />
+            ))}
+          </Tabs>
+
+          <Box sx={{ mt: 2 }} hidden={tab !== 0}>
+            <PersonalDetailsSection fields={fields} onChange={setFields} readOnly={false} />
+          </Box>
+          <Box sx={{ mt: 2 }} hidden={tab !== 1}>
+            <SlidesSection slides={moduleConfig.slides} onChange={(slides) => setModuleConfig({ ...moduleConfig, slides })} readOnly={false} />
+          </Box>
+          <Box sx={{ mt: 2 }} hidden={tab !== 2}>
+            <QuestionsSection
+              questions={moduleConfig.quiz?.questions || []}
+              onChange={(qs) => setModuleConfig({ ...moduleConfig, quiz: { questions: qs } })}
+              readOnly={false}
+            />
+          </Box>
+          <Box sx={{ mt: 2 }} hidden={tab !== 3}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Pass mark (%)"
+                  type="number"
+                  fullWidth
+                  value={moduleConfig.settings?.passMark ?? 80}
+                  onChange={(e) =>
+                    setModuleConfig({
+                      ...moduleConfig,
+                      settings: { ...moduleConfig.settings, passMark: Number(e.target.value) },
+                    })
+                  }
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Randomize questions"
+                  select
+                  fullWidth
+                  SelectProps={{ native: true }}
+                  value={moduleConfig.settings?.randomizeQuestions ? 'yes' : 'no'}
+                  onChange={(e) =>
+                    setModuleConfig({
+                      ...moduleConfig,
+                      settings: { ...moduleConfig.settings, randomizeQuestions: e.target.value === 'yes' },
+                    })
+                  }
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Allow retry"
+                  select
+                  fullWidth
+                  SelectProps={{ native: true }}
+                  value={moduleConfig.settings?.allowRetry ? 'yes' : 'no'}
+                  onChange={(e) =>
+                    setModuleConfig({
+                      ...moduleConfig,
+                      settings: { ...moduleConfig.settings, allowRetry: e.target.value === 'yes' },
+                    })
+                  }
+                >
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </TextField>
+              </Grid>
+            </Grid>
+          </Box>
+        </CardContent>
+      </Card>
+    </>
+  )
 }
   const toCamelKey = (label) => {
     if (!label) return ''

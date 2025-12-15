@@ -42,6 +42,7 @@ export default function DashboardLayout({ children }) {
     ? [
         { label: 'Admin Dashboard', to: '/admin', icon: <DashboardIcon /> },
         { label: 'Project Register', to: '/admin/projects', icon: <FolderIcon /> },
+        { label: 'Induction Templates', to: '/admin/templates', icon: <MenuBookIcon /> },
         { label: 'Module Reviews', to: '/admin/reviews', icon: <RateReviewIcon /> },
         { label: 'User Directory', to: '/admin/users', icon: <PeopleIcon /> },
         { label: 'Safety Settings', to: '/admin/settings', icon: <SettingsIcon /> },

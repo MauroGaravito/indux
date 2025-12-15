@@ -16,7 +16,7 @@ import LocationOnIcon from '@mui/icons-material/LocationOn'
 import LockIcon from '@mui/icons-material/Lock'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../../utils/api.js'
-import AsyncButton from '../../components/AsyncButton.jsx'
+import CreateModuleDialog from '../../components/admin/CreateModuleDialog.jsx'
 import { fetchProjectModules } from '../../utils/modules.js'
 
 export default function ManagerProjectDetail() {
@@ -28,7 +28,7 @@ export default function ManagerProjectDetail() {
   const [selectedModuleId, setSelectedModuleId] = useState('')
   const [error, setError] = useState('')
   const [managerAssignments, setManagerAssignments] = useState([])
-  const [createLoading, setCreateLoading] = useState(false)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
   const loadProject = async () => {
     try {
@@ -126,20 +126,16 @@ export default function ManagerProjectDetail() {
     if (idToOpen) navigate(`/manager/projects/${projectId}/module/${idToOpen}`)
   }
 
-  const createModule = async () => {
-    if (!projectId) return
-    setCreateLoading(true)
-    try {
-      const res = await api.post(`/projects/${projectId}/modules/induction`, {})
-      const mod = res.data
-      await loadModules()
-      if (mod?._id) {
-        navigate(`/manager/projects/${projectId}/module/${mod._id}`)
-      }
-    } catch (e) {
-      setError(e?.response?.data?.error || 'Unable to create induction module.')
-    } finally {
-      setCreateLoading(false)
+  const createModule = () => {
+    setCreateDialogOpen(true)
+  }
+
+  const handleModuleCreated = (mod) => {
+    setCreateDialogOpen(false)
+    if (mod?._id) {
+      navigate(`/manager/projects/${projectId}/module/${mod._id}`)
+    } else {
+      loadModules()
     }
   }
 
@@ -196,9 +192,9 @@ export default function ManagerProjectDetail() {
             {!modulesLoading && modules.length === 0 && (
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center">
                 <Typography variant="body2" color="text.secondary">No induction modules configured for this project.</Typography>
-                <AsyncButton variant="contained" onClick={createModule} loading={createLoading}>
+                <Button variant="contained" onClick={createModule}>
                   Create induction module
-                </AsyncButton>
+                </Button>
               </Stack>
             )}
             {!modulesLoading && modules.length > 0 && (
@@ -238,9 +234,9 @@ export default function ManagerProjectDetail() {
             <Button variant="contained" color={buttonColor} onClick={() => openModule(selectedModuleId)} disabled={!selectedModuleId}>
               Edit selected module
             </Button>
-            <AsyncButton variant="outlined" onClick={createModule} loading={createLoading}>
+            <Button variant="outlined" onClick={createModule}>
               Create new module
-            </AsyncButton>
+            </Button>
             <Button variant="outlined" onClick={() => navigate(`/manager/projects/${projectId}/team`)}>
               Manage assigned workers
             </Button>
@@ -249,6 +245,12 @@ export default function ManagerProjectDetail() {
           {!selectedModuleId && !modulesLoading && <Alert severity="info">No induction module selected.</Alert>}
         </Stack>
       </CardContent>
+      <CreateModuleDialog
+        projectId={projectId}
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        onCreated={handleModuleCreated}
+      />
     </Card>
   )
 }

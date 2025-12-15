@@ -9,6 +9,7 @@ import moduleRoutes from './routes/modules.js';
 import moduleFieldRoutes from './routes/moduleFields.js';
 import moduleReviewRoutes from './routes/moduleReviews.js';
 import moduleSubmissionRoutes from './routes/moduleSubmissions.js';
+import inductionTemplateRoutes from './routes/inductionTemplates.js';
 import uploadRoutes from './routes/uploads.js';
 import userRoutes from './routes/users.js';
 import assignmentsRoutes from './routes/assignments.js';
@@ -89,6 +90,7 @@ app.use('/uploads', uploadRoutes);
 app.use('/users', userRoutes);
 app.use('/assignments', assignmentsRoutes);
 app.use('/brand-config', brandConfigRoutes);
+app.use('/induction-templates', inductionTemplateRoutes);
 
 // --- Start Server ---
 async function start() {
