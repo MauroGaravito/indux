@@ -93,22 +93,6 @@ export const InductionModuleUpdateDraftSchema = z
   .strict()
   .passthrough();
 
-export const InductionTemplateCreateSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  config: InductionModuleConfigSchema.optional(),
-  fields: z.array(ModuleFieldStrictSchema).optional(),
-});
-
-export const InductionTemplateUpdateSchema = z
-  .object({
-    name: z.string().min(1).optional(),
-    description: z.string().optional(),
-    config: InductionModuleConfigSchema.optional(),
-    fields: z.array(ModuleFieldStrictSchema).optional(),
-  })
-  .strict();
-
 // Strict schemas for review validation
 const SlideItemStrictSchema = z.object({
   key: z.string().min(1),
@@ -164,6 +148,22 @@ export const ModuleFieldCreateSchema = z.object({
 });
 
 export const ModuleFieldUpdateSchema = ModuleFieldCreateSchema.partial().omit({ moduleId: true });
+
+export const InductionTemplateCreateSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  config: InductionModuleConfigSchema.optional(),
+  fields: z.array(ModuleFieldStrictSchema).optional(),
+});
+
+export const InductionTemplateUpdateSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    config: InductionModuleConfigSchema.optional(),
+    fields: z.array(ModuleFieldStrictSchema).optional(),
+  })
+  .strict();
 
 export const ModuleReviewCreateSchema = z.object({
   moduleId: z.string().min(1),
