@@ -61,6 +61,7 @@ export default function Projects() {
   const [modulesLoading, setModulesLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false)
+  const [moduleActionLoading, setModuleActionLoading] = useState(false)
 
   const loadProjects = async () => {
     try {
@@ -234,6 +235,21 @@ export default function Projects() {
     navigate(`/admin/projects/${selectedId}/modules/induction/${moduleId}`)
   }
 
+  const deleteModule = async (moduleId) => {
+    if (!moduleId || !selectedId) return
+    const confirmed = window.confirm('Remove this induction module? All reviews and submissions for it will also be deleted.')
+    if (!confirmed) return
+    try {
+      setModuleActionLoading(true)
+      await api.delete(`/modules/${moduleId}`)
+      await loadModulesForProject(selectedId)
+    } catch (e) {
+      setErrorMsg(e?.response?.data?.error || 'Failed to delete induction module')
+    } finally {
+      setModuleActionLoading(false)
+    }
+  }
+
   const projectTabs = useMemo(() => ([
     { label: 'Project details', icon: <InfoIcon /> },
     { label: 'Assigned managers', icon: <AssignmentIndIcon /> },
@@ -338,7 +354,20 @@ export default function Projects() {
                             <Typography variant="body1">{mod.name || 'Induction module'}</Typography>
                             <Typography variant="body2" color="text.secondary">Status: {mod.reviewStatus || 'draft'}</Typography>
                           </Stack>
-                          <Button variant="contained" onClick={() => openModule(mod._id)} sx={{ textTransform: 'none' }}>Open module</Button>
+                          <Stack direction="row" spacing={1}>
+                            <Button variant="contained" onClick={() => openModule(mod._id)} sx={{ textTransform: 'none' }}>
+                              Open module
+                            </Button>
+                            <Button
+                              color="error"
+                              variant="outlined"
+                              disabled={moduleActionLoading}
+                              onClick={() => deleteModule(mod._id)}
+                              sx={{ textTransform: 'none' }}
+                            >
+                              Remove
+                            </Button>
+                          </Stack>
                         </Stack>
                       ))}
                       <Button variant="outlined" onClick={() => setModuleDialogOpen(true)} sx={{ alignSelf: 'flex-start', textTransform: 'none' }}>Create another induction module</Button>

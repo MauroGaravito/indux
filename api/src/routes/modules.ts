@@ -6,6 +6,8 @@ import { InductionModule } from '../models/InductionModule.js';
 import { InductionModuleField } from '../models/InductionModuleField.js';
 import { Assignment } from '../models/Assignment.js';
 import { InductionTemplate } from '../models/InductionTemplate.js';
+import { ModuleReview } from '../models/ModuleReview.js';
+import { Submission } from '../models/Submission.js';
 import {
   InductionModuleCreateSchema,
   InductionModuleUpdateDraftSchema,
@@ -332,6 +334,38 @@ router.put(
       .lean();
 
     res.json({ module: mod, fields });
+  },
+);
+
+/* -------------------------------------------------------------------------- */
+/*                           DELETE INDUCTION MODULE                           */
+/* -------------------------------------------------------------------------- */
+
+router.delete(
+  '/modules/:moduleId',
+  requireAuth,
+  requireRole('admin'),
+  async (req, res) => {
+    const moduleId = req.params.moduleId;
+
+    if (!Types.ObjectId.isValid(moduleId)) {
+      return res.status(400).json({ error: 'Invalid module id' });
+    }
+
+    const mod = await InductionModule.findById(moduleId);
+    if (!mod) {
+      return res.status(404).json({ error: 'Module not found' });
+    }
+
+    await Promise.all([
+      InductionModuleField.deleteMany({ moduleId }),
+      ModuleReview.deleteMany({ moduleId }),
+      Submission.deleteMany({ moduleId }),
+    ]);
+
+    await mod.deleteOne();
+
+    res.json({ ok: true });
   },
 );
 
