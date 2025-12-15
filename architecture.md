@@ -18,7 +18,7 @@ Project
        ├─ InductionModuleField (personal data schema)
        ├─ ModuleReview (snapshot of module state)
        └─ Submission (worker output → certificates)
-Assignment (user ↔ project, role = manager | worker)
+Assignment (user ↔ project, role = manager | worker, optional module list)
 InductionTemplate (admin-only blueprint cloned into new modules)
 ```
 
@@ -28,7 +28,7 @@ InductionTemplate (admin-only blueprint cloned into new modules)
 - **InductionModuleField** – `{ _id, moduleId, key, label, type(text|number|date|select|file|photo|textarea|boolean), required, order, step, options?, visibleIf? }`
 - **ModuleReview** – `{ _id, moduleId, projectId, type='induction', data snapshot, status (pending|approved|declined), reason?, requestedBy, reviewedBy?, timestamps }`
 - **Submission** – `{ _id, moduleId, projectId, userId, status (pending|approved|declined), payload, uploads[{ key, type }], quiz { answers, score, passed }, signatureDataUrl?, certificateKey?, reviewedBy?, reviewReason?, timestamps }`
-- **Assignment** – `{ user, project, role ('manager'|'worker'), assignedBy?, createdAt, updatedAt }` (unique per user + project).
+- **Assignment** – `{ user, project, role ('manager'|'worker'), assignedBy?, modules?: ObjectId[], createdAt, updatedAt }` (unique per user + project).
 - **InductionTemplate** – `{ _id, name, description?, type='induction', config (same shape as modules), fields[ ModuleField-like schema ], createdBy?, updatedBy?, timestamps }`. Templates never hold reviews or submissions; they are cloned into projects.
 - **User** – `{ email, name, password (hashed), role (admin|manager|worker), disabled?, position?, phone?, companyName?, avatarUrl? }`
 
@@ -70,12 +70,12 @@ The worker wizard hides conditional fields until the criteria is satisfied and h
 - `POST /projects/:projectId/modules/induction`
 - `GET /projects/:projectId/modules/induction`
 - `GET /modules/:moduleId`
-- `GET /modules/:moduleId`
 - `PUT /modules/:moduleId`
 - `GET /modules/:moduleId/fields`
 - `POST /modules/:moduleId/fields`
 - `PUT /module-fields/:id`
 - `DELETE /module-fields/:id`
+- `DELETE /modules/:moduleId`
 
 ### Module Reviews
 - `POST /modules/:moduleId/reviews`
@@ -96,6 +96,7 @@ The worker wizard hides conditional fields until the criteria is satisfied and h
 - `GET /assignments/user/:userId`
 - `GET /assignments/project/:projectId`
 - `GET /assignments/manager/:managerId/team`
+- `PUT /assignments/:id/modules`
 - `DELETE /assignments/:id`
 
 ### Uploads & Files
@@ -130,8 +131,8 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 ### Admin Flow
 1. **Create Project** – Admin UI or `POST /projects`.
 2. **Seed Module** – `POST /projects/:projectId/modules/induction` using the creation dialog (blank or clone from template). Cloned modules automatically copy config + fields.
-3. **Configure Content** – Module Editor (admin mode) updates fields, slides, quiz, and settings while module is draft.
-4. **Assign Managers & Workers** – Admin Projects provides dedicated tabs for both roles; `POST /assignments` seeds manager/worker links so managers can see their pool and workers can access the wizard.
+3. **Configure Content** – Module Editor (admin mode) updates fields, slides, quiz, and settings while module is draft. Admin Projects also allows deleting unused modules; removal cascades through reviews and submissions automatically.
+4. **Assign Managers & Workers** – Admin Projects provides dedicated tabs for both roles; `POST /assignments` seeds manager/worker links so managers can see their pool and workers can access the wizard. Admins can also open the per-worker module dialog here to restrict which modules each worker must complete.
 5. **Monitor Reviews** – Review Queue lists module reviews and worker submissions; admins can approve/decline or override.
 6. **Branding & Users** – Admin Settings and Users screens manage organisational metadata and accounts.
 
@@ -141,10 +142,10 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 3. **Project Detail** – `ManagerProjectDetail` displays summary, assigned managers, a module selector (multiple modules per project), and actions to edit modules, request new ones (blank/template), or manage workers.
 4. **Module Editing** – `ManagerModuleEditor` wraps the admin editor; editing allowed if assignment exists and module status is draft/declined/pending.
 5. **Pending Approvals** – Review Queue (Submission Reviews + Module Review Requests) filtered by assignments. Managers can approve/decline worker submissions for projects they manage, but module approvals remain admin-only.
-6. **Team Management** – `ManagerTeam` uses `/assignments/project/:projectId` and `/assignments/manager/:id/team` to manage worker rosters.
+6. **Team Management** – `ManagerTeam` uses `/assignments/project/:projectId` and `/assignments/manager/:id/team` to manage worker rosters and opens the per-worker module dialog (`PUT /assignments/:id/modules`) so managers can decide which modules each worker must complete.
 
 ### Worker Pipeline
-1. **Worker Dashboard** – Uses `/assignments/user/:id` to show assigned projects, manager contacts, and submission status.
+1. **Worker Dashboard** – Uses `/assignments/user/:id` to show assigned projects, manager contacts, and submission status. Module lists are filtered using the worker’s assignment so restricted modules stay hidden.
 2. **Induction Wizard** – Steps driven by module config/fields. Wizard checks `/modules/:moduleId/submissions/my` to prevent duplicate pending/approved submissions.
 3. **Uploads** – `file` and `photo` inputs pass through `POST /uploads/presign`; photos open the camera (mobile) or webcam/file picker (desktop), preview immediately, and store the resulting keys in submission payloads.
 4. **Slides Viewer** – Workers now pass the slide’s name and extension to `/slides-viewer` so PDFs render via pdf.js (matching admin/manager behaviour).
@@ -171,6 +172,7 @@ Managers assigned to the project can approve or decline submissions directly (ad
 - Stored in `assignments` with a unique `(user, project)` constraint.
 - Manager endpoints verify `{ user: req.user.id, project: projectId, role: 'manager' }` before allowing module edits, approvals, team management, or downloads.
 - Worker endpoints verify `{ user: req.user.id, project: projectId, role: 'worker' }` before exposing module data or allowing submissions.
+- Optional `modules` array on worker assignments limits which induction modules that worker can see or submit to. Leaving it empty grants access to every module in the project; specifying IDs filters `GET /projects/:id/modules/induction`, `GET /modules/:id`, and worker submission endpoints.
 - Admins bypass assignment checks but still require authentication.
 - Admin Projects now exposes **Assigned managers** and **Assigned workers** tabs so admins can seed both roles directly; managers can only invite workers that already exist in their pool (`GET /assignments/manager/:id/team`).
 
@@ -196,9 +198,10 @@ Managers assigned to the project can approve or decline submissions directly (ad
 2. **Role Checks** – `requireRole` middleware ensures only authorised roles hit protected routes.
 3. **File Ownership** – Downloads/streaming map keys to modules or submissions and ensure the user either owns the submission or manages the project.
 4. **Module Access** – `GET /projects/:projectId/modules/induction` returns data only if the caller is admin or assigned manager/worker of that project.
-5. **Submission Safety** – Workers can submit only when modules are approved and they have assignments; pending submissions are updated instead of deleted to avoid race conditions.
-6. **Auditing** – ModuleReview stores snapshots; submissions capture reviewer IDs and reasons.
-7. **Creation/List Guardrails** – Managers must be assigned to a project before hitting `POST /projects/:projectId/modules/induction` or `GET /modules/:moduleId/submissions`. Admins bypass this requirement.
+5. **Per-Worker Module Restrictions** – If a worker assignment stores module IDs, module listings, detail calls, and submission routes are filtered so the worker sees only the assigned inductions; empty lists continue to expose all modules.
+6. **Submission Safety** – Workers can submit only when modules are approved and they have assignments; pending submissions are updated instead of deleted to avoid race conditions.
+7. **Auditing** – ModuleReview stores snapshots; submissions capture reviewer IDs and reasons.
+8. **Creation/List Guardrails** – Managers must be assigned to a project before hitting `POST /projects/:projectId/modules/induction` or `GET /modules/:moduleId/submissions`. Admins bypass this requirement.
 
 ## Docker & Environment Setup
 1. **Environment Variables** – `.env` defines Mongo URI, MinIO endpoint/access keys, JWT secrets, SMTP, and allowed origins (used by both API and frontend).

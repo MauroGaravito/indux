@@ -39,3 +39,10 @@
 2. Updated project module creation to support blank modules or deep clones from templates, including automatic field/config seeding. Projects can now host multiple modules, and the UI (admin + manager) includes selectors and creation dialogs.
 3. Added assignment guardrails so managers must be assigned to a project before creating modules or listing submissions; admins bypass as usual.
 4. Refreshed documentation (`README.md`, `architecture.md`) and frontend empty states to reflect multi-module support, template workflows, and the new security rules.
+
+## 17 December 2025
+1. Added module deletion support (`DELETE /modules/:moduleId`) plus admin UI controls so unused inductions can be removed along with dependent reviews/submissions.
+2. Introduced per-worker module permissions: assignments now store an optional `modules[]`, `PUT /assignments/:id/modules` lets admins/managers configure access, and worker-facing APIs/UI filter module lists accordingly.
+3. Updated Admin Projects and Manager Team pages with the new "Assign modules" dialog, showing summaries of current restrictions and allowing edits from both consoles.
+4. Filtered worker dashboards, module detail endpoints, and submission routes to honour the assignment’s module list, preventing workers from seeing or submitting to unauthorised inductions.
+5. Documented the new behaviour in `README.md` and `architecture.md`.

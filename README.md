@@ -6,11 +6,11 @@ INDUX is a project-centric Work Health & Safety (WHS) induction platform for Aus
 1. **Admin**
    - Creates projects, manages reusable induction templates, and seeds project modules (blank or cloned from a template).
    - Configures fields, slides, quizzes, and settings.
-   - Assigns managers and workers to each project and oversees reviews.
+   - Assigns managers and workers to each project, controls per-worker module access, deletes unused modules, and oversees reviews.
 2. **Manager**
    - Edits modules while they are in `draft`, `declined`, or `pending`.
    - Sends modules for review and tracks status, but only admins can approve or decline module reviews. Pending modules now show a banner when waiting for admin approval.
-   - Approves/declines worker submissions for projects they manage and manages allocated workers from the same dashboard.
+   - Approves/declines worker submissions for projects they manage, manages worker rosters, and can optionally restrict which modules each worker must complete.
 3. **Worker**
    - Sees only assigned projects on the Worker Dashboard.
    - Completes the Induction Wizard (personal data, uploads, slides, quiz, signature).
@@ -18,7 +18,7 @@ INDUX is a project-centric Work Health & Safety (WHS) induction platform for Aus
 
 ## Roles
 - **Admin** - Full control over projects, modules, assignments, submissions, reviews, users, and branding.
-- **Manager** - Owns assigned projects, edits modules in draft/declined/pending, approves/declines submissions, manages workers.
+- **Manager** - Owns assigned projects, edits modules in draft/declined/pending, approves/declines submissions, manages workers, and can configure per-worker module access.
 - **Worker** - Completes inductions for assigned projects and stores their certificate history.
 
 ## Module & Submission Lifecycle
@@ -72,33 +72,36 @@ The wizard hides fields until the condition is met and hidden fields never block
 ## Manager Editing Behaviour
 Managers may edit induction modules (fields, slides, quiz, settings) whenever `reviewStatus` is `draft`, `pending`, or `declined`. Only `approved` modules become read-only in manager mode. Admins may edit at any stage but usually keep approved modules locked for audit purposes. When a project does not yet have an induction module, the editor surfaces a dedicated empty state with the template-aware creation dialog so admins/managers can create the first module without leaving the page.
 
-## Assignment Workflow & Worker Pools
+## Assignment Workflow, Worker Pools & Module Access
 - Admins assign **managers** and **workers** via Admin -> Projects. The detail panel now includes distinct tabs for **Assigned managers** and **Assigned workers** so admins can seed both roles in one place.
 - Workers must be assigned by an admin before they appear in a manager's pool (`ManagerTeam`). Managers can only add/remove workers that already exist in their pool.
+- Admins and assigned managers can optionally restrict a worker to specific induction modules. Leaving everything unchecked continues to grant access to all modules in the project; selecting at least one module hides the rest from that worker across the dashboard, wizard, and API responses.
 - Core endpoints:
   - `POST /assignments` (`role: 'manager' | 'worker'`)
   - `GET /assignments/project/:projectId`
   - `GET /assignments/manager/:managerId/team`
+  - `PUT /assignments/:assignmentId/modules`
   - `DELETE /assignments/:id`
 
 ## Security Model
 - Assignment-based access ensures managers/workers can only interact with their projects; admins bypass the checks.
+- Per-worker module restrictions trim module listings, detail calls, and submission endpoints so a worker only sees the modules explicitly assigned (or all if none are selected).
 - Module creation and submission listing endpoints now require managers to be assigned to the target project; admins bypass these checks.
 - Module, review, submission, and upload routes all verify role + project assignment.
 - Presigned downloads and streaming endpoints validate ownership before exposing slides, uploads, or certificates.
 - Worker dashboard, wizard, and history are fully scoped to each worker's assignments.
 
 ## API Overview (Conceptual)
-- **Projects & Modules** - Create projects, seed induction modules, update configuration, and advance review status.
+- **Projects & Modules** - Create projects, seed induction modules, update configuration, delete modules, and advance review status.
 - **Reviews & Submissions** - Module review requests plus manager/admin approvals or declines; worker submissions and resubmissions.
-- **Assignments** - Manager/worker assignment management and manager team lookups.
+- **Assignments** - Manager/worker assignment management, per-worker module permissions, and manager team lookups.
 - **Uploads** - Presigned PUT/GET endpoints and streaming for MinIO-backed files.
 - **Worker/Manager Utilities** - Dashboard data, histories, and review queues powered by assignment-aware endpoints.
 See `architecture.md` for the full endpoint catalogue.
 
 ## Frontend Experience
 - **Admin Dashboard** - Project register, module editor, user directory, branding, Pending Approvals, Assigned Workers tab per project, plus the Induction Templates workspace for managing reusable blueprints.
-- **Manager Console** - Assigned projects overview, module editor (manager mode), project detail with module selector, team management, Pending Approvals, and the creation dialog (blank or from template) for projects they manage. Managers can act on worker submissions they own but module approvals remain admin-only.
+- **Manager Console** - Assigned projects overview, module editor (manager mode), project detail with module selector, team management (including per-worker module assignment dialog), Pending Approvals, and the creation dialog (blank or from template) for projects they manage. Managers can act on worker submissions they own but module approvals remain admin-only.
 - **Worker Dashboard** - Assigned projects, submission status, manager contacts, and certificate access.
 - **Induction Wizard** - Guided worker experience across project selection, personal data (with conditional fields), uploads, slides viewer, quiz, signature, and submission. Photo fields open the camera, upload to MinIO via the same presigned pipeline, and render a thumbnail preview for confidence.
 - **History & Certificates** - Secure record of submissions with certificate downloads.
