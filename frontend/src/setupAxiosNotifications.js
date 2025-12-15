@@ -65,8 +65,13 @@ export function attachAxiosNotifications() {
       return response
     },
     (error) => {
-      // Try to extract a meaningful message
       const resp = error?.response
+      const method = error?.config?.method?.toLowerCase?.()
+      const url = error?.config?.url || ''
+      if (resp?.status === 404 && method === 'get' && url.includes('/modules/induction')) {
+        return Promise.reject(error)
+      }
+
       const msg =
         resp?.data?.message ||
         resp?.data?.error ||
