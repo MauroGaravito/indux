@@ -36,6 +36,8 @@ export type ReviewStatus = 'draft' | 'pending' | 'approved' | 'declined';
 export interface IInductionModule extends Document {
   projectId: Types.ObjectId;
   type: 'induction';
+  name?: string;
+  description?: string;
   reviewStatus: ReviewStatus;
   config: InductionModuleConfig;
   createdBy?: Types.ObjectId;
@@ -68,6 +70,8 @@ const ModuleSchema = new Schema<IInductionModule>(
   {
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
     type: { type: String, enum: ['induction'], default: 'induction' },
+    name: { type: String, trim: true },
+    description: { type: String },
     reviewStatus: { type: String, enum: ['draft', 'pending', 'approved', 'declined'], default: 'draft', index: true },
     config: {
       steps: { type: [String], default: [] },

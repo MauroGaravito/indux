@@ -52,17 +52,23 @@ export const InductionModuleConfigSchema = z.object({
 
 export const InductionModuleCreateSchema = z.object({
   projectId: z.string().min(1),
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
   config: InductionModuleConfigSchema.optional(),
   reviewStatus: z.enum(['draft', 'pending', 'approved', 'declined']).optional(),
 });
 
 export const InductionModuleUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
   config: InductionModuleConfigSchema.optional(),
   reviewStatus: z.enum(['draft', 'pending', 'approved', 'declined']).optional(),
 }).strict();
 
 // Draft-friendly schema: allows empty/partial payloads (used on PUT save)
 export const InductionModuleUpdateDraftSchema = z.object({
+  name: z.string().optional(),
+  description: z.string().optional(),
   config: z
     .object({
       steps: z.array(z.string()).optional(),
