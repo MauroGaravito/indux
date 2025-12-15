@@ -19,9 +19,9 @@ router.post('/modules/:moduleId/reviews', requireAuth, requireRole('admin', 'man
     if (!assignment) return res.status(403).json({ error: 'Not assigned to project' });
   }
 
-  // Reviewable status
-  if (mod.reviewStatus && !['draft', 'declined'].includes(mod.reviewStatus)) {
-    return res.status(400).json({ error: 'Module is not in draft/declined state' });
+  // Reviewable status: only approved modules are locked
+  if (mod.reviewStatus === 'approved') {
+    return res.status(400).json({ error: 'Module is already approved' });
   }
 
   const fields = await InductionModuleField.find({ moduleId }).sort({ order: 1, createdAt: 1 }).lean();
@@ -50,20 +50,43 @@ router.post('/modules/:moduleId/reviews', requireAuth, requireRole('admin', 'man
     return res.status(400).json({ error: { formErrors: ['Field validation failed'], fieldErrors: fieldsResult } });
   }
 
-  const review = await ModuleReview.create({
-    moduleId: mod._id,
-    projectId: mod.projectId,
-    type: 'induction',
-    data: snapshot,
-    status: 'pending',
-    requestedBy: req.user!.sub as any,
-  });
+  let review: any = null;
+  let created = false;
 
-  // mark module as pending review
-  mod.reviewStatus = 'pending';
-  await mod.save();
+  if (mod.reviewStatus === 'pending') {
+    review = await ModuleReview.findOne({ moduleId: mod._id, status: 'pending' }).sort({ createdAt: -1 });
+    if (review) {
+      review.data = snapshot;
+      review.requestedBy = req.user!.sub as any;
+      await review.save();
+    } else {
+      review = await ModuleReview.create({
+        moduleId: mod._id,
+        projectId: mod.projectId,
+        type: 'induction',
+        data: snapshot,
+        status: 'pending',
+        requestedBy: req.user!.sub as any,
+      });
+      created = true;
+    }
+  } else {
+    review = await ModuleReview.create({
+      moduleId: mod._id,
+      projectId: mod.projectId,
+      type: 'induction',
+      data: snapshot,
+      status: 'pending',
+      requestedBy: req.user!.sub as any,
+    });
+    created = true;
 
-  res.status(201).json(review);
+    // mark module as pending review
+    mod.reviewStatus = 'pending';
+    await mod.save();
+  }
+
+  res.status(created ? 201 : 200).json(review);
 });
 
 router.get('/modules/:moduleId/reviews', requireAuth, requireRole('manager', 'admin'), async (req, res) => {
