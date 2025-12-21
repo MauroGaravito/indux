@@ -14,6 +14,8 @@ const QuizQuestionSchema = new Schema({
 const ModuleSchema = new Schema({
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
     type: { type: String, enum: ['induction'], default: 'induction' },
+    name: { type: String, trim: true },
+    description: { type: String },
     reviewStatus: { type: String, enum: ['draft', 'pending', 'approved', 'declined'], default: 'draft', index: true },
     config: {
         steps: { type: [String], default: [] },
@@ -30,5 +32,5 @@ const ModuleSchema = new Schema({
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
-ModuleSchema.index({ projectId: 1, type: 1 }, { unique: true });
+ModuleSchema.index({ projectId: 1, type: 1 });
 export const InductionModule = mongoose.model('InductionModule', ModuleSchema);

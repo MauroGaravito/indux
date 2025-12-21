@@ -37,6 +37,10 @@ export async function seedAll() {
       name: 'Demo Project',
       description: 'Sample project for induction module',
       status: 'active',
+      location: { lat: -33.865143, lng: 151.2099 },
+      pointsOfInterest: [
+        { label: 'Site office', lat: -33.865143, lng: 151.2099 },
+      ],
     });
     console.log('Seeded project');
   }

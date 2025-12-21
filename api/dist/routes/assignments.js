@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { Assignment } from '../models/Assignment.js';
 import { Project } from '../models/Project.js';
+import { InductionModule } from '../models/InductionModule.js';
 const router = Router();
 // Helper: check if a manager is assigned as manager to a given project
 async function isManagerOfProject(managerId, projectId) {
@@ -10,6 +11,23 @@ async function isManagerOfProject(managerId, projectId) {
         return false;
     const found = await Assignment.findOne({ user: managerId, project: projectId, role: 'manager' }).lean();
     return !!found;
+}
+async function resolveModuleAssignments(projectId, modulesInput) {
+    if (!Array.isArray(modulesInput) || !modulesInput.length)
+        return [];
+    const normalized = modulesInput.map((value) => {
+        if (!Types.ObjectId.isValid(value)) {
+            throw new Error('INVALID_MODULE_ID');
+        }
+        return new Types.ObjectId(value);
+    });
+    const uniqueIds = Array.from(new Set(normalized.map((id) => id.toString()))).map((id) => new Types.ObjectId(id));
+    const projectObjectId = new Types.ObjectId(projectId);
+    const count = await InductionModule.countDocuments({ _id: { $in: uniqueIds }, projectId: projectObjectId });
+    if (count !== uniqueIds.length) {
+        throw new Error('MODULE_PROJECT_MISMATCH');
+    }
+    return uniqueIds;
 }
 // POST /assignments → create assignment (admin or manager)
 router.post('/', requireAuth, requireRole('admin', 'manager'), async (req, res) => {
@@ -26,7 +44,28 @@ router.post('/', requireAuth, requireRole('admin', 'manager'), async (req, res) 
             if (!allowed)
                 return res.status(403).json({ error: 'Forbidden' });
         }
-        const doc = await Assignment.create({ user, project, role, assignedBy: req.user.sub });
+        let modules = [];
+        if (role === 'worker') {
+            try {
+                modules = await resolveModuleAssignments(project, req.body?.modules);
+            }
+            catch (err) {
+                if (err?.message === 'INVALID_MODULE_ID') {
+                    return res.status(400).json({ error: 'Invalid induction module id.' });
+                }
+                if (err?.message === 'MODULE_PROJECT_MISMATCH') {
+                    return res.status(400).json({ error: 'Modules must belong to the same project.' });
+                }
+                throw err;
+            }
+        }
+        const doc = await Assignment.create({
+            user,
+            project,
+            role,
+            assignedBy: req.user.sub,
+            modules: modules.length ? modules : undefined,
+        });
         const populated = await doc.populate([{ path: 'user', select: '-password' }, { path: 'project' }]);
         return res.status(201).json(populated);
     }
@@ -46,7 +85,7 @@ router.get('/user/:id', requireAuth, requireRole('admin', 'manager', 'worker'), 
         if (req.user.role === 'admin' || req.user.sub === targetUserId) {
             const list = await Assignment.find({ user: targetUserId })
                 .populate([
-                { path: 'project', select: 'name status address description createdAt updatedAt' },
+                { path: 'project', select: 'name status address description location pointsOfInterest createdAt updatedAt' },
                 { path: 'user', select: '-password' },
             ])
                 .lean();
@@ -75,7 +114,7 @@ router.get('/user/:id', requireAuth, requireRole('admin', 'manager', 'worker'), 
                 project: { $in: Array.from(existingProjectIds) },
             })
                 .populate([
-                { path: 'project', select: 'name status address description createdAt updatedAt' },
+                { path: 'project', select: 'name status address description location pointsOfInterest createdAt updatedAt' },
                 { path: 'user', select: '-password' },
             ])
                 .lean();
@@ -141,7 +180,41 @@ router.delete('/:id', requireAuth, requireRole('admin', 'manager'), async (req, 
         return res.status(500).json({ error: e?.message || 'Failed to delete assignment' });
     }
 });
-export default router;
+// Update module assignments for a worker
+router.put('/:id/modules', requireAuth, requireRole('admin', 'manager'), async (req, res) => {
+    const assignmentId = req.params.id;
+    if (!Types.ObjectId.isValid(assignmentId)) {
+        return res.status(400).json({ error: 'Invalid assignment id' });
+    }
+    const assignment = await Assignment.findById(assignmentId);
+    if (!assignment)
+        return res.status(404).json({ error: 'Assignment not found' });
+    if (assignment.role !== 'worker') {
+        return res.status(400).json({ error: 'Only worker assignments can have module restrictions' });
+    }
+    if (req.user.role === 'manager') {
+        const allowed = await isManagerOfProject(req.user.sub, assignment.project.toString());
+        if (!allowed)
+            return res.status(403).json({ error: 'Forbidden' });
+    }
+    let modules = [];
+    try {
+        modules = await resolveModuleAssignments(assignment.project.toString(), req.body?.modules);
+    }
+    catch (err) {
+        if (err?.message === 'INVALID_MODULE_ID') {
+            return res.status(400).json({ error: 'Invalid induction module id.' });
+        }
+        if (err?.message === 'MODULE_PROJECT_MISMATCH') {
+            return res.status(400).json({ error: 'Modules must belong to the same project.' });
+        }
+        return res.status(400).json({ error: 'Unable to update module assignments' });
+    }
+    assignment.modules = modules;
+    await assignment.save();
+    const populated = await assignment.populate([{ path: 'user', select: '-password' }, { path: 'project' }]);
+    return res.json(populated);
+});
 // --- Manager Team View ---
 // GET /assignments/manager/:id/team
 // Returns workers assigned to any project managed by :id
@@ -176,3 +249,4 @@ router.get('/manager/:id/team', requireAuth, requireRole('admin', 'manager'), as
         return res.status(500).json({ error: e?.message || 'Failed to fetch team' });
     }
 });
+export default router;

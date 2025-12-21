@@ -90,7 +90,7 @@ router.get('/user/:id', requireAuth, requireRole('admin', 'manager', 'worker'), 
     if (req.user!.role === 'admin' || req.user!.sub === targetUserId) {
       const list = await Assignment.find({ user: targetUserId })
         .populate([
-          { path: 'project', select: 'name status address description createdAt updatedAt' },
+          { path: 'project', select: 'name status address description location pointsOfInterest createdAt updatedAt' },
           { path: 'user', select: '-password' },
         ])
         .lean();
@@ -124,7 +124,7 @@ router.get('/user/:id', requireAuth, requireRole('admin', 'manager', 'worker'), 
         project: { $in: Array.from(existingProjectIds) },
       })
         .populate([
-          { path: 'project', select: 'name status address description createdAt updatedAt' },
+          { path: 'project', select: 'name status address description location pointsOfInterest createdAt updatedAt' },
           { path: 'user', select: '-password' },
         ])
         .lean();

@@ -195,6 +195,11 @@ export default function WorkerDashboard() {
       .toUpperCase()
   }, [user])
 
+  const formatCoordinates = (loc) => {
+    if (!loc || typeof loc.lat !== 'number' || typeof loc.lng !== 'number') return ''
+    return `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`
+  }
+
   return (
     <Stack spacing={3}>
       <Typography variant="h5" sx={{ fontWeight: 700 }}>Worker dashboard</Typography>
@@ -256,6 +261,11 @@ export default function WorkerDashboard() {
                           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{p.name}</Typography>
                           <Chip size="small" label={p.status} color={p.status === 'active' ? 'success' : p.status === 'archived' ? 'warning' : 'default'} />
                         </Stack>
+                        {formatCoordinates(p.location) && (
+                          <Typography variant="body2" color="text.secondary">
+                            Coordinates: {formatCoordinates(p.location)}
+                          </Typography>
+                        )}
                         {p.address && <Typography variant="body2" color="text.secondary">{p.address}</Typography>}
                         <Typography variant="body2" color="text.secondary">{p.description || 'No description provided.'}</Typography>
                         <Stack spacing={1}>

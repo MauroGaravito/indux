@@ -55,6 +55,11 @@ export default function ManagerProjects() {
     }
   }
 
+  const formatCoordinates = (loc) => {
+    if (!loc || typeof loc.lat !== 'number' || typeof loc.lng !== 'number') return ''
+    return `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`
+  }
+
   const projects = assignments.map((a) => a.project)
   const statusLabel = (status) => {
     if (!status) return { label: 'No module', color: 'default' }
@@ -84,6 +89,11 @@ export default function ManagerProjects() {
                       <Typography variant="h6" sx={{ fontWeight: 600 }}>{p.name}</Typography>
                       <Chip size="small" label={p.status} color={p.status === 'active' ? 'success' : p.status === 'archived' ? 'warning' : 'default'} />
                     </Stack>
+                    {formatCoordinates(p.location) && (
+                      <Typography variant="body2" color="text.secondary">
+                        Coordinates: {formatCoordinates(p.location)}
+                      </Typography>
+                    )}
                     {p.address && (
                       <Typography variant="body2" color="text.secondary">
                         {p.address}

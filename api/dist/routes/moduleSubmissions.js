@@ -11,6 +11,14 @@ import { generateCertificate } from '../services/pdf.js';
 import { v4 as uuidv4 } from 'uuid';
 import { Assignment } from '../models/Assignment.js';
 const router = Router();
+const workerCanAccessModule = (assignment, moduleId) => {
+    if (!assignment)
+        return false;
+    if (!assignment.modules || assignment.modules.length === 0)
+        return true;
+    const target = moduleId.toString();
+    return assignment.modules.some((id) => id.toString() === target);
+};
 router.post('/modules/:moduleId/submissions', requireAuth, requireRole('worker'), async (req, res) => {
     const moduleId = req.params.moduleId;
     if (!Types.ObjectId.isValid(moduleId))
@@ -37,6 +45,9 @@ router.post('/modules/:moduleId/submissions', requireAuth, requireRole('worker')
     const assigned = await Assignment.findOne({ user: req.user.sub, project: project._id, role: 'worker' });
     if (!assigned)
         return res.status(403).json({ error: 'Not assigned to project' });
+    const allowed = workerCanAccessModule(assigned, mod._id);
+    if (!allowed)
+        return res.status(403).json({ error: 'Module not assigned to worker' });
     const existing = await Submission.findOne({ moduleId, userId: req.user.sub, status: { $in: ['pending', 'approved'] } });
     if (existing && existing.status === 'approved') {
         return res.status(409).json({ error: 'Submission already approved' });
@@ -81,6 +92,9 @@ router.get('/modules/:moduleId/submissions/my', requireAuth, requireRole('worker
     const assigned = await Assignment.findOne({ user: req.user.sub, project: mod.projectId, role: 'worker' });
     if (!assigned)
         return res.status(403).json({ error: 'Not assigned to project' });
+    const allowed = workerCanAccessModule(assigned, mod._id);
+    if (!allowed)
+        return res.status(403).json({ error: 'Module not assigned to worker' });
     const submission = await Submission.findOne({ moduleId, userId: req.user.sub }).sort({ createdAt: -1 });
     if (!submission)
         return res.json({ submission: null });
@@ -91,12 +105,20 @@ router.get('/modules/:moduleId/submissions', requireAuth, requireRole('manager',
     const moduleId = req.params.moduleId;
     if (!Types.ObjectId.isValid(moduleId))
         return res.status(400).json({ error: 'Invalid module id' });
+    const mod = await InductionModule.findById(moduleId);
+    if (!mod)
+        return res.status(404).json({ error: 'Module not found' });
+    if (req.user.role === 'manager') {
+        const assignment = await Assignment.findOne({ user: req.user.sub, project: mod.projectId, role: 'manager' });
+        if (!assignment)
+            return res.status(403).json({ error: 'Not assigned to project' });
+    }
     const statusRaw = req.query?.status || 'pending';
     const status = ['pending', 'approved', 'declined', 'all'].includes(statusRaw) ? statusRaw : 'pending';
     const filter = status === 'all' ? { moduleId } : { moduleId, status };
     const list = await Submission.find(filter)
         .populate('userId', 'name email')
-        .populate('projectId', 'name')
+        .populate('projectId', 'name address location pointsOfInterest')
         .populate('reviewedBy', 'name')
         .sort({ createdAt: -1 });
     res.json(list);
@@ -108,7 +130,7 @@ router.get('/workers/me/submissions', requireAuth, requireRole('worker'), async 
         return res.json({ submissions: [] });
     const subs = await Submission.find({ userId: req.user.sub, projectId: { $in: projectIds } })
         .sort({ createdAt: -1 })
-        .populate('projectId', 'name address')
+        .populate('projectId', 'name address location pointsOfInterest')
         .select('moduleId status certificateKey createdAt updatedAt projectId reviewReason')
         .lean();
     const submissions = subs.map((s) => ({
@@ -124,7 +146,11 @@ router.get('/workers/me/submissions', requireAuth, requireRole('worker'), async 
             ? {
                 id: s.projectId._id,
                 name: s.projectId.name,
-                address: s.projectId.address || ''
+                address: s.projectId.address || '',
+                location: s.projectId.location || null,
+                pointsOfInterest: Array.isArray(s.projectId.pointsOfInterest)
+                    ? s.projectId.pointsOfInterest
+                    : [],
             }
             : null
     }));

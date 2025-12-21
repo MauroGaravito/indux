@@ -50,6 +50,11 @@ export default function WorkerHistory() {
     }
   }
 
+  const formatCoordinates = (loc) => {
+    if (!loc || typeof loc.lat !== 'number' || typeof loc.lng !== 'number') return ''
+    return `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`
+  }
+
   return (
     <Stack spacing={3}>
       <Typography variant="h5" sx={{ fontWeight: 700 }}>Induction history & certificates</Typography>
@@ -64,6 +69,7 @@ export default function WorkerHistory() {
           const created = new Date(sub.createdAt).toLocaleString()
           const projectName = sub.project?.name || 'Unknown project'
           const projectAddress = sub.project?.address
+          const coords = formatCoordinates(sub.project?.location)
           return (
             <Card key={sub.id} variant="outlined">
               <CardContent>
@@ -72,6 +78,7 @@ export default function WorkerHistory() {
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{projectName}</Typography>
                     <Chip size="small" label={chip.label} color={chip.color} />
                   </Stack>
+                  {coords && <Typography variant="body2" color="text.secondary">Coordinates: {coords}</Typography>}
                   {projectAddress && <Typography variant="body2" color="text.secondary">{projectAddress}</Typography>}
                   <Typography variant="body2" color="text.secondary">Induction module ID: {sub.moduleId}</Typography>
                   <Typography variant="caption" color="text.secondary">Submitted on: {created}</Typography>

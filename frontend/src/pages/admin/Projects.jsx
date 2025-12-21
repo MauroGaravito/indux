@@ -37,6 +37,7 @@ import { useAuthStore } from '../../store/auth.js'
 import CreateModuleDialog from '../../components/admin/CreateModuleDialog.jsx'
 import WorkerModuleAssignmentDialog from '../../components/WorkerModuleAssignmentDialog.jsx'
 import { fetchProjectModules } from '../../utils/modules.js'
+import { DEFAULT_PROJECT_LOCATION } from '../../constants/location.js'
 
 export default function Projects() {
   const theme = useTheme()
@@ -45,10 +46,19 @@ export default function Projects() {
   const { projectId: projectIdParam } = useParams()
   const { user } = useAuthStore()
 
+  const createEmptyForm = () => ({
+    name: '',
+    description: '',
+    address: '',
+    status: 'draft',
+    location: { ...DEFAULT_PROJECT_LOCATION },
+    pointsOfInterest: [],
+  })
+
   const [projects, setProjects] = useState([])
   const [archivedProjects, setArchivedProjects] = useState([])
   const [selectedId, setSelectedId] = useState('')
-  const [projectForm, setProjectForm] = useState({ name: '', description: '', address: '', status: 'draft' })
+  const [projectForm, setProjectForm] = useState(createEmptyForm())
   const [tab, setTab] = useState(0)
   const [assignments, setAssignments] = useState([])
   const [managerUsers, setManagerUsers] = useState([])
@@ -124,11 +134,21 @@ export default function Projects() {
     setSelectedId(id)
     const p = projects.find((x) => x._id === id)
     if (p) {
-      setProjectForm({ name: p.name || '', description: p.description || '', address: p.address || '', status: p.status || 'draft' })
+      setProjectForm({
+        name: p.name || '',
+        description: p.description || '',
+        address: p.address || '',
+        status: p.status || 'draft',
+        location:
+          p.location && typeof p.location.lat === 'number' && typeof p.location.lng === 'number'
+            ? p.location
+            : { ...DEFAULT_PROJECT_LOCATION },
+        pointsOfInterest: Array.isArray(p.pointsOfInterest) ? p.pointsOfInterest : [],
+      })
       await Promise.all([loadAssignments(id), loadModulesForProject(id)])
       if (id) navigate(`/admin/projects/${id}`, { replace: true })
     } else {
-      setProjectForm({ name: '', description: '', address: '', status: 'draft' })
+      setProjectForm(createEmptyForm())
       setAssignments([])
       setModules([])
       navigate('/admin/projects', { replace: true })
@@ -137,7 +157,12 @@ export default function Projects() {
 
   const createProject = async () => {
     if (!newProject.name) return
-    await api.post('/projects', { name: newProject.name, description: newProject.description })
+    await api.post('/projects', {
+      name: newProject.name,
+      description: newProject.description,
+      location: { ...DEFAULT_PROJECT_LOCATION },
+      pointsOfInterest: [],
+    })
     setNewProject({ name: '', description: '' })
     await loadProjects()
   }
@@ -154,7 +179,7 @@ export default function Projects() {
     if (!confirmed) return
     await api.put(`/projects/${selectedId}/archive`)
     setSelectedId('')
-    setProjectForm({ name: '', description: '', address: '', status: 'draft' })
+    setProjectForm(createEmptyForm())
     setAssignments([])
     setModules([])
     await loadProjects()
@@ -170,7 +195,7 @@ export default function Projects() {
       setArchivedProjects((prev) => prev.filter((p) => p._id !== id))
       setProjects((prev) => [restored, ...prev])
       setSelectedId('')
-      setProjectForm({ name: '', description: '', address: '', status: 'draft' })
+      setProjectForm(createEmptyForm())
       setAssignments([])
       setModules([])
     } catch (e) {

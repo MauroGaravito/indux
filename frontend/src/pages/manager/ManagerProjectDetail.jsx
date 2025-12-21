@@ -146,6 +146,11 @@ export default function ManagerProjectDetail() {
   const moduleStatus = moduleStatusChip(selectedModule?.reviewStatus)
   const buttonColor = moduleStatus.color === 'default' ? 'primary' : moduleStatus.color
 
+  const formatCoordinates = (loc) => {
+    if (!loc || typeof loc.lat !== 'number' || typeof loc.lng !== 'number') return ''
+    return `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`
+  }
+
   if (error) return <Alert severity="error">{error}</Alert>
   if (!project) return <Alert severity="info">Loading project overview...</Alert>
 
@@ -158,11 +163,16 @@ export default function ManagerProjectDetail() {
             <Chip label={project.status} color={project.status === 'active' ? 'success' : project.status === 'archived' ? 'warning' : 'default'} />
           </Stack>
           <Typography variant="body1" color="text.primary">{project.description || 'No description provided yet.'}</Typography>
-          {project.address && (
+          {formatCoordinates(project.location) && (
             <Stack direction="row" alignItems="center" spacing={1}>
               <LocationOnIcon fontSize="small" color="action" />
-              <Typography variant="body2" color="text.secondary">{project.address}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Coordinates: {formatCoordinates(project.location)}
+              </Typography>
             </Stack>
+          )}
+          {project.address && (
+            <Typography variant="body2" color="text.secondary">{project.address}</Typography>
           )}
           <Divider />
           <Stack spacing={1}>

@@ -3,14 +3,33 @@ export const LoginSchema = z.object({
     email: z.string().email(),
     password: z.string().min(6),
 });
+const CoordinateSchema = z.object({
+    lat: z.number(),
+    lng: z.number(),
+});
+const PointOfInterestSchema = z.object({
+    label: z.string().min(1),
+    lat: z.number(),
+    lng: z.number(),
+});
 export const ProjectCreateSchema = z.object({
     name: z.string().min(1),
     description: z.string().optional(),
     address: z.string().optional(),
     managers: z.array(z.string()).default([]),
+    location: CoordinateSchema,
+    pointsOfInterest: z.array(PointOfInterestSchema).default([]),
     status: z.enum(['draft', 'active', 'archived']).default('draft'),
 });
-export const ProjectUpdateSchema = ProjectCreateSchema.partial();
+export const ProjectUpdateSchema = z.object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    address: z.string().optional(),
+    managers: z.array(z.string()).optional(),
+    status: z.enum(['draft', 'active', 'archived']).optional(),
+    location: CoordinateSchema.optional(),
+    pointsOfInterest: z.array(PointOfInterestSchema).optional(),
+});
 const SlideItemSchema = z.object({
     key: z.string().min(1),
     title: z.string().optional(),
@@ -43,15 +62,25 @@ export const InductionModuleConfigSchema = z.object({
 });
 export const InductionModuleCreateSchema = z.object({
     projectId: z.string().min(1),
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    templateId: z.string().min(1).optional(),
     config: InductionModuleConfigSchema.optional(),
     reviewStatus: z.enum(['draft', 'pending', 'approved', 'declined']).optional(),
 });
-export const InductionModuleUpdateSchema = z.object({
+export const InductionModuleUpdateSchema = z
+    .object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
     config: InductionModuleConfigSchema.optional(),
     reviewStatus: z.enum(['draft', 'pending', 'approved', 'declined']).optional(),
-}).strict();
+})
+    .strict();
 // Draft-friendly schema: allows empty/partial payloads (used on PUT save)
-export const InductionModuleUpdateDraftSchema = z.object({
+export const InductionModuleUpdateDraftSchema = z
+    .object({
+    name: z.string().optional(),
+    description: z.string().optional(),
     config: z
         .object({
         steps: z.array(z.string()).optional(),
@@ -68,7 +97,9 @@ export const InductionModuleUpdateDraftSchema = z.object({
         .partial()
         .optional(),
     reviewStatus: z.enum(['draft', 'pending', 'approved', 'declined']).optional(),
-}).strict().passthrough();
+})
+    .strict()
+    .passthrough();
 // Strict schemas for review validation
 const SlideItemStrictSchema = z.object({
     key: z.string().min(1),
@@ -99,7 +130,7 @@ const ModuleFieldVisibleIfSchema = z
 export const ModuleFieldStrictSchema = z.object({
     key: z.string().min(1),
     label: z.string().min(1),
-    type: z.enum(['text', 'number', 'date', 'select', 'file', 'textarea', 'boolean']),
+    type: z.enum(['text', 'number', 'date', 'select', 'file', 'photo', 'textarea', 'boolean']),
     required: z.boolean().optional(),
     order: z.number().optional(),
     step: z.string().optional(),
@@ -110,7 +141,7 @@ export const ModuleFieldCreateSchema = z.object({
     moduleId: z.string().min(1),
     key: z.string().min(1),
     label: z.string().min(1),
-    type: z.enum(['text', 'number', 'date', 'select', 'file', 'textarea', 'boolean']).default('text'),
+    type: z.enum(['text', 'number', 'date', 'select', 'file', 'photo', 'textarea', 'boolean']).default('text'),
     required: z.boolean().default(false),
     order: z.number().default(0),
     step: z.string().default('personal'),
@@ -118,6 +149,20 @@ export const ModuleFieldCreateSchema = z.object({
     visibleIf: ModuleFieldVisibleIfSchema.optional(),
 });
 export const ModuleFieldUpdateSchema = ModuleFieldCreateSchema.partial().omit({ moduleId: true });
+export const InductionTemplateCreateSchema = z.object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    config: InductionModuleConfigSchema.optional(),
+    fields: z.array(ModuleFieldStrictSchema).optional(),
+});
+export const InductionTemplateUpdateSchema = z
+    .object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    config: InductionModuleConfigSchema.optional(),
+    fields: z.array(ModuleFieldStrictSchema).optional(),
+})
+    .strict();
 export const ModuleReviewCreateSchema = z.object({
     moduleId: z.string().min(1),
 });

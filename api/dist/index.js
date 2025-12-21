@@ -9,12 +9,14 @@ import moduleRoutes from './routes/modules.js';
 import moduleFieldRoutes from './routes/moduleFields.js';
 import moduleReviewRoutes from './routes/moduleReviews.js';
 import moduleSubmissionRoutes from './routes/moduleSubmissions.js';
+import inductionTemplateRoutes from './routes/inductionTemplates.js';
 import uploadRoutes from './routes/uploads.js';
 import userRoutes from './routes/users.js';
 import assignmentsRoutes from './routes/assignments.js';
 import brandConfigRoutes from './routes/brandConfigRoutes.js';
 import { seedAll } from './seed.js';
 import { ensureBucket } from './services/minio.js';
+import { InductionModule } from './models/InductionModule.js';
 // NOTE: Reverse proxy (e.g., Caddy) handles the '/api' prefix externally using
 // 'handle_path /api/*' which strips the prefix before forwarding. Therefore,
 // routes here are mounted WITHOUT the '/api' prefix.
@@ -81,10 +83,22 @@ app.use('/uploads', uploadRoutes);
 app.use('/users', userRoutes);
 app.use('/assignments', assignmentsRoutes);
 app.use('/brand-config', brandConfigRoutes);
+app.use('/induction-templates', inductionTemplateRoutes);
 // --- Start Server ---
 async function start() {
     try {
         await connectDB();
+        // Drop legacy unique index preventing multiple modules per project
+        try {
+            await InductionModule.collection.dropIndex('projectId_1_type_1');
+            console.log('Dropped legacy unique index projectId_1_type_1');
+        }
+        catch (err) {
+            const message = err?.message || '';
+            if (!/index not found/i.test(message)) {
+                console.warn('Failed to drop legacy induction module index:', message);
+            }
+        }
         // Ensure S3 bucket exists before serving requests that presign
         try {
             await ensureBucket();

@@ -5,15 +5,36 @@ export const LoginSchema = z.object({
   password: z.string().min(6),
 });
 
+const CoordinateSchema = z.object({
+  lat: z.number(),
+  lng: z.number(),
+});
+
+const PointOfInterestSchema = z.object({
+  label: z.string().min(1),
+  lat: z.number(),
+  lng: z.number(),
+});
+
 export const ProjectCreateSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   address: z.string().optional(),
   managers: z.array(z.string()).default([]),
+  location: CoordinateSchema,
+  pointsOfInterest: z.array(PointOfInterestSchema).default([]),
   status: z.enum(['draft', 'active', 'archived']).default('draft'),
 });
 
-export const ProjectUpdateSchema = ProjectCreateSchema.partial();
+export const ProjectUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
+  address: z.string().optional(),
+  managers: z.array(z.string()).optional(),
+  status: z.enum(['draft', 'active', 'archived']).optional(),
+  location: CoordinateSchema.optional(),
+  pointsOfInterest: z.array(PointOfInterestSchema).optional(),
+});
 
 const SlideItemSchema = z.object({
   key: z.string().min(1),

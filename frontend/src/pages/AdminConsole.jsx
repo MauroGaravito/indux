@@ -12,6 +12,7 @@ import SaveIcon from '@mui/icons-material/Save'
 import SendIcon from '@mui/icons-material/Send'
 import AsyncButton from '../components/AsyncButton.jsx'
 import { useTheme } from '@mui/material/styles'
+import { DEFAULT_PROJECT_LOCATION } from '../constants/location.js'
 
 const defaultConfig = {
   steps: ['personal', 'uploads', 'slides', 'quiz', 'sign'],
@@ -25,7 +26,15 @@ export default function AdminConsole() {
   const theme = useTheme()
   const [projects, setProjects] = useState([])
   const [selectedId, setSelectedId] = useState('')
-  const [projectForm, setProjectForm] = useState({ name: '', description: '', address: '', status: 'draft' })
+  const createEmptyForm = () => ({
+    name: '',
+    description: '',
+    address: '',
+    status: 'draft',
+    location: { ...DEFAULT_PROJECT_LOCATION },
+    pointsOfInterest: [],
+  })
+  const [projectForm, setProjectForm] = useState(createEmptyForm())
   const [module, setModule] = useState(null)
   const [moduleConfig, setModuleConfig] = useState(defaultConfig)
   const [fields, setFields] = useState([])
@@ -49,7 +58,12 @@ export default function AdminConsole() {
   if (user.role !== 'admin') return <Alert severity="warning">Admins only.</Alert>
 
   const createProject = async () => {
-    await api.post('/projects', { name: newProject.name, description: newProject.description })
+    await api.post('/projects', {
+      name: newProject.name,
+      description: newProject.description,
+      location: { ...DEFAULT_PROJECT_LOCATION },
+      pointsOfInterest: [],
+    })
     setNewProject({ name: '', description: '' })
     await loadProjects()
   }
@@ -76,7 +90,17 @@ export default function AdminConsole() {
   const onProjectChange = async (id) => {
     setSelectedId(id)
     const p = projects.find(x => x._id === id)
-    setProjectForm({ name: p?.name || '', description: p?.description || '', address: p?.address || '', status: p?.status || 'draft' })
+    setProjectForm({
+      name: p?.name || '',
+      description: p?.description || '',
+      address: p?.address || '',
+      status: p?.status || 'draft',
+      location:
+        p?.location && typeof p.location.lat === 'number' && typeof p.location.lng === 'number'
+          ? p.location
+          : { ...DEFAULT_PROJECT_LOCATION },
+      pointsOfInterest: Array.isArray(p?.pointsOfInterest) ? p.pointsOfInterest : [],
+    })
     if (id) await loadModule(id)
   }
 

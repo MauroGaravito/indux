@@ -109,7 +109,7 @@ router.get('/modules/:moduleId/submissions', requireAuth, requireRole('manager',
   const filter = status === 'all' ? { moduleId } : { moduleId, status };
   const list = await Submission.find(filter)
     .populate('userId', 'name email')
-    .populate('projectId', 'name')
+    .populate('projectId', 'name address location pointsOfInterest')
     .populate('reviewedBy', 'name')
     .sort({ createdAt: -1 });
   res.json(list);
@@ -122,7 +122,7 @@ router.get('/workers/me/submissions', requireAuth, requireRole('worker'), async 
 
   const subs = await Submission.find({ userId: req.user!.sub, projectId: { $in: projectIds } })
     .sort({ createdAt: -1 })
-    .populate('projectId', 'name address')
+    .populate('projectId', 'name address location pointsOfInterest')
     .select('moduleId status certificateKey createdAt updatedAt projectId reviewReason')
     .lean();
 
@@ -139,7 +139,11 @@ router.get('/workers/me/submissions', requireAuth, requireRole('worker'), async 
       ? {
           id: (s.projectId as any)._id,
           name: (s.projectId as any).name,
-          address: (s.projectId as any).address || ''
+          address: (s.projectId as any).address || '',
+          location: (s.projectId as any).location || null,
+          pointsOfInterest: Array.isArray((s.projectId as any).pointsOfInterest)
+            ? (s.projectId as any).pointsOfInterest
+            : [],
         }
       : null
   }));
