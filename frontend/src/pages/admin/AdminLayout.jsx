@@ -8,6 +8,8 @@ import { useTheme } from '@mui/material/styles'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import FolderIcon from '@mui/icons-material/Folder'
 import RateReviewIcon from '@mui/icons-material/RateReview'
+import FactCheckIcon from '@mui/icons-material/FactCheck'
+import LibraryBooksIcon from '@mui/icons-material/LibraryBooks'
 import PeopleIcon from '@mui/icons-material/People'
 import SettingsIcon from '@mui/icons-material/Settings'
 import MenuIcon from '@mui/icons-material/Menu'
@@ -25,7 +27,9 @@ export default function AdminLayout() {
   const items = [
     { label: 'Dashboard', to: '/admin', icon: <DashboardIcon /> },
     { label: 'Projects', to: '/admin/projects', icon: <FolderIcon /> },
-    { label: 'Reviews', to: '/admin/reviews', icon: <RateReviewIcon /> },
+    { label: 'Induction Module Reviews', to: '/admin/reviews', icon: <RateReviewIcon /> },
+    { label: 'Inspection Module Reviews', to: '/admin/inspections/reviews', icon: <FactCheckIcon /> },
+    { label: 'Inspection Templates', to: '/admin/inspections/templates', icon: <LibraryBooksIcon /> },
     { label: 'Users', to: '/admin/users', icon: <PeopleIcon /> },
     { label: 'Settings', to: '/admin/settings', icon: <SettingsIcon /> },
   ]

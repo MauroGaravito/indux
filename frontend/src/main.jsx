@@ -14,12 +14,15 @@ import DashboardLayout from './layouts/DashboardLayout.jsx'
 import AdminDashboard from './pages/admin/AdminDashboard.jsx'
 import AdminProjects from './pages/admin/Projects.jsx'
 import AdminReviews from './pages/admin/Reviews.jsx'
+import InspectionTemplates from './pages/admin/InspectionTemplates.jsx'
+import InspectionReviews from './pages/admin/InspectionReviews.jsx'
 import AdminUsers from './pages/admin/Users.jsx'
 import AdminSettings from './pages/admin/Settings.jsx'
 import ModuleEditor from './pages/admin/ModuleEditor.jsx'
 import InductionTemplates from './pages/admin/InductionTemplates.jsx'
 import AdminProjectLocation from './pages/admin/ProjectLocation.jsx'
 import AdminWorkerSubmissions from './pages/admin/WorkerSubmissions.jsx'
+import ProjectInspections from './pages/inspections/ProjectInspections.jsx'
 import ManagerDashboard from './pages/manager/ManagerDashboard.jsx'
 import ManagerProjects from './pages/manager/ManagerProjects.jsx'
 import ManagerProjectDetail from './pages/manager/ManagerProjectDetail.jsx'
@@ -89,10 +92,13 @@ function App({ brand }) {
             <Route path="projects" element={<AdminProjects />} />
             <Route path="projects/:projectId" element={<AdminProjects />} />
             <Route path="projects/:projectId/modules/induction/:moduleId" element={<ModuleEditor />} />
+            <Route path="inspections/projects/:projectId" element={<ProjectInspections />} />
             <Route path="projects/:projectId/location" element={<AdminProjectLocation />} />
             <Route path="templates" element={<InductionTemplates />} />
             <Route path="templates/:templateId" element={<ModuleEditor mode="template" />} />
             <Route path="reviews" element={<AdminReviews />} />
+            <Route path="inspections/reviews" element={<InspectionReviews />} />
+            <Route path="inspections/templates" element={<InspectionTemplates />} />
             <Route path="worker-submissions" element={<AdminWorkerSubmissions />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="settings" element={<AdminSettings />} />
