@@ -28,6 +28,13 @@ function createPoiIcon(color) {
 
 const poiIcon = createPoiIcon('#FF6F00')
 
+const createPoiId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `poi-${Date.now()}-${Math.round(Math.random() * 100000)}`
+}
+
 function MapClickHandler({ canEdit, onLocationChange }) {
   useMapEvents({
     click(e) {
@@ -66,7 +73,7 @@ export default function ProjectMapEditor({
   const addPoint = () => {
     if (!canEdit) return
     const base = safeLocation
-    const next = { label: nextLabel, lat: base.lat, lng: base.lng }
+    const next = { label: nextLabel, lat: base.lat, lng: base.lng, id: createPoiId() }
     onPointsChange?.([...pois, next])
   }
 
@@ -124,9 +131,10 @@ export default function ProjectMapEditor({
               {pois.map((poi, idx) => {
                 const lat = typeof poi.lat === 'number' ? poi.lat : safeLocation.lat
                 const lng = typeof poi.lng === 'number' ? poi.lng : safeLocation.lng
+                const pointKey = poi._id || poi.id || `marker-${idx}`
                 return (
                   <Marker
-                    key={`${poi.label}-${idx}`}
+                    key={pointKey}
                     position={[lat, lng]}
                     icon={secondaryIcon}
                     draggable={canEdit}
@@ -159,9 +167,10 @@ export default function ProjectMapEditor({
             {pois.map((poi, idx) => {
               const latText = typeof poi.lat === 'number' ? poi.lat.toFixed(5) : '0.00000'
               const lngText = typeof poi.lng === 'number' ? poi.lng.toFixed(5) : '0.00000'
+              const pointKey = poi._id || poi.id || `poi-${idx}`
               return (
                 <Stack
-                  key={`${poi.label}-${idx}`}
+                  key={pointKey}
                   direction={{ xs: 'column', md: 'row' }}
                   spacing={1}
                   alignItems={{ xs: 'flex-start', md: 'center' }}

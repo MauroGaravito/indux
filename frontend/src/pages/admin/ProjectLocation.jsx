@@ -6,7 +6,7 @@ import {
   Button,
   CircularProgress,
   Stack,
-  Typography
+  Typography,
 } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import SaveIcon from '@mui/icons-material/Save'
@@ -27,7 +27,7 @@ export default function ProjectLocation() {
 
   useEffect(() => {
     loadProject()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId])
 
   const loadProject = async () => {
@@ -89,44 +89,55 @@ export default function ProjectLocation() {
   }
 
   return (
-    <Stack spacing={2} sx={{ height: 'calc(100vh - 120px)' }}>
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, flex: 1 }}>
-          {projectName ? `${projectName} — Full map view` : 'Project location'}
-        </Typography>
-        <Stack direction="row" spacing={1}>
-          <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={handleBack}>
-            Back to project
-          </Button>
-          <Button
-            startIcon={<SaveIcon />}
-            variant="contained"
-            onClick={handleSave}
-            disabled={saving || loading}
-          >
-            {saving ? 'Saving...' : 'Save changes'}
-          </Button>
-        </Stack>
-      </Stack>
-
-      {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
-      {successMsg && <Alert severity="success" onClose={() => setSuccessMsg('')}>{successMsg}</Alert>}
-
-      <Box sx={{ flex: 1, borderRadius: 2, overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
-        {loading ? (
-          <Stack alignItems="center" justifyContent="center" sx={{ height: '100%' }}>
-            <CircularProgress />
+    <Box sx={{ minHeight: 'calc(100vh - 80px)', overflowY: 'auto', px: { xs: 1, sm: 2 }, py: 2 }}>
+      <Stack spacing={2}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, flex: 1 }}>
+            {projectName ? `${projectName} — Full map view` : 'Project location'}
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Button startIcon={<ArrowBackIcon />} variant="outlined" onClick={handleBack}>
+              Back to project
+            </Button>
+            <Button
+              startIcon={<SaveIcon />}
+              variant="contained"
+              onClick={handleSave}
+              disabled={saving || loading}
+            >
+              {saving ? 'Saving...' : 'Save changes'}
+            </Button>
           </Stack>
-        ) : (
-          <ProjectMapEditor
-            canEdit
-            location={location}
-            pointsOfInterest={pointsOfInterest}
-            onLocationChange={setLocation}
-            onPointsChange={setPointsOfInterest}
-          />
-        )}
-      </Box>
-    </Stack>
+        </Stack>
+
+        {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
+        {successMsg && <Alert severity="success" onClose={() => setSuccessMsg('')}>{successMsg}</Alert>}
+
+        <Box
+          sx={{
+            borderRadius: 2,
+            overflow: 'hidden',
+            border: '1px solid',
+            borderColor: 'divider',
+            minHeight: { xs: 360, sm: 520, md: 640 },
+            width: '100%',
+          }}
+        >
+          {loading ? (
+            <Stack alignItems="center" justifyContent="center" sx={{ height: '100%' }}>
+              <CircularProgress />
+            </Stack>
+          ) : (
+            <ProjectMapEditor
+              canEdit
+              location={location}
+              pointsOfInterest={pointsOfInterest}
+              onLocationChange={setLocation}
+              onPointsChange={setPointsOfInterest}
+            />
+          )}
+        </Box>
+      </Stack>
+    </Box>
   )
 }
