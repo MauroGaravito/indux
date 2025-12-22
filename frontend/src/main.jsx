@@ -19,6 +19,7 @@ import AdminSettings from './pages/admin/Settings.jsx'
 import ModuleEditor from './pages/admin/ModuleEditor.jsx'
 import InductionTemplates from './pages/admin/InductionTemplates.jsx'
 import AdminProjectLocation from './pages/admin/ProjectLocation.jsx'
+import AdminWorkerSubmissions from './pages/admin/WorkerSubmissions.jsx'
 import ManagerDashboard from './pages/manager/ManagerDashboard.jsx'
 import ManagerProjects from './pages/manager/ManagerProjects.jsx'
 import ManagerProjectDetail from './pages/manager/ManagerProjectDetail.jsx'
@@ -92,6 +93,7 @@ function App({ brand }) {
             <Route path="templates" element={<InductionTemplates />} />
             <Route path="templates/:templateId" element={<ModuleEditor mode="template" />} />
             <Route path="reviews" element={<AdminReviews />} />
+            <Route path="worker-submissions" element={<AdminWorkerSubmissions />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>

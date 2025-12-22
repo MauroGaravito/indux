@@ -20,6 +20,7 @@ import { useTheme } from '@mui/material/styles';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import FolderIcon from '@mui/icons-material/Folder';
 import RateReviewIcon from '@mui/icons-material/RateReview';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
 import PeopleIcon from '@mui/icons-material/People';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ChecklistIcon from '@mui/icons-material/Checklist';
@@ -44,6 +45,7 @@ export default function DashboardLayout({ children }) {
         { label: 'Project Register', to: '/admin/projects', icon: <FolderIcon /> },
         { label: 'Induction Templates', to: '/admin/templates', icon: <MenuBookIcon /> },
         { label: 'Module Reviews', to: '/admin/reviews', icon: <RateReviewIcon /> },
+        { label: 'Worker Submissions', to: '/admin/worker-submissions', icon: <FactCheckIcon /> },
         { label: 'User Directory', to: '/admin/users', icon: <PeopleIcon /> },
         { label: 'Safety Settings', to: '/admin/settings', icon: <SettingsIcon /> },
       ]
