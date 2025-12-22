@@ -4,13 +4,14 @@ INDUX is a project-centric Work Health & Safety (WHS) induction platform for Aus
 
 ## Workflow at a Glance
 1. **Admin**
-   - Creates projects, manages reusable induction templates, and seeds project modules (blank or cloned from a template).
-   - Configures fields, slides, quizzes, and settings.
-   - Assigns managers and workers to each project, controls per-worker module access, deletes unused modules, and oversees reviews.
+  - Creates projects, manages reusable induction templates, and seeds project modules (blank or cloned from a template).
+  - Maintains project geography: click-to-set map location (Leaflet + OpenStreetMap), add/edit/remove Points of Interest, and open a full-screen Project Map Editor for fine-grained control.
+  - Configures fields, slides, quizzes, and settings.
+  - Assigns managers and workers to each project, controls per-worker module access, deletes unused modules, reviews induction submissions, and oversees induction module approvals.
 2. **Manager**
    - Edits modules while they are in `draft`, `declined`, or `pending`.
-   - Sends modules for review and tracks status, but only admins can approve or decline module reviews. Pending modules now show a banner when waiting for admin approval.
-   - Approves/declines worker submissions for projects they manage, manages worker rosters, and can optionally restrict which modules each worker must complete.
+  - Sends modules for review and tracks status, but only admins can approve or decline induction module reviews. Pending modules now show a banner when waiting for admin approval.
+  - Approves/declines worker submissions for projects they manage through the shared Review Queue or the dedicated Worker Submissions view, manages worker rosters, and can optionally restrict which modules each worker must complete.
 3. **Worker**
    - Sees only assigned projects on the Worker Dashboard.
    - Completes the Induction Wizard (personal data, uploads, slides, quiz, signature).
@@ -27,7 +28,7 @@ INDUX is a project-centric Work Health & Safety (WHS) induction platform for Aus
 3. **Approved** - Locked for managers, open for worker submissions.
 4. **Declined** - Reopens for edits and can re-enter the review pipeline.
 
-Worker submissions mirror this process: pending + approved (certificate generated) or declined (worker resubmits). Certificates are produced during approval and stored securely. Managers can approve or decline submissions as long as they are assigned to the project; admins retain override control.
+Worker submissions mirror this process: pending + approved (certificate generated) or declined (worker resubmits). Certificates are produced during approval and stored securely. Managers can approve or decline submissions as long as they are assigned to the project; admins retain override control. The Admin console now lists these items under **Worker Submissions** with tabs for Inductions, Exams (preview), and Inspections (coming soon) to clearly separate current and future module types.
 
 ## Induction Field Defaults & Customisation
 Every project receives a WHS-ready personal data pack when its induction module is created:
@@ -100,8 +101,8 @@ Managers may edit induction modules (fields, slides, quiz, settings) whenever `r
 See `architecture.md` for the full endpoint catalogue.
 
 ## Frontend Experience
-- **Admin Dashboard** - Project register, module editor, user directory, branding, Pending Approvals, Assigned Workers tab per project, plus the Induction Templates workspace for managing reusable blueprints.
-- **Manager Console** - Assigned projects overview, module editor (manager mode), project detail with module selector, team management (including per-worker module assignment dialog), Pending Approvals, and the creation dialog (blank or from template) for projects they manage. Managers can act on worker submissions they own but module approvals remain admin-only.
+- **Admin Dashboard** - Project register, module editor, user directory, branding, Pending Approvals, Worker Submissions (with Inductions/Exams/Inspections tabs), Assigned Workers tab per project, the full-screen Project Map Editor, and the Induction Templates workspace for managing reusable blueprints.
+- **Manager Console** - Assigned projects overview, module editor (manager mode), project detail with module selector, team management (including per-worker module assignment dialog), Pending Approvals, the Worker Submissions tooling (for projects they manage), and the creation dialog (blank or from template) for projects they manage. Managers can act on worker submissions they own but module approvals remain admin-only.
 - **Worker Dashboard** - Assigned projects, submission status, manager contacts, and certificate access.
 - **Induction Wizard** - Guided worker experience across project selection, personal data (with conditional fields), uploads, slides viewer, quiz, signature, and submission. Photo fields open the camera, upload to MinIO via the same presigned pipeline, and render a thumbnail preview for confidence.
 - **History & Certificates** - Secure record of submissions with certificate downloads.

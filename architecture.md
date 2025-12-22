@@ -4,6 +4,8 @@ This document is the single source of truth for repository layout, data models, 
 
 ## Repository Layout
 ```
+
+Project geography is managed via Leaflet + OpenStreetMap. The Admin Project Info panel supports click-to-set coordinates, drag-to-move Points of Interest, and a CTA to open the full-screen map editor (`/admin/projects/:projectId/location`) for precise adjustments. Location and POI data surface across dashboards (manager/worker) so crews see both textual addresses and coordinates.
 /api                  Express + TypeScript backend (Node 18)
 /frontend             React + Vite frontend (Material UI, Zustand)
 /docs                 Additional documentation
@@ -13,7 +15,7 @@ docker-compose.yml    Orchestrates API, frontend, MongoDB, MinIO
 
 ## Data Architecture
 ```
-Project
+Project (location + POIs + metadata)
   └─ InductionModule (type='induction', multiple per project)
        ├─ InductionModuleField (personal data schema)
        ├─ ModuleReview (snapshot of module state)
@@ -23,7 +25,7 @@ InductionTemplate (admin-only blueprint cloned into new modules)
 ```
 
 ### Models
-- **Project** – `{ _id, name, description, address?, status (draft|active|archived), createdBy?, updatedBy?, createdAt, updatedAt }`
+- **Project** - `{ _id, name, description, address?, status (draft|active|archived), location: { lat, lng }, pointsOfInterest: [{ label, lat, lng }], createdBy?, updatedBy?, createdAt, updatedAt }`
 - **InductionModule** – `{ _id, projectId, type='induction', name?, description?, reviewStatus (draft|pending|approved|declined), config { steps, slides[{ key, title?, fileKey, thumbKey?, order }], quiz{ questions[{ question, options[], answerIndex }] }, settings{ passMark, randomizeQuestions, allowRetry } }, createdBy?, updatedBy?, timestamps }`
 - **InductionModuleField** – `{ _id, moduleId, key, label, type(text|number|date|select|file|photo|textarea|boolean), required, order, step, options?, visibleIf? }`
 - **ModuleReview** – `{ _id, moduleId, projectId, type='induction', data snapshot, status (pending|approved|declined), reason?, requestedBy, reviewedBy?, timestamps }`
@@ -77,7 +79,7 @@ The worker wizard hides conditional fields until the criteria is satisfied and h
 - `DELETE /module-fields/:id`
 - `DELETE /modules/:moduleId`
 
-### Module Reviews
+### Induction Module Reviews
 - `POST /modules/:moduleId/reviews`
 - `GET /modules/:moduleId/reviews`
 - `POST /modules/:moduleId/reviews/:reviewId/approve`
@@ -120,7 +122,7 @@ The worker wizard hides conditional fields until the criteria is satisfied and h
 ## Role & Permission Matrix
 | Role   | Capabilities |
 |--------|--------------|
-| Admin  | Full CRUD over projects, modules, assignments, submissions, reviews, users, and branding. Can approve or decline any review/submission and assign managers. |
+| Admin  | Full CRUD over projects, modules, assignments, submissions, reviews, users, and branding. Can approve or decline any review/submission (including the Worker Submissions console) and assign managers. |
 | Manager| Limited to assigned projects. Can edit modules in draft/declined/pending, send modules for review, approve/decline worker submissions, manage workers, and view pending approvals. |
 | Worker | Completes inductions for assigned projects, views submission status, downloads certificates, and resubmits when declined. |
 
@@ -133,7 +135,7 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 2. **Seed Module** – `POST /projects/:projectId/modules/induction` using the creation dialog (blank or clone from template). Cloned modules automatically copy config + fields.
 3. **Configure Content** – Module Editor (admin mode) updates fields, slides, quiz, and settings while module is draft. Admin Projects also allows deleting unused modules; removal cascades through reviews and submissions automatically.
 4. **Assign Managers & Workers** – Admin Projects provides dedicated tabs for both roles; `POST /assignments` seeds manager/worker links so managers can see their pool and workers can access the wizard. Admins can also open the per-worker module dialog here to restrict which modules each worker must complete.
-5. **Monitor Reviews** – Review Queue lists module reviews and worker submissions; admins can approve/decline or override.
+5. **Monitor Reviews** - Review Queue lists induction module reviews and worker submissions; admins can approve/decline or override. The admin navigation also exposes a dedicated **Worker Submissions** page (Inductions, Exams, Inspections tabs) so compliance reviews stay separate from template/module approvals.
 6. **Branding & Users** – Admin Settings and Users screens manage organisational metadata and accounts.
 
 ### Manager Workflow
@@ -141,7 +143,7 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 2. **Project Register** – `ManagerProjects` lists each project with module status, quick actions, and descriptions.
 3. **Project Detail** – `ManagerProjectDetail` displays summary, assigned managers, a module selector (multiple modules per project), and actions to edit modules, request new ones (blank/template), or manage workers.
 4. **Module Editing** – `ManagerModuleEditor` wraps the admin editor; editing allowed if assignment exists and module status is draft/declined/pending.
-5. **Pending Approvals** – Review Queue (Submission Reviews + Module Review Requests) filtered by assignments. Managers can approve/decline worker submissions for projects they manage, but module approvals remain admin-only.
+5. **Pending Approvals** - Review Queue (Submission Reviews + Induction Module Review Requests) filtered by assignments, plus the Worker Submissions surface for projects they manage. Managers can approve/decline worker submissions, but induction module approvals remain admin-only.
 6. **Team Management** – `ManagerTeam` uses `/assignments/project/:projectId` and `/assignments/manager/:id/team` to manage worker rosters and opens the per-worker module dialog (`PUT /assignments/:id/modules`) so managers can decide which modules each worker must complete.
 
 ### Worker Pipeline

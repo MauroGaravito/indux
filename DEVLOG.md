@@ -44,5 +44,10 @@
 1. Added module deletion support (`DELETE /modules/:moduleId`) plus admin UI controls so unused inductions can be removed along with dependent reviews/submissions.
 2. Introduced per-worker module permissions: assignments now store an optional `modules[]`, `PUT /assignments/:id/modules` lets admins/managers configure access, and worker-facing APIs/UI filter module lists accordingly.
 3. Updated Admin Projects and Manager Team pages with the new "Assign modules" dialog, showing summaries of current restrictions and allowing edits from both consoles.
-4. Filtered worker dashboards, module detail endpoints, and submission routes to honour the assignment’s module list, preventing workers from seeing or submitting to unauthorised inductions.
+4. Filtered worker dashboards, module detail endpoints, and submission routes to honour the assignment's module list, preventing workers from seeing or submitting to unauthorised inductions.
 5. Documented the new behaviour in `README.md` and `architecture.md`.
+
+## 21 December 2025
+1. Replaced the Google Maps dependency with Leaflet + OpenStreetMap across Admin projects. The Project Info panel now includes click-to-set locations, editable Points of Interest, and a CTA that opens a full-screen Project Map Editor at `/admin/projects/:projectId/location`. Coordinates are persisted on the project model and surfaced to managers/workers.
+2. Added the dedicated **Worker Submissions** console for admins/managers with tabs for Inductions, Exams (placeholder), and Inspections (placeholder). Existing submission review logic was moved here, improving clarity between worker compliance reviews and module/template approvals.
+3. Cleaned up the admin navigation and review pages by renaming “Module Reviews” to **Induction Module Reviews**, updating all headings/empty states/button text accordingly so it is explicit that this screen is only for induction modules/templates. README and architecture docs were updated to describe the new map editing flow and worker submissions area.
