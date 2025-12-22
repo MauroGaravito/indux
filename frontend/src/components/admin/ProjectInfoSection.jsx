@@ -1,19 +1,22 @@
 import React from 'react'
 import {
+  Button,
   Card,
   CardHeader,
   CardContent,
   Grid,
+  MenuItem,
+  Stack,
   TextField,
   Typography,
-  MenuItem,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import BusinessIcon from '@mui/icons-material/Business'
+import FullscreenIcon from '@mui/icons-material/Fullscreen'
 import ProjectMapEditor from './ProjectMapEditor.jsx'
 import { DEFAULT_PROJECT_LOCATION } from '../../constants/location.js'
 
-export default function ProjectInfoSection({ value, onChange }) {
+export default function ProjectInfoSection({ value, onChange, onOpenFullMap }) {
   const v = value || {}
   const set = (k, val) => onChange({ ...v, [k]: val })
   const theme = useTheme()
@@ -65,6 +68,27 @@ export default function ProjectInfoSection({ value, onChange }) {
             </TextField>
           </Grid>
           <Grid item xs={12}>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={1}
+              alignItems={{ xs: 'flex-start', sm: 'center' }}
+              justifyContent="space-between"
+              sx={{ mb: 1 }}
+            >
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Project location</Typography>
+              {onOpenFullMap && (
+                <Button
+                  size="small"
+                  startIcon={<FullscreenIcon />}
+                  variant="contained"
+                  color="secondary"
+                  onClick={onOpenFullMap}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Open full map
+                </Button>
+              )}
+            </Stack>
             <ProjectMapEditor
               canEdit
               location={locationValue}

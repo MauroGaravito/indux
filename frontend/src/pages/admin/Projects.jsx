@@ -448,7 +448,11 @@ export default function Projects() {
                 </Tabs>
 
                 <Box sx={{ mt: 2 }} hidden={tab !== 0}>
-                  <ProjectInfoSection value={projectForm} onChange={(val) => setProjectForm(val)} />
+                  <ProjectInfoSection
+                    value={projectForm}
+                    onChange={(val) => setProjectForm(val)}
+                    onOpenFullMap={selectedId ? () => navigate(`/admin/projects/${selectedId}/location`) : undefined}
+                  />
                 </Box>
 
                 <Box sx={{ mt: 2 }} hidden={tab !== 1}>
