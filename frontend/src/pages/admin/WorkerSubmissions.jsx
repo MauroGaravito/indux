@@ -138,7 +138,7 @@ export default function WorkerSubmissions() {
     <Stack spacing={2}>
       <Typography variant="h5" sx={{ fontWeight: 700 }}>Worker Submissions</Typography>
       <Typography variant="body2" color="text.secondary">
-        Review induction completions submitted by workers. Approvals trigger certificate generation as usual.
+        Review submissions completed by workers, including induction completions and the upcoming inspection modules.
       </Typography>
 
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
@@ -147,7 +147,7 @@ export default function WorkerSubmissions() {
       <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
         <Tab label="Inductions" />
         <Tab label="Exams" />
-        <Tab label="Future modules" />
+        <Tab label="Inspections" />
       </Tabs>
 
       {tab === 0 && (
@@ -205,8 +205,8 @@ export default function WorkerSubmissions() {
 
       {tab === 2 && (
         <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle1">Future modules</Typography>
-          <Alert severity="info" sx={{ mt: 1 }}>Coming soon — additional compliance modules will surface in this tab.</Alert>
+          <Typography variant="subtitle1">Inspection modules</Typography>
+          <Alert severity="info" sx={{ mt: 1 }}>Inspection modules are coming soon.</Alert>
         </Paper>
       )}
 
