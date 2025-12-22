@@ -71,7 +71,7 @@ export default function ModuleReviews() {
       const mods = await loadContext()
       await loadReviews(mods)
     } catch (e) {
-      setError(e?.response?.data?.error || 'Unable to load module review requests.')
+      setError(e?.response?.data?.error || 'Unable to load induction module review requests.')
     } finally {
       setLoading(false)
     }
@@ -109,16 +109,16 @@ export default function ModuleReviews() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="h5" sx={{ fontWeight: 700 }}>Module Reviews</Typography>
+      <Typography variant="h5" sx={{ fontWeight: 700 }}>Induction Module Reviews</Typography>
       <Typography variant="body2" color="text.secondary">
-        Approve or decline structural changes to induction modules and templates.
+        Approve or decline structural updates to induction modules and templates.
       </Typography>
 
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       {loading && <Alert severity="info">Refreshing review queue...</Alert>}
 
       <Paper sx={{ p: 2 }}>
-        <Typography variant="subtitle1" sx={{ mb: 1 }}>Pending module review requests</Typography>
+        <Typography variant="subtitle1" sx={{ mb: 1 }}>Pending induction module review requests</Typography>
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -141,12 +141,12 @@ export default function ModuleReviews() {
                     <Button size="small" onClick={() => openView(r)}>Open snapshot</Button>
                     {isAdmin && (
                       <AsyncButton size="small" color="success" variant="contained" onClick={() => approveReview(r)}>
-                        Approve module
+                        Approve induction module
                       </AsyncButton>
                     )}
                     {isAdmin && (
                       <Button size="small" color="error" onClick={() => openDecline(r)}>
-                        Decline module
+                        Decline induction module
                       </Button>
                     )}
                   </Stack>
@@ -155,12 +155,12 @@ export default function ModuleReviews() {
             ))}
           </TableBody>
         </Table>
-        {!reviews.length && <Alert severity="info" sx={{ mt: 2 }}>No module review requests at the moment.</Alert>}
-        {!isAdmin && <Alert severity="info" sx={{ mt: 2 }}>Only admins can approve or decline module reviews.</Alert>}
+        {!reviews.length && <Alert severity="info" sx={{ mt: 2 }}>No induction module review requests at the moment.</Alert>}
+        {!isAdmin && <Alert severity="info" sx={{ mt: 2 }}>Only admins can approve or decline induction module reviews.</Alert>}
       </Paper>
 
       <Dialog open={viewOpen} onClose={closeView} maxWidth="md" fullWidth>
-        <DialogTitle>Module review snapshot</DialogTitle>
+        <DialogTitle>Induction module review snapshot</DialogTitle>
         <DialogContent>
           <ModuleReviewDetails review={viewReview} />
         </DialogContent>
@@ -170,7 +170,7 @@ export default function ModuleReviews() {
       </Dialog>
 
       <Dialog open={declineOpen} onClose={closeDecline}>
-        <DialogTitle>Decline module review</DialogTitle>
+        <DialogTitle>Decline induction module review</DialogTitle>
         <DialogContent>
           <TextField
             fullWidth

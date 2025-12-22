@@ -182,7 +182,7 @@ export default function ReviewQueue() {
       <Typography variant="h5">Pending Approvals</Typography>
       <Tabs value={tab} onChange={(_, v) => setTab(v)}>
         <Tab label="Submission Reviews" />
-        <Tab label="Module Review Requests" />
+        <Tab label="Induction Module Review Requests" />
       </Tabs>
 
       {tab === 0 && (
@@ -225,7 +225,7 @@ export default function ReviewQueue() {
 
       {tab === 1 && (
         <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle1" sx={{ mb: 1 }}>Module review requests</Typography>
+          <Typography variant="subtitle1" sx={{ mb: 1 }}>Induction module review requests</Typography>
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -245,17 +245,17 @@ export default function ReviewQueue() {
                   <TableCell>{r.requestedBy}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      <Button size="small" onClick={() => openView('moduleReview', 'Module review snapshot', r)}>Open snapshot</Button>
-                      {isAdmin && (<AsyncButton size="small" color="success" variant="contained" onClick={() => approveReview(r)}>Approve module</AsyncButton>)}
-                      {isAdmin && (<Button size="small" color="error" onClick={() => openDecline('review', r, 'Not adequate')}>Decline module</Button>)}
+                      <Button size="small" onClick={() => openView('moduleReview', 'Induction module review snapshot', r)}>Open snapshot</Button>
+                      {isAdmin && (<AsyncButton size="small" color="success" variant="contained" onClick={() => approveReview(r)}>Approve induction module</AsyncButton>)}
+                      {isAdmin && (<Button size="small" color="error" onClick={() => openDecline('review', r, 'Not adequate')}>Decline induction module</Button>)}
                     </Stack>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-          {!reviews.length && <Alert severity="info" sx={{ mt: 2 }}>No module review requests at the moment.</Alert>}
-          {!isAdmin && <Alert severity="info" sx={{ mt: 2 }}>Only admins can approve or decline module reviews.</Alert>}
+          {!reviews.length && <Alert severity="info" sx={{ mt: 2 }}>No induction module review requests at the moment.</Alert>}
+          {!isAdmin && <Alert severity="info" sx={{ mt: 2 }}>Only admins can approve or decline induction module reviews.</Alert>}
         </Paper>
       )}
 
