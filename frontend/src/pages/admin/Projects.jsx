@@ -37,7 +37,7 @@ import { useAuthStore } from '../../store/auth.js'
 import CreateModuleDialog from '../../components/admin/CreateModuleDialog.jsx'
 import WorkerModuleAssignmentDialog from '../../components/WorkerModuleAssignmentDialog.jsx'
 import { fetchProjectModules } from '../../utils/modules.js'
-import { DEFAULT_PROJECT_LOCATION } from '../../constants/location.js'
+import { DEFAULT_MAP_ZOOM, DEFAULT_PROJECT_LOCATION } from '../../constants/location.js'
 
 export default function Projects() {
   const theme = useTheme()
@@ -52,6 +52,7 @@ export default function Projects() {
     address: '',
     status: 'draft',
     location: { ...DEFAULT_PROJECT_LOCATION },
+    mapZoom: DEFAULT_MAP_ZOOM,
     pointsOfInterest: [],
   })
 
@@ -143,6 +144,7 @@ export default function Projects() {
           p.location && typeof p.location.lat === 'number' && typeof p.location.lng === 'number'
             ? p.location
             : { ...DEFAULT_PROJECT_LOCATION },
+        mapZoom: typeof p.mapZoom === 'number' ? p.mapZoom : DEFAULT_MAP_ZOOM,
         pointsOfInterest: Array.isArray(p.pointsOfInterest) ? p.pointsOfInterest : [],
       })
       await Promise.all([loadAssignments(id), loadModulesForProject(id)])
@@ -161,6 +163,7 @@ export default function Projects() {
       name: newProject.name,
       description: newProject.description,
       location: { ...DEFAULT_PROJECT_LOCATION },
+      mapZoom: DEFAULT_MAP_ZOOM,
       pointsOfInterest: [],
     })
     setNewProject({ name: '', description: '' })

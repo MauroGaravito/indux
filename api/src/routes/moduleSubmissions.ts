@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Assignment } from '../models/Assignment.js';
 
 const router = Router();
+const DEFAULT_PROJECT_ZOOM = 14;
 
 const workerCanAccessModule = (assignment: any, moduleId: Types.ObjectId) => {
   if (!assignment) return false;
@@ -109,7 +110,7 @@ router.get('/modules/:moduleId/submissions', requireAuth, requireRole('manager',
   const filter = status === 'all' ? { moduleId } : { moduleId, status };
   const list = await Submission.find(filter)
     .populate('userId', 'name email')
-    .populate('projectId', 'name address location pointsOfInterest')
+    .populate('projectId', 'name address location mapZoom pointsOfInterest')
     .populate('reviewedBy', 'name')
     .sort({ createdAt: -1 });
   res.json(list);
@@ -122,7 +123,7 @@ router.get('/workers/me/submissions', requireAuth, requireRole('worker'), async 
 
   const subs = await Submission.find({ userId: req.user!.sub, projectId: { $in: projectIds } })
     .sort({ createdAt: -1 })
-    .populate('projectId', 'name address location pointsOfInterest')
+    .populate('projectId', 'name address location mapZoom pointsOfInterest')
     .select('moduleId status certificateKey createdAt updatedAt projectId reviewReason')
     .lean();
 
@@ -141,6 +142,10 @@ router.get('/workers/me/submissions', requireAuth, requireRole('worker'), async 
           name: (s.projectId as any).name,
           address: (s.projectId as any).address || '',
           location: (s.projectId as any).location || null,
+          mapZoom:
+            typeof (s.projectId as any).mapZoom === 'number'
+              ? (s.projectId as any).mapZoom
+              : DEFAULT_PROJECT_ZOOM,
           pointsOfInterest: Array.isArray((s.projectId as any).pointsOfInterest)
             ? (s.projectId as any).pointsOfInterest
             : [],

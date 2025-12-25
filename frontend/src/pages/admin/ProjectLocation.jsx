@@ -12,7 +12,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import SaveIcon from '@mui/icons-material/Save'
 import api from '../../utils/api.js'
 import ProjectMapEditor from '../../components/admin/ProjectMapEditor.jsx'
-import { DEFAULT_PROJECT_LOCATION } from '../../constants/location.js'
+import { DEFAULT_MAP_ZOOM, DEFAULT_PROJECT_LOCATION } from '../../constants/location.js'
 
 export default function ProjectLocation() {
   const { projectId } = useParams()
@@ -23,6 +23,7 @@ export default function ProjectLocation() {
   const [successMsg, setSuccessMsg] = useState('')
   const [projectName, setProjectName] = useState('')
   const [location, setLocation] = useState({ ...DEFAULT_PROJECT_LOCATION })
+  const [mapZoom, setMapZoom] = useState(DEFAULT_MAP_ZOOM)
   const [pointsOfInterest, setPointsOfInterest] = useState([])
 
   useEffect(() => {
@@ -53,6 +54,7 @@ export default function ProjectLocation() {
             ? project.location
             : { ...DEFAULT_PROJECT_LOCATION }
         )
+        setMapZoom(typeof project.mapZoom === 'number' ? project.mapZoom : DEFAULT_MAP_ZOOM)
         setPointsOfInterest(Array.isArray(project.pointsOfInterest) ? project.pointsOfInterest : [])
       }
     } catch (e) {
@@ -70,6 +72,7 @@ export default function ProjectLocation() {
     try {
       await api.put(`/projects/${projectId}`, {
         location,
+        mapZoom,
         pointsOfInterest,
       })
       setSuccessMsg('Project location updated.')
@@ -131,8 +134,10 @@ export default function ProjectLocation() {
             <ProjectMapEditor
               canEdit
               location={location}
+              mapZoom={mapZoom}
               pointsOfInterest={pointsOfInterest}
               onLocationChange={setLocation}
+              onZoomChange={setMapZoom}
               onPointsChange={setPointsOfInterest}
             />
           )}

@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+const DEFAULT_MAP_ZOOM = 14;
+const DEFAULT_POI_COLOR = '#FF6F00';
+
 export const LoginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
@@ -14,6 +17,7 @@ const PointOfInterestSchema = z.object({
   label: z.string().min(1),
   lat: z.number(),
   lng: z.number(),
+  color: z.string().min(1).default(DEFAULT_POI_COLOR),
 });
 
 export const ProjectCreateSchema = z.object({
@@ -22,6 +26,7 @@ export const ProjectCreateSchema = z.object({
   address: z.string().optional(),
   managers: z.array(z.string()).default([]),
   location: CoordinateSchema,
+  mapZoom: z.number().min(1).max(22).default(DEFAULT_MAP_ZOOM),
   pointsOfInterest: z.array(PointOfInterestSchema).default([]),
   status: z.enum(['draft', 'active', 'archived']).default('draft'),
 });
@@ -33,6 +38,7 @@ export const ProjectUpdateSchema = z.object({
   managers: z.array(z.string()).optional(),
   status: z.enum(['draft', 'active', 'archived']).optional(),
   location: CoordinateSchema.optional(),
+  mapZoom: z.number().min(1).max(22).optional(),
   pointsOfInterest: z.array(PointOfInterestSchema).optional(),
 });
 

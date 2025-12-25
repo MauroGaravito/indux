@@ -14,7 +14,7 @@ import { useTheme } from '@mui/material/styles'
 import BusinessIcon from '@mui/icons-material/Business'
 import FullscreenIcon from '@mui/icons-material/Fullscreen'
 import ProjectMapEditor from './ProjectMapEditor.jsx'
-import { DEFAULT_PROJECT_LOCATION } from '../../constants/location.js'
+import { DEFAULT_MAP_ZOOM, DEFAULT_PROJECT_LOCATION } from '../../constants/location.js'
 
 export default function ProjectInfoSection({ value, onChange, onOpenFullMap }) {
   const v = value || {}
@@ -27,6 +27,7 @@ export default function ProjectInfoSection({ value, onChange, onOpenFullMap }) {
       ? v.location
       : DEFAULT_PROJECT_LOCATION
   const poiValue = Array.isArray(v.pointsOfInterest) ? v.pointsOfInterest : []
+  const zoomValue = typeof v.mapZoom === 'number' ? v.mapZoom : DEFAULT_MAP_ZOOM
 
   return (
     <Card elevation={1} sx={{ borderRadius: 2, bgcolor: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -92,8 +93,10 @@ export default function ProjectInfoSection({ value, onChange, onOpenFullMap }) {
             <ProjectMapEditor
               canEdit
               location={locationValue}
+              mapZoom={zoomValue}
               pointsOfInterest={poiValue}
               onLocationChange={(loc) => set('location', loc)}
+              onZoomChange={(zoom) => set('mapZoom', zoom)}
               onPointsChange={(points) => set('pointsOfInterest', points)}
             />
           </Grid>

@@ -12,7 +12,7 @@ import SaveIcon from '@mui/icons-material/Save'
 import SendIcon from '@mui/icons-material/Send'
 import AsyncButton from '../components/AsyncButton.jsx'
 import { useTheme } from '@mui/material/styles'
-import { DEFAULT_PROJECT_LOCATION } from '../constants/location.js'
+import { DEFAULT_MAP_ZOOM, DEFAULT_PROJECT_LOCATION } from '../constants/location.js'
 
 const defaultConfig = {
   steps: ['personal', 'uploads', 'slides', 'quiz', 'sign'],
@@ -32,6 +32,7 @@ export default function AdminConsole() {
     address: '',
     status: 'draft',
     location: { ...DEFAULT_PROJECT_LOCATION },
+    mapZoom: DEFAULT_MAP_ZOOM,
     pointsOfInterest: [],
   })
   const [projectForm, setProjectForm] = useState(createEmptyForm())
@@ -62,6 +63,7 @@ export default function AdminConsole() {
       name: newProject.name,
       description: newProject.description,
       location: { ...DEFAULT_PROJECT_LOCATION },
+      mapZoom: DEFAULT_MAP_ZOOM,
       pointsOfInterest: [],
     })
     setNewProject({ name: '', description: '' })
@@ -99,6 +101,7 @@ export default function AdminConsole() {
         p?.location && typeof p.location.lat === 'number' && typeof p.location.lng === 'number'
           ? p.location
           : { ...DEFAULT_PROJECT_LOCATION },
+      mapZoom: typeof p?.mapZoom === 'number' ? p.mapZoom : DEFAULT_MAP_ZOOM,
       pointsOfInterest: Array.isArray(p?.pointsOfInterest) ? p.pointsOfInterest : [],
     })
     if (id) await loadModule(id)
