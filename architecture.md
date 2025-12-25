@@ -5,7 +5,7 @@ This document is the single source of truth for repository layout, data models, 
 ## Repository Layout
 ```
 
-Project geography is managed via Leaflet + OpenStreetMap. The Admin Project Info panel supports click-to-set coordinates, drag-to-move Points of Interest, and a CTA to open the full-screen map editor (`/admin/projects/:projectId/location`) for precise adjustments. Location and POI data surface across dashboards (manager/worker) so crews see both textual addresses and coordinates.
+Project geography is managed via Leaflet + OpenStreetMap. The Admin Project Info panel supports click-to-set coordinates, drag-to-move Points of Interest, pick custom marker colours from a palette, adjust a default zoom level, and a CTA to open the full-screen map editor (`/admin/projects/:projectId/location`) for precise adjustments. Location, zoom, and coloured POI data surface across dashboards (manager/worker) so crews see both textual addresses and coordinates.
 /api                  Express + TypeScript backend (Node 18)
 /frontend             React + Vite frontend (Material UI, Zustand)
 /docs                 Additional documentation
@@ -25,7 +25,7 @@ InductionTemplate (admin-only blueprint cloned into new modules)
 ```
 
 ### Models
-- **Project** - `{ _id, name, description, address?, status (draft|active|archived), location: { lat, lng }, pointsOfInterest: [{ label, lat, lng }], createdBy?, updatedBy?, createdAt, updatedAt }`
+- **Project** - `{ _id, name, description, address?, status (draft|active|archived), location: { lat, lng }, mapZoom (1-22), pointsOfInterest: [{ label, lat, lng, color }], createdBy?, updatedBy?, createdAt, updatedAt }`
 - **InductionModule** – `{ _id, projectId, type='induction', name?, description?, reviewStatus (draft|pending|approved|declined), config { steps, slides[{ key, title?, fileKey, thumbKey?, order }], quiz{ questions[{ question, options[], answerIndex }] }, settings{ passMark, randomizeQuestions, allowRetry } }, createdBy?, updatedBy?, timestamps }`
 - **InductionModuleField** – `{ _id, moduleId, key, label, type(text|number|date|select|file|photo|textarea|boolean), required, order, step, options?, visibleIf? }`
 - **ModuleReview** – `{ _id, moduleId, projectId, type='induction', data snapshot, status (pending|approved|declined), reason?, requestedBy, reviewedBy?, timestamps }`
@@ -132,6 +132,7 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 
 ### Admin Flow
 1. **Create Project** – Admin UI or `POST /projects`.
+   - During project edits admins/managers set the default map zoom and pick POI marker colours from the palette (Project Info card or full-screen map editor); values flow through manager/worker dashboards.
 2. **Seed Module** – `POST /projects/:projectId/modules/induction` using the creation dialog (blank or clone from template). Cloned modules automatically copy config + fields.
 3. **Configure Content** – Module Editor (admin mode) updates fields, slides, quiz, and settings while module is draft. Admin Projects also allows deleting unused modules; removal cascades through reviews and submissions automatically.
 4. **Assign Managers & Workers** – Admin Projects provides dedicated tabs for both roles; `POST /assignments` seeds manager/worker links so managers can see their pool and workers can access the wizard. Admins can also open the per-worker module dialog here to restrict which modules each worker must complete.

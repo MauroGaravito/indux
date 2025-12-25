@@ -5,7 +5,7 @@ INDUX is a project-centric Work Health & Safety (WHS) induction platform for Aus
 ## Workflow at a Glance
 1. **Admin**
   - Creates projects, manages reusable induction templates, and seeds project modules (blank or cloned from a template).
-  - Maintains project geography: click-to-set map location (Leaflet + OpenStreetMap), add/edit/remove Points of Interest, and open a full-screen Project Map Editor for fine-grained control.
+  - Maintains project geography: click-to-set map location (Leaflet + OpenStreetMap), set a default zoom per project, add/edit/remove Points of Interest, pick marker colours via a palette, and open a full-screen Project Map Editor for fine-grained control.
   - Configures fields, slides, quizzes, and settings.
   - Assigns managers and workers to each project, controls per-worker module access, deletes unused modules, reviews induction submissions, and oversees induction module approvals.
 2. **Manager**
@@ -101,7 +101,7 @@ Managers may edit induction modules (fields, slides, quiz, settings) whenever `r
 See `architecture.md` for the full endpoint catalogue.
 
 ## Frontend Experience
-- **Admin Dashboard** - Project register, module editor, user directory, branding, Pending Approvals, Worker Submissions (with Inductions/Exams/Inspections tabs), Assigned Workers tab per project, the full-screen Project Map Editor, and the Induction Templates workspace for managing reusable blueprints.
+- **Admin Dashboard** - Project register, module editor, user directory, branding, Pending Approvals, Worker Submissions (with Inductions/Exams/Inspections tabs), Assigned Workers tab per project, the full-screen Project Map Editor (default zoom + POI colour palette), and the Induction Templates workspace for managing reusable blueprints.
 - **Manager Console** - Assigned projects overview, module editor (manager mode), project detail with module selector, team management (including per-worker module assignment dialog), Pending Approvals, the Worker Submissions tooling (for projects they manage), and the creation dialog (blank or from template) for projects they manage. Managers can act on worker submissions they own but module approvals remain admin-only.
 - **Worker Dashboard** - Assigned projects, submission status, manager contacts, and certificate access.
 - **Induction Wizard** - Guided worker experience across project selection, personal data (with conditional fields), uploads, slides viewer, quiz, signature, and submission. Photo fields open the camera, upload to MinIO via the same presigned pipeline, and render a thumbnail preview for confidence.
@@ -118,7 +118,9 @@ See `architecture.md` for the full endpoint catalogue.
 2. Run `docker compose up --build` to start Mongo, MinIO, API, and frontend containers.
 3. Optional: in `api/`, run `SEED=true npm run dev` or `npm run seed` to create demo data (projects, assignments, approved module).
 
-## Roadmap
+## Status & Roadmap
+- **Induction module** work is now feature-complete (templates, approvals, assignments, project map controls, POI colours/zoom, documentation).
+- Next up: begin building the Inspections module (data model, UI flows, submissions) and expand the Worker Submissions console tabs beyond placeholders.
 - Auto-select the only available project for workers to streamline the wizard.
 - Enhanced manager dashboards with direct links to teams and approvals.
 - Versioning and audit history for induction modules.

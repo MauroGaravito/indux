@@ -50,4 +50,10 @@
 ## 21 December 2025
 1. Replaced the Google Maps dependency with Leaflet + OpenStreetMap across Admin projects. The Project Info panel now includes click-to-set locations, editable Points of Interest, and a CTA that opens a full-screen Project Map Editor at `/admin/projects/:projectId/location`. Coordinates are persisted on the project model and surfaced to managers/workers.
 2. Added the dedicated **Worker Submissions** console for admins/managers with tabs for Inductions, Exams (placeholder), and Inspections (placeholder). Existing submission review logic was moved here, improving clarity between worker compliance reviews and module/template approvals.
-3. Cleaned up the admin navigation and review pages by renaming “Module Reviews” to **Induction Module Reviews**, updating all headings/empty states/button text accordingly so it is explicit that this screen is only for induction modules/templates. README and architecture docs were updated to describe the new map editing flow and worker submissions area.
+3. Cleaned up the admin navigation and review pages by renaming "Module Reviews" to **Induction Module Reviews**, updating all headings/empty states/button text accordingly so it is explicit that this screen is only for induction modules/templates. README and architecture docs were updated to describe the new map editing flow and worker submissions area.
+
+## 22 December 2025
+1. Finalised the project map enhancements: admins/managers can now set a default zoom level per project, store it on the Project model, and render that zoom consistently across admin/manager/worker maps.
+2. Added POI colour storage plus a palette-driven picker in `ProjectMapEditor`, so each pin can be recoloured with one click; Leaflet markers adopt the stored colours everywhere.
+3. Updated backend validators, populate paths, and worker/manager payloads so `mapZoom` and `pointsOfInterest.color` are persisted and returned consistently.
+4. Refreshed README and architecture docs to record the new geography controls, note that the induction module scope is complete, and call out that inspections are the next roadmap item; DEVLOG now marks the induction module effort as done.
