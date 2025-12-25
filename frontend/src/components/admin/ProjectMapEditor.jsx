@@ -1,6 +1,6 @@
 import React, { useMemo, useRef } from 'react'
 import PropTypes from 'prop-types'
-import { Box, Button, Card, CardContent, IconButton, Stack, TextField, Tooltip, Typography } from '@mui/material'
+import { Box, Button, Card, CardContent, IconButton, Menu, MenuItem, Stack, TextField, Tooltip, Typography } from '@mui/material'
 import AddLocationAltIcon from '@mui/icons-material/AddLocationAlt'
 import DeleteIcon from '@mui/icons-material/Delete'
 import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet'
@@ -11,6 +11,7 @@ import 'leaflet/dist/leaflet.css'
 const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 const MIN_MAP_ZOOM = 1
 const MAX_MAP_ZOOM = 22
+const COLOR_CHOICES = ['#FF6F00', '#1976d2', '#2E7D32', '#D32F2F', '#F06292', '#7B1FA2', '#FFB300', '#455A64']
 
 const defaultMainIcon = new L.DivIcon({
   html: `<div style="width:22px;height:22px;border-radius:50%;background:#1976d2;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.4);"></div>`,
@@ -110,6 +111,7 @@ export default function ProjectMapEditor({
 
   const markerIcon = useMemo(() => defaultMainIcon, [])
   const poiIconCache = useRef(new Map())
+  const [colorMenu, setColorMenu] = React.useState({ anchorEl: null, index: -1 })
 
   const getPoiIcon = (color) => {
     const key = normalizeColor(color)
@@ -117,6 +119,18 @@ export default function ProjectMapEditor({
       poiIconCache.current.set(key, createPoiIcon(key))
     }
     return poiIconCache.current.get(key)
+  }
+
+  const openColorMenu = (event, index) => {
+    setColorMenu({ anchorEl: event.currentTarget, index })
+  }
+
+  const closeColorMenu = () => setColorMenu({ anchorEl: null, index: -1 })
+
+  const handleColorPick = (color) => {
+    if (colorMenu.index < 0) return
+    updatePoi(colorMenu.index, { color })
+    closeColorMenu()
   }
 
   const addPoint = () => {
@@ -268,23 +282,26 @@ export default function ProjectMapEditor({
                         sx={{ flex: 1 }}
                       />
                       <Stack direction="row" spacing={1} alignItems="center">
-                        <TextField
+                        <Button
+                          variant="outlined"
                           size="small"
-                          label="Colour"
-                          value={poi.color || ''}
-                          onChange={(e) => updatePoi(idx, { color: e.target.value })}
-                          sx={{ width: 160 }}
-                        />
-                        <Box
-                          sx={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: '50%',
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            bgcolor: normalizeColor(poi.color),
-                          }}
-                        />
+                          onClick={(event) => openColorMenu(event, idx)}
+                          sx={{ textTransform: 'none' }}
+                          startIcon={
+                            <Box
+                              sx={{
+                                width: 16,
+                                height: 16,
+                                borderRadius: '50%',
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                bgcolor: normalizeColor(poi.color),
+                              }}
+                            />
+                          }
+                        >
+                          Colour
+                        </Button>
                       </Stack>
                     </Stack>
                   ) : (
@@ -318,6 +335,30 @@ export default function ProjectMapEditor({
           </Stack>
         </Stack>
       </CardContent>
+      <Menu
+        open={Boolean(colorMenu.anchorEl)}
+        anchorEl={colorMenu.anchorEl}
+        onClose={closeColorMenu}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        {COLOR_CHOICES.map((color) => (
+          <MenuItem key={color} onClick={() => handleColorPick(color)}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Box
+                sx={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: color,
+                }}
+              />
+              <Typography variant="body2">{color}</Typography>
+            </Stack>
+          </MenuItem>
+        ))}
+      </Menu>
     </Card>
   )
 }
