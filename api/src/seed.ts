@@ -5,6 +5,7 @@ import { InductionModule } from './models/InductionModule.js';
 import { InductionModuleField } from './models/InductionModuleField.js';
 import { Assignment } from './models/Assignment.js';
 import { InspectionTemplate } from './models/InspectionTemplate.js';
+import { InductionTemplate } from './models/InductionTemplate.js';
 
 export async function seedAll() {
   // Users
@@ -111,6 +112,56 @@ export async function seedAll() {
   }
   if (worker) {
     await Assignment.updateOne({ user: worker._id, project: project._id }, { role: 'worker', assignedBy: manager?._id }, { upsert: true });
+  }
+
+  // Default induction template
+  const defaultInductionTemplate = {
+    name: 'Indux Induct Template',
+    description: 'Starter induction template with common WHS personal data fields and quiz.',
+    type: 'induction' as const,
+    config: {
+      steps: ['personal', 'uploads', 'slides', 'quiz', 'sign'],
+      slides: [],
+      quiz: {
+        questions: [
+          { question: 'All personnel must sign in at the site office?', options: ['No', 'Yes'], answerIndex: 1 },
+          { question: 'Report hazards immediately to your supervisor?', options: ['No', 'Yes'], answerIndex: 1 },
+          { question: 'PPE must be worn in designated areas?', options: ['No', 'Yes'], answerIndex: 1 },
+        ],
+      },
+      settings: { passMark: 80, randomizeQuestions: false, allowRetry: true },
+    },
+    fields: [
+      { key: 'fullName', label: 'Full Name', type: 'text', required: true, order: 1, step: 'personal' },
+      { key: 'email', label: 'Email', type: 'text', required: true, order: 2, step: 'personal' },
+      { key: 'phone', label: 'Phone', type: 'text', required: false, order: 3, step: 'personal' },
+      { key: 'position', label: 'Position', type: 'text', required: false, order: 4, step: 'personal' },
+      { key: 'companyName', label: 'Company Name', type: 'text', required: false, order: 5, step: 'personal' },
+      {
+        key: 'medicalCondition',
+        label: 'Medical Condition',
+        type: 'select',
+        required: true,
+        order: 6,
+        step: 'personal',
+        options: ['Yes', 'No'],
+      },
+      {
+        key: 'medicalConditionDetails',
+        label: 'Medical Condition Details',
+        type: 'textarea',
+        required: false,
+        order: 7,
+        step: 'personal',
+        visibleIf: { fieldKey: 'medicalCondition', equals: 'Yes' },
+      },
+    ],
+  };
+
+  const templateExists = await InductionTemplate.exists({ name: defaultInductionTemplate.name });
+  if (!templateExists) {
+    await InductionTemplate.create(defaultInductionTemplate);
+    console.log('Seeded induction template', defaultInductionTemplate.name);
   }
 
   // Inspection templates

@@ -3,23 +3,24 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  CardHeader,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
-  List,
-  ListItemButton,
-  ListItemText,
+  Paper,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
-  Typography
+  Typography,
 } from '@mui/material'
-import DeleteIcon from '@mui/icons-material/Delete'
 import AddIcon from '@mui/icons-material/Add'
+import DeleteIcon from '@mui/icons-material/Delete'
+import VisibilityIcon from '@mui/icons-material/Visibility'
 import api from '../../utils/api.js'
 import AsyncButton from '../../components/AsyncButton.jsx'
 import { useNavigate } from 'react-router-dom'
@@ -47,7 +48,9 @@ export default function InductionTemplates() {
     }
   }
 
-  useEffect(() => { loadTemplates() }, [])
+  useEffect(() => {
+    loadTemplates()
+  }, [])
 
   const openTemplate = (id) => {
     navigate(`/admin/templates/${id}`)
@@ -59,7 +62,7 @@ export default function InductionTemplates() {
     try {
       const resp = await api.post('/induction-templates', {
         name: newTemplate.name.trim(),
-        description: newTemplate.description || undefined
+        description: newTemplate.description || undefined,
       })
       setCreateOpen(false)
       setNewTemplate({ name: '', description: '' })
@@ -85,32 +88,87 @@ export default function InductionTemplates() {
     }
   }
 
+  const formatDate = (value) => {
+    if (!value) return '—'
+    try {
+      return new Date(value).toLocaleString()
+    } catch {
+      return value
+    }
+  }
+
   return (
     <Stack spacing={2}>
-      <Card elevation={1}>
-        <CardHeader
-          title="Induction templates"
-          action={<Button startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}>New template</Button>}
-        />
-        <CardContent>
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-          {loading && <Alert severity="info">Loading templates...</Alert>}
-          {!loading && !templates.length && <Alert severity="info">No templates have been created yet.</Alert>}
-          <List>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }}>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            Induction templates
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Maintain reusable induction modules that can be cloned straight into projects.
+          </Typography>
+        </Box>
+        <Button startIcon={<AddIcon />} variant="contained" onClick={() => setCreateOpen(true)}>
+          New template
+        </Button>
+      </Stack>
+
+      {error && <Alert severity="error">{error}</Alert>}
+      {loading && <Alert severity="info">Loading templates...</Alert>}
+
+      <TableContainer component={Paper}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Name</TableCell>
+              <TableCell>Description</TableCell>
+              <TableCell>Updated</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
             {templates.map((tpl) => (
-              <ListItemButton key={tpl._id} onClick={() => openTemplate(tpl._id)}>
-                <ListItemText
-                  primary={<Typography sx={{ fontWeight: 600 }}>{tpl.name}</Typography>}
-                  secondary={tpl.description || 'No description'}
-                />
-                <IconButton edge="end" onClick={(e) => { e.stopPropagation(); deleteTemplate(tpl._id) }}>
-                  <DeleteIcon />
-                </IconButton>
-              </ListItemButton>
+              <TableRow key={tpl._id}>
+                <TableCell>
+                  <Typography sx={{ fontWeight: 600 }}>{tpl.name}</Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" color="text.secondary">
+                    {tpl.description || 'No description provided.'}
+                  </Typography>
+                </TableCell>
+                <TableCell>{formatDate(tpl.updatedAt || tpl.createdAt)}</TableCell>
+                <TableCell align="right">
+                  <Stack direction="row" spacing={1} justifyContent="flex-end">
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<VisibilityIcon />}
+                      onClick={() => openTemplate(tpl._id)}
+                    >
+                      Open
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="error"
+                      startIcon={<DeleteIcon />}
+                      onClick={() => deleteTemplate(tpl._id)}
+                    >
+                      Delete
+                    </Button>
+                  </Stack>
+                </TableCell>
+              </TableRow>
             ))}
-          </List>
-        </CardContent>
-      </Card>
+          </TableBody>
+        </Table>
+        {!loading && !templates.length && (
+          <Box sx={{ p: 3 }}>
+            <Alert severity="info">No templates have been created yet.</Alert>
+          </Box>
+        )}
+      </TableContainer>
 
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Create template</DialogTitle>
@@ -132,7 +190,9 @@ export default function InductionTemplates() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateOpen(false)} disabled={creating}>Cancel</Button>
+          <Button onClick={() => setCreateOpen(false)} disabled={creating}>
+            Cancel
+          </Button>
           <AsyncButton onClick={handleCreate} loading={creating} disabled={!newTemplate.name.trim()}>
             Create
           </AsyncButton>
