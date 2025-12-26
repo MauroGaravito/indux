@@ -8,6 +8,7 @@ import Login from './pages/Login.jsx'
 import './setupAxiosNotifications'
 import Landing from './pages/Landing.jsx'
 import InductionWizard from './pages/InductionWizard.jsx'
+import InspectionWizard from './pages/inspections/InspectionWizard.jsx'
 import ReviewQueue from './pages/ReviewQueue.jsx'
 import SlidesViewer from './pages/SlidesViewer.jsx'
 import DashboardLayout from './layouts/DashboardLayout.jsx'
@@ -84,6 +85,7 @@ function App({ brand }) {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/wizard" element={<AuthGuard><WithLayout><InductionWizard /></WithLayout></AuthGuard>} />
+          <Route path="/inspections/wizard" element={<AuthGuard><WithLayout><InspectionWizard /></WithLayout></AuthGuard>} />
           <Route path="/login" element={<Login />} />
           <Route path="/review" element={<AuthGuard><WithLayout><ReviewQueue /></WithLayout></AuthGuard>} />
           <Route path="/slides-viewer" element={<SlidesViewer />} />
