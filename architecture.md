@@ -14,27 +14,22 @@ docker-compose.yml    Orchestrates API, frontend, MongoDB, MinIO
 ```
 
 ## Data Architecture
-```
-Project (location + POIs + metadata)
-  └─ InductionModule (type='induction', multiple per project)
-       ├─ InductionModuleField (personal data schema)
-       ├─ ModuleReview (snapshot of module state)
-       └─ Submission (worker output → certificates)
-Assignment (user ↔ project, role = manager | worker, optional module list)
-InductionTemplate (admin-only blueprint cloned into new modules)
-```
+Projects store location metadata (Leaflet coordinates, default zoom, and colour-coded POIs) and host both induction modules and project inspections. Assignments link users to projects with optional per-module restrictions, while templates provide reusable blueprints for both inductions and inspections.
 
 ### Models
-- **Project** - `{ _id, name, description, address?, status (draft|active|archived), location: { lat, lng }, mapZoom (1-22), pointsOfInterest: [{ label, lat, lng, color }], createdBy?, updatedBy?, createdAt, updatedAt }`
-- **InductionModule** – `{ _id, projectId, type='induction', name?, description?, reviewStatus (draft|pending|approved|declined), config { steps, slides[{ key, title?, fileKey, thumbKey?, order }], quiz{ questions[{ question, options[], answerIndex }] }, settings{ passMark, randomizeQuestions, allowRetry } }, createdBy?, updatedBy?, timestamps }`
-- **InductionModuleField** – `{ _id, moduleId, key, label, type(text|number|date|select|file|photo|textarea|boolean), required, order, step, options?, visibleIf? }`
-- **ModuleReview** – `{ _id, moduleId, projectId, type='induction', data snapshot, status (pending|approved|declined), reason?, requestedBy, reviewedBy?, timestamps }`
-- **Submission** – `{ _id, moduleId, projectId, userId, status (pending|approved|declined), payload, uploads[{ key, type }], quiz { answers, score, passed }, signatureDataUrl?, certificateKey?, reviewedBy?, reviewReason?, timestamps }`
-- **Assignment** – `{ user, project, role ('manager'|'worker'), assignedBy?, modules?: ObjectId[], createdAt, updatedAt }` (unique per user + project).
-- **InductionTemplate** – `{ _id, name, description?, type='induction', config (same shape as modules), fields[ ModuleField-like schema ], createdBy?, updatedBy?, timestamps }`. Templates never hold reviews or submissions; they are cloned into projects.
-- **User** – `{ email, name, password (hashed), role (admin|manager|worker), disabled?, position?, phone?, companyName?, avatarUrl? }`
+- **Project** - `{ _id, name, description, address?, status (draft|active|archived), location: { lat, lng }, mapZoom (1-22), pointsOfInterest: [{ label, lat, lng, color }], createdBy?, updatedBy?, createdAt, updatedAt }`.
+- **InductionModule** - `{ _id, projectId, type: 'induction', name?, description?, reviewStatus (draft|pending|approved|declined), config { steps, slides[{ key, title?, fileKey, thumbKey?, order }], quiz{ questions[{ question, options[], answerIndex }] }, settings{ passMark, randomizeQuestions, allowRetry } }, createdBy?, updatedBy?, timestamps }`.
+- **InductionModuleField** - `{ _id, moduleId, key, label, type(text|number|date|select|file|photo|textarea|boolean), required, order, step, options?, visibleIf? }`.
+- **ModuleReview** - `{ _id, moduleId, projectId, type: 'induction', data snapshot, status (pending|approved|declined), reason?, requestedBy, reviewedBy?, timestamps }`.
+- **Submission** - `{ _id, moduleId, projectId, userId, status (pending|approved|declined), payload, uploads[{ key, type }], quiz { answers, score, passed }, signatureDataUrl?, certificateKey?, reviewedBy?, reviewReason?, timestamps }`.
+- **Assignment** - `{ user, project, role ('manager'|'worker'), assignedBy?, modules?: ObjectId[], createdAt, updatedAt }` (unique per user + project).
+- **InductionTemplate** - `{ _id, name, description?, type: 'induction', config (same shape as modules), fields[ ModuleField-like schema ], createdBy?, updatedBy?, timestamps }`. Templates never hold reviews or submissions; they are cloned into projects or edited directly in admin mode.
+- **InspectionTemplate** - `{ _id, name, description?, requireSignature (default false), requirePOI (default false), categories[{ key, label, order }], items[{ key, categoryKey, label, photoRequired?, photoRequiredOnFail?, notesRequired?, notesRequiredOnFail?, enableRiskLevel?, correctiveActionRequiredOnFail? }], createdBy, updatedBy, timestamps }`.
+- **ProjectInspection** - `{ _id, projectId, templateId, type ('daily'|'weekly'|'adhoc'), active (default true), createdBy, updatedBy, timestamps }`.
+- **InspectionExecution** - `{ _id, projectInspectionId, projectId, templateSnapshot (frozen JSON), executedBy, executedAt (default now), status ('draft'|'submitted'), poiRef?, signatureDataUrl?, itemResults[], submittedAt?, timestamps }`.
+- **User** - `{ email, name, password (hashed), role (admin|manager|worker), disabled?, position?, phone?, companyName?, avatarUrl? }`.
 
-### Default Induction Fields
+### Induction Field Defaults
 When a module is first created it is seeded with:
 1. Full Name
 2. Email
@@ -44,16 +39,21 @@ When a module is first created it is seeded with:
 6. Medical Condition (select Yes/No)
 7. Medical Condition Details (textarea, `visibleIf: { fieldKey: 'medicalCondition', equals: 'Yes' }`)
 
-These defaults are only a starting point—admins/managers can edit labels, steps, type, order, required flags, and conditional logic as needed.
+Admins/managers can edit labels, steps, type, order, required flags, and conditional logic at any time.
 
 ### Induction Templates
-- **Purpose** – reusable admin-only blueprints for common inductions (e.g., Electrician, Forklift). Templates store module config and personal data fields but never hold reviews or submissions.
-- **Endpoints** – `/induction-templates` (CRUD) for admins and `/induction-templates/summaries` for admins/managers when opening the creation dialog.
-- **Cloning Flow** – when a user with permissions creates a module, they choose Blank or Template. If a template is selected, the API deep-copies config + fields and creates a draft module under the project.
-- **Template Editor** – reuses the Module Editor UI in `mode="template"`; actions save directly via the template endpoints.
+- **Purpose** - reusable admin-only blueprints for common inductions (e.g., Electrician, Forklift). Templates store module config and personal data fields but never hold reviews or submissions.
+- **Endpoints** - `/induction-templates` (CRUD) for admins and `/induction-templates/summaries` for admins/managers when opening the creation dialog.
+- **Cloning Flow** - during module creation the user chooses Blank or Template. Selecting a template deep-copies config + fields and creates a draft module under the project.
+- **Template Editor** - reuses the Module Editor UI in `mode="template"`; actions save directly via the template endpoints.
+
+### Inspection Templates
+- **Purpose** - reusable inspection blueprints that define categories, items, and validation toggles (photo, notes, corrective action, risk level, POI and signature requirements).
+- **Activation** - admins/managers activate templates per project via `/projects/:projectId/inspections`, selecting cadence (daily/weekly/adhoc). Each activation creates a `ProjectInspection` record.
+- **Execution Snapshotting** - when an execution is created via `/project-inspections/:projectInspectionId/executions`, the current template is embedded under `templateSnapshot` to keep historical data immutable even if the template later changes.
 
 ### Conditional Fields (`visibleIf`)
-Fields can include:
+`InductionModuleField` supports:
 ```
 visibleIf: {
   fieldKey: string
@@ -61,7 +61,6 @@ visibleIf: {
 }
 ```
 The worker wizard hides conditional fields until the criteria is satisfied and hidden inputs never block submission. Any field type may use `visibleIf`.
-
 ## REST Endpoints (Grouped)
 
 ### Projects & Modules
@@ -92,6 +91,22 @@ The worker wizard hides conditional fields until the criteria is satisfied and h
 - `GET /workers/me/submissions`
 - `POST /submissions/:id/approve`
 - `POST /submissions/:id/decline`
+
+### Inspection Templates
+- `GET /inspection-templates`
+- `POST /inspection-templates`
+- `GET /inspection-templates/:id`
+- `PUT /inspection-templates/:id`
+- `DELETE /inspection-templates/:id`
+
+### Project Inspections
+- `GET /projects/:projectId/inspections`
+- `POST /projects/:projectId/inspections`
+
+### Inspection Executions
+- `POST /project-inspections/:projectInspectionId/executions`
+- `GET /inspection-executions/:id`
+- `POST /inspection-executions/:id/submit`
 
 ### Assignments
 - `POST /assignments`
@@ -131,31 +146,31 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 ## Detailed Workflows
 
 ### Admin Flow
-1. **Create Project** – Admin UI or `POST /projects`.
-   - During project edits admins/managers set the default map zoom and pick POI marker colours from the palette (Project Info card or full-screen map editor); values flow through manager/worker dashboards.
-2. **Seed Module** – `POST /projects/:projectId/modules/induction` using the creation dialog (blank or clone from template). Cloned modules automatically copy config + fields.
-3. **Configure Content** – Module Editor (admin mode) updates fields, slides, quiz, and settings while module is draft. Admin Projects also allows deleting unused modules; removal cascades through reviews and submissions automatically.
-4. **Assign Managers & Workers** – Admin Projects provides dedicated tabs for both roles; `POST /assignments` seeds manager/worker links so managers can see their pool and workers can access the wizard. Admins can also open the per-worker module dialog here to restrict which modules each worker must complete.
-5. **Monitor Reviews** - Review Queue lists induction module reviews and worker submissions; admins can approve/decline or override. The admin navigation also exposes a dedicated **Worker Submissions** page (Inductions, Exams, Inspections tabs) so compliance reviews stay separate from template/module approvals.
-6. **Branding & Users** – Admin Settings and Users screens manage organisational metadata and accounts.
-
+1. **Create Project** - Admin UI or `POST /projects`.
+   - Project edits allow admins/managers to set the default map zoom, recolour POIs from the palette, and open the full-screen map editor; values flow through manager/worker dashboards and the worker map experiences.
+2. **Seed Induction Modules** - `POST /projects/:projectId/modules/induction` using the creation dialog (blank or clone from template). Cloned modules automatically copy config + fields.
+3. **Configure Content** - Module Editor (admin mode) updates fields, slides, quiz, and settings while the module is draft. Admin Projects also allows deleting unused modules; removal cascades through reviews and submissions automatically.
+4. **Assign Managers & Workers** - Admin Projects provides dedicated tabs for both roles; `POST /assignments` seeds manager/worker links so managers can see their pool and workers can access the wizard. Admins can also open the per-worker module dialog here to restrict which modules each worker must complete.
+5. **Manage Inspections** - Admins curate the inspection template library via **Admin -> Inspection Templates** and activate them per project with `/projects/:projectId/inspections`, selecting cadence (daily/weekly/adhoc). Activated templates create `ProjectInspection` records that surface in project dashboards.
+6. **Monitor Reviews & Submissions** - Review Queue lists induction module reviews and worker submissions; admins can approve/decline or override. The admin navigation also exposes a dedicated **Worker Submissions** page (Inductions, Exams, Inspections tabs) and **Inspection Module Reviews** placeholder for future inspection approvals.
+7. **Branding & Users** - Admin Settings and Users screens manage organisational metadata and accounts.
 ### Manager Workflow
-1. **Dashboard** – Shows assigned projects, pending submissions, and modules awaiting review.
-2. **Project Register** – `ManagerProjects` lists each project with module status, quick actions, and descriptions.
-3. **Project Detail** – `ManagerProjectDetail` displays summary, assigned managers, a module selector (multiple modules per project), and actions to edit modules, request new ones (blank/template), or manage workers.
-4. **Module Editing** – `ManagerModuleEditor` wraps the admin editor; editing allowed if assignment exists and module status is draft/declined/pending.
-5. **Pending Approvals** - Review Queue (Submission Reviews + Induction Module Review Requests) filtered by assignments, plus the Worker Submissions surface for projects they manage. Managers can approve/decline worker submissions, but induction module approvals remain admin-only.
-6. **Team Management** – `ManagerTeam` uses `/assignments/project/:projectId` and `/assignments/manager/:id/team` to manage worker rosters and opens the per-worker module dialog (`PUT /assignments/:id/modules`) so managers can decide which modules each worker must complete.
-
+1. **Dashboard** - Shows assigned projects, pending submissions, and modules awaiting review.
+2. **Project Register** - `ManagerProjects` lists each project with module status, quick actions, and descriptions.
+3. **Project Detail** - `ManagerProjectDetail` displays summary, assigned managers, a module selector, and actions to edit modules, request new ones (blank/template), manage workers, or open the Project Inspections tab.
+4. **Module & Template Editing** - `ManagerModuleEditor` wraps the admin editor; editing is allowed if an assignment exists and the module status is draft/declined/pending.
+5. **Project Inspections** - Assigned managers can enable new inspections via the Project Inspections dialog, choosing a template and cadence (daily/weekly/adhoc). Workers inherit these activations when launching the Inspection Wizard.
+6. **Pending Approvals** - Review Queue (Submission Reviews + Induction Module Review Requests) filtered by assignments, plus the Worker Submissions surface for projects they manage. Managers can approve/decline worker submissions, but induction module approvals remain admin-only.
+7. **Team Management** - `ManagerTeam` uses `/assignments/project/:projectId` and `/assignments/manager/:id/team` to manage worker rosters and opens the per-worker module dialog (`PUT /assignments/:id/modules`) so managers can decide which modules each worker must complete.
 ### Worker Pipeline
-1. **Worker Dashboard** – Uses `/assignments/user/:id` to show assigned projects, manager contacts, and submission status. Module lists are filtered using the worker’s assignment so restricted modules stay hidden.
-2. **Induction Wizard** – Steps driven by module config/fields. Wizard checks `/modules/:moduleId/submissions/my` to prevent duplicate pending/approved submissions.
-3. **Uploads** – `file` and `photo` inputs pass through `POST /uploads/presign`; photos open the camera (mobile) or webcam/file picker (desktop), preview immediately, and store the resulting keys in submission payloads.
-4. **Slides Viewer** – Workers now pass the slide’s name and extension to `/slides-viewer` so PDFs render via pdf.js (matching admin/manager behaviour).
-5. **Submission** – `POST /modules/:moduleId/submissions` stores or updates pending submissions safely.
-6. **Review Decision** – Managers/admins approve or decline; approved submissions trigger certificate generation.
-7. **History** – `GET /workers/me/submissions` lists past submissions with certificate download links protected by assignment checks.
-
+1. **Worker Dashboard** - Uses `/assignments/user/:id` to show assigned projects, manager contacts, and submission status. Module lists are filtered by the worker assignment so restricted modules stay hidden.
+2. **Induction Wizard** - Steps driven by module config/fields. Wizard checks `/modules/:moduleId/submissions/my` to prevent duplicate pending/approved submissions.
+3. **Inspection Wizard** - Mirrors the Induction Wizard UX with a visible stepper for Context, Checklist, Summary, Signature, and Submit. Workers pick POIs when required, complete checklist items with pass/fail/NA, capture photos/notes/corrective actions, and provide signatures when demanded.
+4. **Uploads** - `file` and `photo` inputs pass through `POST /uploads/presign`; photos open the camera (mobile) or webcam/file picker (desktop), preview immediately, and store the resulting keys in submission payloads.
+5. **Slides Viewer** - Workers pass the slide name and extension to `/slides-viewer` so PDFs render via pdf.js (matching admin/manager behaviour).
+6. **Submission** - `POST /modules/:moduleId/submissions` stores or updates pending submissions safely, while inspections use `POST /inspection-executions/:id/submit` after checklist validation.
+7. **Review Decision** - Managers/admins approve or decline; approved submissions trigger certificate generation. Inspection submissions become immutable after submit until downstream reviews are built.
+8. **History** - `GET /workers/me/submissions` lists past submissions with certificate download links protected by assignment checks.
 ## Module Lifecycle
 1. **Draft** – Fully editable; workers cannot submit.
 2. **Pending** – Submitted for review; managers retain edit access until decision.
@@ -211,7 +226,7 @@ Managers assigned to the project can approve or decline submissions directly (ad
 2. **Compose Services** – `indux-api`, `indux-frontend`, `mongo`, and `minio`. Reverse proxy (Caddy/Dokploy) runs separately and attaches to the shared network.
 3. **Volumes/Networks** – External volumes (`indux_mongo_data`, `indux_minio_data`) and `shared_caddy_net` mimic production; adjust as needed for local-only environments.
 4. **Local Run** – `docker compose up --build` starts the full stack. Dev mode can use `npm run dev` in `/api` and `/frontend` for hot reload.
-5. **Seeding** – `SEED=true npm run dev` or `npm run seed` populates demo users (admin/manager/worker), the demo project, approved module, quiz, fields, and assignments.
+5. **Seeding** - `SEED=true npm run dev` or `npm run seed` populates demo users (admin/manager/worker), the demo project, the approved induction module, quiz, default fields, assignments, the seeded **Indux Induct Template**, and five default Inspection Templates (PPE, Pre-Start Heavy Machinery, Site Safety HazCheck, First Aid Kit, High-Risk Work Permit).
 
 ## Troubleshooting
 | Symptom | Resolution |
@@ -229,7 +244,7 @@ Managers assigned to the project can approve or decline submissions directly (ad
 - `manager@indux.local` / `manager123` (manager)
 - `worker@indux.local` / `worker123` (worker)
 
-Seeding also creates “Demo Project” (status `active`) with an approved module, quiz questions, default fields, and assignments so the full induction pipeline works immediately.
+Seeding also creates "Demo Project" (status `active`) with an approved module, quiz questions, default fields, and assignments so the full induction pipeline works immediately, plus the reusable **Indux Induct Template** and five inspection templates for PPE, Heavy Machinery, HazCheck, First Aid, and High-Risk permits.
 
 ## Additional Notes
 - Axios interceptors refresh JWTs and handle 401/403 responses globally.
@@ -239,12 +254,3 @@ Seeding also creates “Demo Project” (status `active`) with an approved modul
 - Manager dashboard quick actions route to `/manager/projects` so managers choose a project before managing teams or approvals.
 
 Keep this file updated alongside feature changes to maintain an accurate technical reference.
-- `GET /induction-templates` (admin)
-- `POST /induction-templates` (admin)
-- `GET /induction-templates/:id` (admin)
-- `PUT /induction-templates/:id` (admin)
-- `DELETE /induction-templates/:id` (admin)
-- `GET /induction-templates/summaries` (admin + assigned managers; used for creation dialog)
-- `GET /induction-templates/summaries` (admin + assigned managers; used for creation dialog)
-
-`GET /projects/:projectId/modules/induction` now returns `{ modules: [...] }` because projects can host multiple modules. Frontend consumers select the relevant module ID before loading `/modules/:moduleId`. Managers must be assigned to the project before calling `POST /projects/:projectId/modules/induction` or `GET /modules/:moduleId/submissions`.

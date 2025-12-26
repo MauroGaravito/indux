@@ -1,20 +1,20 @@
-﻿# INDUX - WHS Inductions for Project Teams
+# INDUX - WHS Inductions for Project Teams
 
 INDUX is a project-centric Work Health & Safety (WHS) induction platform for Australian construction companies. Projects can host multiple induction modules (e.g., General site, Electrician, Forklift) while admins, managers, and workers collaborate to keep crews compliant.
 
 ## Workflow at a Glance
 1. **Admin**
-  - Creates projects, manages reusable induction templates, and seeds project modules (blank or cloned from a template).
+  - Creates projects, manages reusable induction and inspection templates, seeds project modules (blank or cloned from a template), and activates inspection templates for each project cadence.
   - Maintains project geography: click-to-set map location (Leaflet + OpenStreetMap), set a default zoom per project, add/edit/remove Points of Interest, pick marker colours via a palette, and open a full-screen Project Map Editor for fine-grained control.
-  - Configures fields, slides, quizzes, and settings.
-  - Assigns managers and workers to each project, controls per-worker module access, deletes unused modules, reviews induction submissions, and oversees induction module approvals.
+  - Configures fields, slides, quizzes, and settings for inductions and curates the inspection template library.
+  - Assigns managers and workers to each project, controls per-worker module access, deletes unused modules, reviews induction submissions, and oversees inspection/induction approvals.
 2. **Manager**
    - Edits modules while they are in `draft`, `declined`, or `pending`.
   - Sends modules for review and tracks status, but only admins can approve or decline induction module reviews. Pending modules now show a banner when waiting for admin approval.
   - Approves/declines worker submissions for projects they manage through the shared Review Queue or the dedicated Worker Submissions view, manages worker rosters, and can optionally restrict which modules each worker must complete.
 3. **Worker**
    - Sees only assigned projects on the Worker Dashboard.
-   - Completes the Induction Wizard (personal data, uploads, slides, quiz, signature).
+   - Completes the Induction Wizard (personal data, uploads, slides, quiz, signature) plus the Inspection Wizard for any active project inspections (POI selection, checklist, summary, signature).
    - Resubmits if declined and accesses certificates once approved.
 
 ## Roles
@@ -28,7 +28,7 @@ INDUX is a project-centric Work Health & Safety (WHS) induction platform for Aus
 3. **Approved** - Locked for managers, open for worker submissions.
 4. **Declined** - Reopens for edits and can re-enter the review pipeline.
 
-Worker submissions mirror this process: pending + approved (certificate generated) or declined (worker resubmits). Certificates are produced during approval and stored securely. Managers can approve or decline submissions as long as they are assigned to the project; admins retain override control. The Admin console now lists these items under **Worker Submissions** with tabs for Inductions, Exams (preview), and Inspections (coming soon) to clearly separate current and future module types.
+Worker submissions mirror this process: pending + approved (certificate generated) or declined (worker resubmits). Certificates are produced during approval and stored securely. Managers can approve or decline submissions as long as they are assigned to the project; admins retain override control. The Admin console now lists these items under **Worker Submissions** with tabs for Inductions, Exams (preview), and Inspections to clearly separate current and future module types.
 
 ## Induction Field Defaults & Customisation
 Every project receives a WHS-ready personal data pack when its induction module is created:
@@ -65,10 +65,16 @@ visibleIf: {
 The wizard hides fields until the condition is met and hidden fields never block submission. Medical Condition Details is preconfigured with `visibleIf: { fieldKey: 'medicalCondition', equals: 'Yes' }`, and the same structure can be applied to any custom field.
 
 ## Induction Templates
-- Templates are admin-only blueprints containing module config and personal data fields (no submissions or approvals).
-- Admins manage templates under **Admin → Induction Templates** and edit them using the Module Editor in template mode.
+- Templates are admin-only blueprints containing module config and personal data fields (no submissions or approvals). New installs seed a default **Indux Induct Template** so projects can be bootstrapped immediately.
+- Admins manage templates under **Admin -> Induction Templates** (table view with quick actions) and edit them using the Module Editor in template mode.
 - When creating a project module, admins and assigned managers can pick **Blank** or **From template** in the creation dialog; cloning performs a deep copy so the new module is independent.
-- Template summaries are exposed via `/induction-templates/summaries` for the creation dialog, while full CRUD endpoints remain admin-only.
+- Template summaries are exposed via /induction-templates/summaries for the creation dialog, while full CRUD endpoints remain admin-only.
+
+## Inspection Templates
+- Five inspection templates (PPE, Pre-Start Heavy Machinery, Site Safety HazCheck, First Aid Kit Audit, High-Risk Work Permit) are seeded automatically so inspections can be activated without manual authoring.
+- Admins manage templates under **Admin -> Inspection Templates** using the same UX pattern as induction templates and can review/clone/delete them at any time.
+- Projects activate inspection templates from the Project Inspections screen, selecting cadence (daily, weekly, adhoc) before launching the Inspection Wizard.
+- Each template stores categories/items (photo + notes rules, corrective actions, risk toggles) so executions inherit the correct validation requirements automatically.
 
 ## Manager Editing Behaviour
 Managers may edit induction modules (fields, slides, quiz, settings) whenever `reviewStatus` is `draft`, `pending`, or `declined`. Only `approved` modules become read-only in manager mode. Admins may edit at any stage but usually keep approved modules locked for audit purposes. When a project does not yet have an induction module, the editor surfaces a dedicated empty state with the template-aware creation dialog so admins/managers can create the first module without leaving the page.
@@ -101,10 +107,11 @@ Managers may edit induction modules (fields, slides, quiz, settings) whenever `r
 See `architecture.md` for the full endpoint catalogue.
 
 ## Frontend Experience
-- **Admin Dashboard** - Project register, module editor, user directory, branding, Pending Approvals, Worker Submissions (with Inductions/Exams/Inspections tabs), Assigned Workers tab per project, the full-screen Project Map Editor (default zoom + POI colour palette), and the Induction Templates workspace for managing reusable blueprints.
-- **Manager Console** - Assigned projects overview, module editor (manager mode), project detail with module selector, team management (including per-worker module assignment dialog), Pending Approvals, the Worker Submissions tooling (for projects they manage), and the creation dialog (blank or from template) for projects they manage. Managers can act on worker submissions they own but module approvals remain admin-only.
-- **Worker Dashboard** - Assigned projects, submission status, manager contacts, and certificate access.
+- **Admin Dashboard** - Project register, module editor, user directory, branding, Pending Approvals, Worker Submissions (with Inductions/Exams/Inspections tabs), Assigned Workers tab per project, the full-screen Project Map Editor (default zoom + POI colour palette), the refreshed Induction Templates workspace, and the Inspection Templates manager.
+- **Manager Console** - Assigned projects overview, module editor (manager mode), project detail with module selector, team management (including per-worker module assignment dialog), Pending Approvals, Worker Submissions (projects they manage), and the Project Inspections surface where managers can activate templates if assigned to the project.
+- **Worker Dashboard** - Assigned projects, submission status, manager contacts, certificate access, and shortcuts into active inspections.
 - **Induction Wizard** - Guided worker experience across project selection, personal data (with conditional fields), uploads, slides viewer, quiz, signature, and submission. Photo fields open the camera, upload to MinIO via the same presigned pipeline, and render a thumbnail preview for confidence.
+- **Inspection Wizard** - Mirrors the Induction Wizard structure with a stepper spanning Context, Checklist, Summary, Signature, and Submit. It enforces POI/signature requirements, item-level validation (photo/notes/corrective action/risk), and submit confirmation.
 - **History & Certificates** - Secure record of submissions with certificate downloads.
 
 ## Tech Stack
@@ -128,3 +135,5 @@ See `architecture.md` for the full endpoint catalogue.
 - Continuing UX refinements across dashboards, wizard steps, and notifications.
 
 For full technical details, visit `architecture.md`.
+
+

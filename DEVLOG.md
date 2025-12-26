@@ -57,3 +57,9 @@
 2. Added POI colour storage plus a palette-driven picker in `ProjectMapEditor`, so each pin can be recoloured with one click; Leaflet markers adopt the stored colours everywhere.
 3. Updated backend validators, populate paths, and worker/manager payloads so `mapZoom` and `pointsOfInterest.color` are persisted and returned consistently.
 4. Refreshed README and architecture docs to record the new geography controls, note that the induction module scope is complete, and call out that inspections are the next roadmap item; DEVLOG now marks the induction module effort as done.
+
+## 23 December 2025
+1. Landed the inspections data model (InspectionTemplate, ProjectInspection, InspectionExecution), admin CRUD endpoints, project activation routes, execution APIs, and submit validation (POI, signature, item rules) without touching the older induction flows.
+2. Delivered the Inspection Templates admin UI, Project Inspections page, and Inspection Wizard that mirrors the Induction Wizard (Context, Checklist, Summary, Signature, Submit) using the same MUI stepper and gating patterns.
+3. Wired admin routing/navigation with new sidebar items, refreshed the Induction Templates UI to match inspection styling, and seeded five professional inspection templates plus the default **Indux Induct Template** during bootstrap.
+4. Updated README, `architecture.md`, and other docs to describe inspection workflows, seeded templates, project activation, and the worker-facing wizard so onboarding stays accurate.
