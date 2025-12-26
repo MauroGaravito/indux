@@ -14,6 +14,7 @@ import {
 } from '@mui/material'
 import LocationOnIcon from '@mui/icons-material/LocationOn'
 import LockIcon from '@mui/icons-material/Lock'
+import FactCheckIcon from '@mui/icons-material/FactCheck'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../../utils/api.js'
 import CreateModuleDialog from '../../components/admin/CreateModuleDialog.jsx'
@@ -29,6 +30,9 @@ export default function ManagerProjectDetail() {
   const [error, setError] = useState('')
   const [managerAssignments, setManagerAssignments] = useState([])
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [inspections, setInspections] = useState([])
+  const [inspectionsLoading, setInspectionsLoading] = useState(false)
+  const [inspectionTemplates, setInspectionTemplates] = useState([])
 
   const loadProject = async () => {
     try {
@@ -87,10 +91,40 @@ export default function ManagerProjectDetail() {
     }
   }
 
+  const loadInspections = async () => {
+    if (!projectId) {
+      setInspections([])
+      return
+    }
+    setInspectionsLoading(true)
+    try {
+      const resp = await api.get(`/projects/${projectId}/inspections`)
+      setInspections(resp.data?.inspections || [])
+    } catch (e) {
+      setInspections([])
+      if (e?.response?.status === 403) {
+        setError('Not authorised to view inspections for this project.')
+      }
+    } finally {
+      setInspectionsLoading(false)
+    }
+  }
+
+  const loadInspectionTemplates = async () => {
+    try {
+      const resp = await api.get('/inspection-templates')
+      setInspectionTemplates(resp.data?.templates || resp.data || [])
+    } catch {
+      setInspectionTemplates([])
+    }
+  }
+
   useEffect(() => {
     loadProject()
     loadModules()
     loadManagers()
+    loadInspections()
+    loadInspectionTemplates()
   }, [projectId])
 
   const managers = useMemo(() => {
@@ -149,6 +183,25 @@ export default function ManagerProjectDetail() {
   const formatCoordinates = (loc) => {
     if (!loc || typeof loc.lat !== 'number' || typeof loc.lng !== 'number') return ''
     return `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`
+  }
+
+  const inspectionTemplateMap = useMemo(() => {
+    const map = new Map()
+    inspectionTemplates.forEach((tpl) => map.set(String(tpl._id), tpl.name || 'Inspection template'))
+    return map
+  }, [inspectionTemplates])
+
+  const inspectionRows = useMemo(() => {
+    const typeLabels = { daily: 'Daily', weekly: 'Weekly', adhoc: 'Ad-hoc' }
+    return inspections.map((insp) => ({
+      ...insp,
+      templateName: inspectionTemplateMap.get(String(insp.templateId)) || 'Inspection template',
+      typeLabel: typeLabels[insp.type] || insp.type || 'Inspection',
+    }))
+  }, [inspections, inspectionTemplateMap])
+
+  const openInspections = () => {
+    navigate(`/manager/projects/${projectId}/inspections`)
   }
 
   if (error) return <Alert severity="error">{error}</Alert>
@@ -253,6 +306,43 @@ export default function ManagerProjectDetail() {
             {selectedModule && <Chip label={moduleStatus.label} color={moduleStatus.color} />}
           </Stack>
           {!selectedModuleId && !modulesLoading && <Alert severity="info">No induction module selected.</Alert>}
+          <Divider />
+          <Stack spacing={1}>
+            <Typography variant="subtitle2">Project inspections</Typography>
+            {inspectionsLoading && <Alert severity="info">Loading inspections…</Alert>}
+            {!inspectionsLoading && !inspectionRows.length && (
+              <Alert severity="info">
+                No inspections have been activated yet. Use the inspection workspace to add one.
+              </Alert>
+            )}
+            {!inspectionsLoading && inspectionRows.length > 0 && (
+              <Stack spacing={1}>
+                {inspectionRows.map((insp) => (
+                  <Card key={insp._id} variant="outlined" sx={{ borderRadius: 2 }}>
+                    <CardContent>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between">
+                        <Box>
+                          <Typography sx={{ fontWeight: 600 }}>{insp.templateName}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Type: {insp.typeLabel}
+                          </Typography>
+                        </Box>
+                        <Chip label="Active" color="success" size="small" />
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Stack>
+            )}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+              <Button variant="contained" startIcon={<FactCheckIcon />} onClick={openInspections}>
+                Open inspection workspace
+              </Button>
+              <Button variant="outlined" onClick={openInspections}>
+                Activate / run inspection
+              </Button>
+            </Stack>
+          </Stack>
         </Stack>
       </CardContent>
       <CreateModuleDialog

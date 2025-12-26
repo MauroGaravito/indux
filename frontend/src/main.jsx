@@ -110,6 +110,7 @@ function App({ brand }) {
             <Route path="projects" element={<ManagerProjects />} />
             <Route path="projects/:projectId" element={<ManagerProjectDetail />} />
             <Route path="projects/:projectId/module/:moduleId" element={<ManagerModuleEditor />} />
+            <Route path="projects/:projectId/inspections" element={<ProjectInspections />} />
             <Route path="projects/:projectId/team" element={<ManagerTeam />} />
           </Route>
           <Route path="/worker" element={<WorkerGuard><DashboardLayout /></WorkerGuard>}>
