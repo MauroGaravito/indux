@@ -45,6 +45,7 @@ export default function DashboardLayout({ children }) {
         { label: 'Project Register', to: '/admin/projects', icon: <FolderIcon /> },
         { label: 'Induction Templates', to: '/admin/templates', icon: <MenuBookIcon /> },
         { label: 'Inspection Templates', to: '/admin/inspection-templates', icon: <MenuBookIcon /> },
+        { label: 'Inspection Records', to: '/admin/inspection-records', icon: <ChecklistIcon /> },
         { label: 'Induction Module Reviews', to: '/admin/reviews', icon: <RateReviewIcon /> },
         { label: 'Inspection Module Reviews', to: '/admin/inspection-reviews', icon: <FactCheckIcon /> },
         { label: 'Worker Submissions', to: '/admin/worker-submissions', icon: <FactCheckIcon /> },

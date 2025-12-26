@@ -81,6 +81,7 @@ The wizard hides fields until the condition is met and hidden fields never block
 - **Managers y Workers** asignados al proyecto ven las inspecciones activas directamente en sus dashboards. Cada tarjeta ofrece un CTA (Run/Open inspection) que crea o reanuda la ejecución y abre el `InspectionWizard`.
 - **InspectionWizard** guía el proceso (Context, Checklist, Summary, Signature, Submit). Cuando se pulsa **Submit**, la inspección queda bloqueada en modo lectura y se considera evidencia WHS.
 - **Fin del flujo**: no existe aprobación/rechazo en v1. Una vez enviada, la inspección aparece como **Completed** en los dashboards y en el historial del proyecto, lista para ser consultada como registro.
+- **Inspection Records**: admins aplican filtros globales en **Admin → Inspection Records**, managers revisan el historial por proyecto desde **Project → Inspections → History** y los workers ven **Completed inspections** en su dashboard. Todas las rutas abren el `InspectionWizard` en modo `readOnly`, mostrando snapshot del template, checklist completo, fotos, notas, firma, POI y metadatos para auditorías WHS.
 
 ## Manager Editing Behaviour
 Managers may edit induction modules (fields, slides, quiz, settings) whenever `reviewStatus` is `draft`, `pending`, or `declined`. Only `approved` modules become read-only in manager mode. Admins may edit at any stage but usually keep approved modules locked for audit purposes. When a project does not yet have an induction module, the editor surfaces a dedicated empty state with the template-aware creation dialog so admins/managers can create the first module without leaving the page.
@@ -117,7 +118,8 @@ See `architecture.md` for the full endpoint catalogue.
 - **Manager Console** - Assigned projects overview, module editor (manager mode), project detail with module selector, team management (including per-worker module assignment dialog), Pending Approvals, Worker Submissions (projects they manage), and the Project Inspections surface where managers can activate templates if assigned to the project.
 - **Worker Dashboard** - Assigned projects, submission status, manager contacts, certificate access, and shortcuts into active inspections.
 - **Induction Wizard** - Guided worker experience across project selection, personal data (with conditional fields), uploads, slides viewer, quiz, signature, and submission. Photo fields open the camera, upload to MinIO via the same presigned pipeline, and render a thumbnail preview for confidence.
-- **Inspection Wizard** - Mirrors the Induction Wizard structure with a stepper spanning Context, Checklist, Summary, Signature, and Submit. It enforces POI/signature requirements, item-level validation (photo/notes/corrective action/risk), and submit confirmation.
+- **Inspection Wizard** - Mirrors the Induction Wizard structure with a stepper spanning Context, Checklist, Summary, Signature, and Submit. It enforces POI/signature requirements, item-level validation (photo/notes/corrective action/risk), and submit confirmation. The same component now renders a read-only audit mode that presents the template snapshot, checklist decisions, notes, corrective actions, attached photos (with secure download), POI, signature, and metadata once a record is submitted.
+- **Inspection Records** - Admin console view with filters (project, user, template, date range), the manager Project → Inspections → History table, and the worker dashboard "Completed inspections" list. Each row links into the read-only Inspection Wizard to keep evidence immutable even if templates evolve later.
 - **History & Certificates** - Secure record of submissions with certificate downloads.
 
 ## Tech Stack
@@ -133,7 +135,7 @@ See `architecture.md` for the full endpoint catalogue.
 
 ## Status & Roadmap
 - **Induction module** work is now feature-complete (templates, approvals, assignments, project map controls, POI colours/zoom, documentation).
-- Next up: begin building the Inspections module (data model, UI flows, submissions) and expand the Worker Submissions console tabs beyond placeholders.
+- **Inspection module v1** is also complete: template library, per-project activations, execution wizard, immutable submissions, global/project/worker record views, and the read-only audit experience. V2 will add approvals, corrective actions, notifications, analytics, and PDF exports.
 - Auto-select the only available project for workers to streamline the wizard.
 - Enhanced manager dashboards with direct links to teams and approvals.
 - Versioning and audit history for induction modules.

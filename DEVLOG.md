@@ -68,4 +68,10 @@
 1. Closed **Inspection Module v1** from a UX perspective: dashboards (manager/worker) now muestran cada inspección activada, su estado (Not started/In progress/Completed) y botones para ejecutar o ver el `InspectionWizard` en modo lectura tras el submit.
 2. El wizard registra cada envío como evidencia WHS (sin revisión): `Submit` bloquea la inspección, actualiza el historial local y actualiza los estados en los dashboards.
 3. La pestaña **Project → Inspections** incorpora un historial read-only con las ejecuciones enviadas (fecha, usuario, estado Submitted) más controles para activar/desactivar plantillas.
-4. Documentación actualizada (`README`, `architecture.md`) con la sección “Inspection Workflow (v1)” que deja claro que el backend está completo, que manager/worker son los ejecutores y que no existe revisión/aprobación en esta versión (se planifica para una fase futura).
+4. Documentación actualizada (`README`, `architecture.md`) con la sección "Inspection Workflow (v1)" que deja claro que el backend está completo, que manager/worker son los ejecutores y que no existe revisión/aprobación en esta versión (se planifica para una fase futura).
+
+## 28 December 2025
+1. Confirmé que `InspectionExecution` almacena `templateId` y `executedByRole`, añadí índices de auditoría y dejé expuestos los endpoints read-only (`GET /inspection-records`, `/projects/:projectId/inspection-records`, `/my/inspection-records`, `/inspection-records/:id`) para Admin, Manager y Worker.
+2. Publiqué **Admin → Inspection Records** con filtros por proyecto/usuario/plantilla/rango de fechas, tabla estilo MUI y botón **View** que abre el `InspectionWizard` en modo `readOnly`.
+3. Añadí el historial por proyecto (Project → Inspections → History) y la tabla "Completed inspections" en el dashboard del worker, ambos alimentados por los nuevos endpoints y enlazados al wizard en modo auditoría (snapshot, checklist, fotos con presign, firma, POI, metadatos).
+4. Extendí `InspectionWizard` con `mode="readOnly"` para reutilizar el mismo layout como visor de auditoría, y actualicé `README.md` + `architecture.md` + `DEVLOG.md` para dejar marcado que el Inspection Module v1 queda cerrado y audit-ready.

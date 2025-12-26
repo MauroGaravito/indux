@@ -18,8 +18,10 @@ export interface IInspectionResult {
 export interface IInspectionExecution extends Document {
   projectInspectionId: Types.ObjectId;
   projectId: Types.ObjectId;
+  templateId?: Types.ObjectId;
   templateSnapshot: Record<string, any>;
-  executedBy?: Types.ObjectId;
+  executedBy: Types.ObjectId;
+  executedByRole?: 'manager' | 'worker';
   executedAt: Date;
   status: InspectionExecutionStatus;
   poiRef?: string;
@@ -34,8 +36,10 @@ const InspectionExecutionSchema = new Schema<IInspectionExecution>(
   {
     projectInspectionId: { type: Schema.Types.ObjectId, ref: 'ProjectInspection', required: true },
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
+    templateId: { type: Schema.Types.ObjectId, ref: 'InspectionTemplate', index: true },
     templateSnapshot: { type: Schema.Types.Mixed, required: true },
-    executedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    executedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    executedByRole: { type: String, enum: ['manager', 'worker'] },
     executedAt: { type: Date, default: Date.now },
     status: { type: String, enum: ['draft', 'submitted'], default: 'draft' },
     poiRef: { type: String },
@@ -64,5 +68,9 @@ const InspectionExecutionSchema = new Schema<IInspectionExecution>(
   },
   { timestamps: true }
 );
+
+InspectionExecutionSchema.index({ status: 1, submittedAt: -1 });
+InspectionExecutionSchema.index({ projectId: 1, status: 1, submittedAt: -1 });
+InspectionExecutionSchema.index({ executedBy: 1, status: 1, submittedAt: -1 });
 
 export const InspectionExecution = mongoose.model<IInspectionExecution>('InspectionExecution', InspectionExecutionSchema);

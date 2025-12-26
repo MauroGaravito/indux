@@ -9,6 +9,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Chip,
   MenuItem,
   Paper,
   Stack,
@@ -23,9 +24,10 @@ import {
 import AddIcon from '@mui/icons-material/Add'
 import HistoryIcon from '@mui/icons-material/History'
 import api from '../../utils/api.js'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/auth.js'
 import AsyncButton from '../../components/AsyncButton.jsx'
+import { fetchProjectInspectionRecords } from '../../utils/inspections.js'
 
 const INSPECTION_TYPES = [
   { value: 'daily', label: 'Daily' },
@@ -33,8 +35,18 @@ const INSPECTION_TYPES = [
   { value: 'adhoc', label: 'Ad-hoc' },
 ]
 
+const formatDateTime = (value) => {
+  if (!value) return '—'
+  try {
+    return new Date(value).toLocaleString()
+  } catch {
+    return value
+  }
+}
+
 export default function ProjectInspections() {
   const { projectId } = useParams()
+  const navigate = useNavigate()
   const { user } = useAuthStore()
   const [inspections, setInspections] = useState([])
   const [templates, setTemplates] = useState([])
@@ -44,6 +56,9 @@ export default function ProjectInspections() {
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [selectedType, setSelectedType] = useState('daily')
   const [saving, setSaving] = useState(false)
+  const [historyRecords, setHistoryRecords] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState('')
 
   const canActivate = useMemo(() => {
     if (!projectId) return false
@@ -75,9 +90,25 @@ export default function ProjectInspections() {
     }
   }
 
+  const loadHistory = async () => {
+    if (!projectId) return
+    setHistoryLoading(true)
+    setHistoryError('')
+    try {
+      const records = await fetchProjectInspectionRecords(projectId)
+      setHistoryRecords(records)
+    } catch (e) {
+      setHistoryRecords([])
+      setHistoryError(e?.response?.data?.error || 'Unable to load inspection history for this project.')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
   useEffect(() => {
     loadInspections()
     loadTemplates()
+    loadHistory()
   }, [projectId])
 
   const openDialog = () => {
@@ -127,7 +158,7 @@ export default function ProjectInspections() {
             Project inspections
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Activated inspection templates for this project. Execution history will be available soon.
+            Activated inspection templates for this project plus the submitted inspection history.
           </Typography>
         </Box>
         {canActivate && (
@@ -145,7 +176,7 @@ export default function ProjectInspections() {
           <Typography variant="subtitle1" sx={{ mb: 2 }}>
             Active inspections
           </Typography>
-          <Table component={Paper} size="small">
+          <Table size="small">
             <TableHead>
               <TableRow>
                 <TableCell>Template</TableCell>
@@ -182,6 +213,59 @@ export default function ProjectInspections() {
           {!inspectionRows.length && !loading && (
             <Alert severity="info" sx={{ mt: 2 }}>
               No inspections have been activated yet. Activate a template to get started.
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card elevation={1}>
+        <CardContent>
+          <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between">
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Inspection history</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Submitted inspections for this project. Records are read-only.
+              </Typography>
+            </Box>
+          </Stack>
+          {historyError && <Alert severity="error" sx={{ mt: 2 }}>{historyError}</Alert>}
+          {historyLoading && <Alert severity="info" sx={{ mt: 2 }}>Loading inspection history…</Alert>}
+          <Table size="small" sx={{ mt: 2 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Date</TableCell>
+                <TableCell>Template</TableCell>
+                <TableCell>Executed by</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell align="right">Action</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {historyRecords.map((record) => (
+                <TableRow key={record.id}>
+                  <TableCell>{formatDateTime(record.submittedAt)}</TableCell>
+                  <TableCell>{record.template?.name || 'Inspection template'}</TableCell>
+                  <TableCell>
+                    <Typography variant="body2">{record.executedBy?.name || 'User'}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {record.executedBy?.role || ''}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Chip label={record.status || 'submitted'} color="success" size="small" variant="outlined" />
+                  </TableCell>
+                  <TableCell align="right">
+                    <Button size="small" onClick={() => navigate(`/inspection-records/${record.id}`)}>
+                      View
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {!historyRecords.length && !historyLoading && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              No submitted inspections yet for this project.
             </Alert>
           )}
         </CardContent>

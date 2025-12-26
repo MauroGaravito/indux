@@ -26,8 +26,9 @@ import SignaturePad from '../../components/SignaturePad.jsx'
 import AsyncButton from '../../components/AsyncButton.jsx'
 import { useAuthStore } from '../../store/auth.js'
 import api from '../../utils/api.js'
-import { uploadFile } from '../../utils/upload.js'
+import { uploadFile, presignGet } from '../../utils/upload.js'
 import { setInspectionExecutionRecord, appendInspectionHistory } from '../../utils/inspectionStorage.js'
+import { fetchInspectionRecordDetail } from '../../utils/inspections.js'
 
 const stepsLabels = ['Context', 'Checklist', 'Summary', 'Signature', 'Submit']
 const STATUS_OPTIONS = [
@@ -35,6 +36,26 @@ const STATUS_OPTIONS = [
   { value: 'fail', label: 'Fail' },
   { value: 'na', label: 'N/A' },
 ]
+
+const statusChipColor = (value) => {
+  if (value === 'pass') return 'success'
+  if (value === 'fail') return 'error'
+  return 'default'
+}
+
+const formatDateTime = (value) => {
+  if (!value) return '—'
+  try {
+    return new Date(value).toLocaleString()
+  } catch {
+    return value
+  }
+}
+
+const formatRole = (role) => {
+  if (!role) return '—'
+  return role.charAt(0).toUpperCase() + role.slice(1)
+}
 
 const createEmptyResult = (item) => ({
   itemKey: item.key,
@@ -45,12 +66,31 @@ const createEmptyResult = (item) => ({
   photos: [],
 })
 
-export default function InspectionWizard() {
+const hydrateResults = (snapshotItems, existingResults) => {
+  const items = Array.isArray(snapshotItems) ? snapshotItems : []
+  const existing = Array.isArray(existingResults) ? existingResults : []
+  return items.map((item) => {
+    const found = existing.find((res) => res.itemKey === item.key) || {}
+    return {
+      itemKey: item.key,
+      status: found.status || '',
+      notes: found.notes || '',
+      correctiveAction: found.correctiveAction || '',
+      riskLevel: found.riskLevel || '',
+      photos: Array.isArray(found.photos) ? found.photos : [],
+    }
+  })
+}
+
+export default function InspectionWizard({ mode = 'interactive', recordId: recordIdProp = '' }) {
   const [searchParams] = useSearchParams()
   const { user } = useAuthStore()
 
   const projectInspectionId = searchParams.get('projectInspectionId') || ''
   const existingExecutionId = searchParams.get('executionId') || ''
+  const searchRecordId = searchParams.get('recordId') || ''
+  const recordId = recordIdProp || searchRecordId
+  const isReadOnly = mode === 'readOnly'
 
   const [executionId, setExecutionId] = useState(existingExecutionId)
   const [execution, setExecution] = useState(null)
@@ -64,15 +104,18 @@ export default function InspectionWizard() {
   const [uploading, setUploading] = useState({})
   const [submitStatus, setSubmitStatus] = useState('idle')
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [recordMetadata, setRecordMetadata] = useState(null)
+  const [previewingPhoto, setPreviewingPhoto] = useState('')
 
   const template = execution?.templateSnapshot || {}
   const categories = Array.isArray(template.categories) ? template.categories : []
   const items = Array.isArray(template.items) ? template.items : []
   const requirePOI = !!template.requirePOI
   const requireSignature = !!template.requireSignature
-  const locked = execution?.status === 'submitted' || submitStatus === 'success'
+  const locked = isReadOnly || execution?.status === 'submitted' || submitStatus === 'success'
 
   useEffect(() => {
+    if (isReadOnly) return
     if (!execution || !user?.id) return
     const projectInspectionId =
       (execution.projectInspectionId && execution.projectInspectionId.toString) ?
@@ -87,9 +130,10 @@ export default function InspectionWizard() {
       templateName: template?.name || execution.templateSnapshot?.name || '',
       submittedAt: execution.submittedAt || null,
     })
-  }, [execution, project, template, user])
+  }, [execution, project, template, user, isReadOnly])
 
   useEffect(() => {
+    if (isReadOnly) return
     if (!execution || !user?.id) return
     const projectInspectionId = execution.projectInspectionId || execution.projectInspectionId?._id
     if (!projectInspectionId || !execution._id) return
@@ -97,15 +141,20 @@ export default function InspectionWizard() {
       executionId: execution._id,
       status: execution.status || 'draft',
     })
-  }, [execution, user])
+  }, [execution, user, isReadOnly])
 
   useEffect(() => {
     if (!user) return
-    initialize()
+    if (isReadOnly) {
+      loadRecord()
+    } else {
+      initialize()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
+  }, [user, isReadOnly, recordId, projectInspectionId, existingExecutionId])
 
   const initialize = async () => {
+    if (isReadOnly) return
     if (!user) {
       setError('Sign in to run inspections.')
       return
@@ -144,20 +193,7 @@ export default function InspectionWizard() {
     setPoiRef(data?.poiRef || '')
     setSignature(data?.signatureDataUrl || '')
     const snapshotItems = Array.isArray(data?.templateSnapshot?.items) ? data.templateSnapshot.items : []
-    const existing = Array.isArray(data?.results) ? data.results : []
-    const mapped = snapshotItems.map((item) => {
-      const found = existing.find((res) => res.itemKey === item.key)
-      if (!found) return createEmptyResult(item)
-      return {
-        itemKey: found.itemKey,
-        status: found.status || '',
-        notes: found.notes || '',
-        correctiveAction: found.correctiveAction || '',
-        riskLevel: found.riskLevel || '',
-        photos: Array.isArray(found.photos) ? found.photos : [],
-      }
-    })
-    setResults(mapped)
+    setResults(hydrateResults(snapshotItems, data?.results))
     return data
   }
 
@@ -169,6 +205,63 @@ export default function InspectionWizard() {
       setProject(found || null)
     } catch {
       setProject(null)
+    }
+  }
+
+  const loadRecord = async () => {
+    if (!user) {
+      setError('Sign in to view inspection records.')
+      return
+    }
+    if (!recordId) {
+      setError('Missing inspection record reference.')
+      return
+    }
+    try {
+      setLoading(true)
+      setError('')
+      const data = await fetchInspectionRecordDetail(recordId)
+      if (!data) {
+        setError('Inspection record not found.')
+        return
+      }
+      const executionLike = {
+        _id: data.id,
+        templateSnapshot: data.templateSnapshot || {},
+        results: data.results || [],
+        status: data.metadata?.status || 'submitted',
+        projectId: data.metadata?.project?.id || data.project?.id,
+        projectInspectionId: data.metadata?.projectInspectionId || null,
+        poiRef: data.poi || '',
+        signatureDataUrl: data.signatureDataUrl || '',
+        submittedAt: data.metadata?.submittedAt,
+      }
+      setExecution(executionLike)
+      setPoiRef(data.poi || '')
+      setSignature(data.signatureDataUrl || '')
+      const snapshotItems = Array.isArray(data?.templateSnapshot?.items) ? data.templateSnapshot.items : []
+      setResults(hydrateResults(snapshotItems, data?.results))
+      setProject({
+        _id: data.project?.id || '',
+        name: data.project?.name || data.metadata?.project?.name || 'Project',
+        pointsOfInterest: [],
+        description: data.project?.description,
+      })
+      setRecordMetadata({
+        submittedAt: data.metadata?.submittedAt || null,
+        executedAt: data.metadata?.executedAt || null,
+        executedBy: data.metadata?.executedBy || null,
+        project: data.metadata?.project || data.project || null,
+        template: data.metadata?.template || data.template || null,
+        status: data.metadata?.status || 'submitted',
+        poi: data.poi || null,
+      })
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to load inspection record.')
+      setExecution(null)
+      setProject(null)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -204,6 +297,19 @@ export default function InspectionWizard() {
         (photo) => photo.key !== photoKey
       ),
     })
+  }
+
+  const handleViewPhoto = async (photoKey) => {
+    if (!photoKey) return
+    setPreviewingPhoto(photoKey)
+    try {
+      const { url } = await presignGet(photoKey)
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      setError(err?.response?.data?.error || 'Unable to open photo.')
+    } finally {
+      setPreviewingPhoto('')
+    }
   }
 
   const validateStepContext = () => {
@@ -340,6 +446,65 @@ export default function InspectionWizard() {
     )
   }
 
+  const renderReadOnlyItem = (item) => {
+    const result = results.find((entry) => entry.itemKey === item.key) || createEmptyResult(item)
+    const photos = Array.isArray(result.photos) ? result.photos : []
+    return (
+      <Paper key={item.key} variant="outlined" sx={{ p: 2 }}>
+        <Stack spacing={1}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography sx={{ fontWeight: 600 }}>{item.label || 'Checklist item'}</Typography>
+            <Chip
+              size="small"
+              label={result.status || 'n/a'}
+              color={statusChipColor((result.status || '').toLowerCase())}
+              variant="outlined"
+            />
+          </Stack>
+          {result.notes && (
+            <Typography variant="body2" color="text.secondary">
+              Notes: {result.notes}
+            </Typography>
+          )}
+          {result.correctiveAction && (
+            <Typography variant="body2" color="text.secondary">
+              Corrective action: {result.correctiveAction}
+            </Typography>
+          )}
+          {result.riskLevel && (
+            <Typography variant="body2" color="text.secondary">
+              Risk level: {result.riskLevel}
+            </Typography>
+          )}
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              Photos
+            </Typography>
+            {photos.length ? (
+              <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap">
+                {photos.map((photo, index) => (
+                  <Button
+                    key={photo.key || index}
+                    size="small"
+                    variant="outlined"
+                    onClick={() => handleViewPhoto(photo.key)}
+                    disabled={previewingPhoto === photo.key}
+                  >
+                    {previewingPhoto === photo.key ? 'Opening…' : `Photo ${index + 1}`}
+                  </Button>
+                ))}
+              </Stack>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No photos attached.
+              </Typography>
+            )}
+          </Box>
+        </Stack>
+      </Paper>
+    )
+  }
+
   const validateSignature = () => {
     if (!requireSignature) return true
     return !!signature
@@ -437,6 +602,164 @@ export default function InspectionWizard() {
   }
 
   const templateName = template?.name || 'Inspection template'
+
+  if (isReadOnly) {
+    const recordInfo = recordMetadata || {}
+    const executedBy = recordInfo.executedBy || {}
+    const projectName = recordInfo.project?.name || project?.name || 'Project'
+    const templateLabel = recordInfo.template?.name || templateName
+    const submittedAt = recordInfo.submittedAt || execution?.submittedAt
+    const executedAt = recordInfo.executedAt || execution?.executedAt
+    const statusLabel = (recordInfo.status || execution?.status || 'submitted').toLowerCase()
+    const statusText = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1)
+    const poiValue = recordInfo.poi || poiRef || 'Not provided'
+
+    return (
+      <Stack spacing={3}>
+        <Stack spacing={0.5}>
+          <Typography variant="h5">{`Inspection record - ${templateLabel}`}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Submitted on {formatDateTime(submittedAt)} by {executedBy.name || 'User'}
+          </Typography>
+        </Stack>
+
+        <Paper sx={{ p: 2 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Project
+              </Typography>
+              <Typography variant="body1">{projectName}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Executed by
+              </Typography>
+              <Typography variant="body1">{executedBy.name || 'User'}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {formatRole(executedBy.role)}
+              </Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Submitted at
+              </Typography>
+              <Typography variant="body1">{formatDateTime(submittedAt)}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Executed at
+              </Typography>
+              <Typography variant="body1">{formatDateTime(executedAt)}</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Status
+              </Typography>
+              <Chip label={statusText} color="success" variant="outlined" size="small" />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Point of interest
+              </Typography>
+              <Typography variant="body1">{poiValue}</Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" color="text.secondary">
+                Signature
+              </Typography>
+              {signature ? (
+                <Box
+                  component="img"
+                  src={signature}
+                  alt="Inspection signature"
+                  sx={{ mt: 1, maxWidth: 360, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
+                />
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No signature captured.
+                </Typography>
+              )}
+            </Grid>
+          </Grid>
+        </Paper>
+
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+            Summary
+          </Typography>
+          <Stack direction="row" spacing={2} sx={{ mt: 1 }} flexWrap="wrap">
+            <Chip label={`Pass: ${summaryCounts.pass}`} color="success" />
+            <Chip label={`Fail: ${summaryCounts.fail}`} color="error" />
+            <Chip label={`N/A: ${summaryCounts.na}`} />
+          </Stack>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle2">Failed items</Typography>
+            {failedItems.length ? (
+              <Stack spacing={1} sx={{ mt: 1 }}>
+                {failedItems.map(({ item, result }) => (
+                  <Card key={item.key} variant="outlined">
+                    <CardContent>
+                      <Typography sx={{ fontWeight: 600 }}>{item.label}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Corrective action: {result?.correctiveAction || '—'}
+                      </Typography>
+                      {result?.notes && (
+                        <Typography variant="body2" color="text.secondary">
+                          Notes: {result.notes}
+                        </Typography>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </Stack>
+            ) : (
+              <Alert severity="info" sx={{ mt: 1 }}>
+                No failed items recorded in this inspection.
+              </Alert>
+            )}
+          </Box>
+        </Paper>
+
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+            Checklist
+          </Typography>
+          <Stack spacing={2} sx={{ mt: 2 }}>
+            {categories.map((category) => {
+              const catItems = items.filter((item) => item.categoryKey === category.key)
+              if (!catItems.length) return null
+              return (
+                <Card key={category.key} variant="outlined">
+                  <CardContent>
+                    <Typography variant="subtitle2">{category.label || 'Category'}</Typography>
+                    <Stack spacing={2} sx={{ mt: 2 }}>
+                      {catItems.map((item) => renderReadOnlyItem(item))}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              )
+            })}
+            {ungroupedItems.length > 0 && (
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="subtitle2">Additional items</Typography>
+                  <Stack spacing={2} sx={{ mt: 2 }}>
+                    {ungroupedItems.map((item) => renderReadOnlyItem(item))}
+                  </Stack>
+                </CardContent>
+              </Card>
+            )}
+            {!items.length && (
+              <Alert severity="info">
+                This template has no checklist items configured.
+              </Alert>
+            )}
+          </Stack>
+        </Paper>
+      </Stack>
+    )
+  }
 
   return (
     <Stack spacing={3}>

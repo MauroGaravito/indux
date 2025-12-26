@@ -9,12 +9,17 @@ import {
   Chip,
   Divider,
   Grid,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
   Stack,
   Typography
 } from '@mui/material'
 import api from '../../utils/api.js'
 import { fetchProjectModules } from '../../utils/modules.js'
-import { fetchProjectInspections, listInspectionTemplates, startInspectionExecution } from '../../utils/inspections.js'
+import { fetchProjectInspections, fetchMyInspectionRecords, listInspectionTemplates, startInspectionExecution } from '../../utils/inspections.js'
 import { getInspectionExecutionRecord, setInspectionExecutionRecord } from '../../utils/inspectionStorage.js'
 import { useAuthStore } from '../../store/auth.js'
 import { useNavigate } from 'react-router-dom'
@@ -51,6 +56,9 @@ export default function WorkerDashboard() {
   const [inspections, setInspections] = useState([])
   const [inspectionLoading, setInspectionLoading] = useState(false)
   const [inspectionError, setInspectionError] = useState('')
+  const [completedRecords, setCompletedRecords] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState('')
 
   const formatDate = (value) => {
     if (!value) return ''
@@ -184,6 +192,20 @@ export default function WorkerDashboard() {
     }
   }
 
+  const loadCompletedRecords = async () => {
+    setHistoryLoading(true)
+    setHistoryError('')
+    try {
+      const data = await fetchMyInspectionRecords()
+      setCompletedRecords(data)
+    } catch (e) {
+      setCompletedRecords([])
+      setHistoryError(e?.response?.data?.error || 'Unable to load completed inspections.')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
   const loadData = async () => {
     if (!user?.id) return
     setLoading(true)
@@ -211,6 +233,7 @@ export default function WorkerDashboard() {
 
       await loadManagers(list)
       await loadInspections(list)
+      await loadCompletedRecords()
     } catch (e) {
       setError(e?.response?.data?.error || 'Failed to load data')
       setAssignments([])
@@ -379,6 +402,53 @@ export default function WorkerDashboard() {
               )
             })}
           </Stack>
+        </CardContent>
+      </Card>
+
+      <Card elevation={1} sx={{ borderRadius: 2 }}>
+        <CardContent>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Completed inspections</Typography>
+            <Chip size="small" label={completedRecords.length} />
+          </Stack>
+          <Typography variant="body2" color="text.secondary">
+            Submitted inspection records assigned to you. Records are immutable and can be opened for audit review.
+          </Typography>
+          {historyError && <Alert severity="error" sx={{ mt: 2 }}>{historyError}</Alert>}
+          {historyLoading && <Alert severity="info" sx={{ mt: 2 }}>Loading completed inspections...</Alert>}
+          {!historyLoading && !completedRecords.length && (
+            <Alert severity="info" sx={{ mt: 2 }}>No inspections submitted yet.</Alert>
+          )}
+          {!!completedRecords.length && (
+            <Table size="small" sx={{ mt: 2 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Date</TableCell>
+                  <TableCell>Project</TableCell>
+                  <TableCell>Template</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell align="right">Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {completedRecords.map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell>{formatDate(record.submittedAt)}</TableCell>
+                    <TableCell>{record.project?.name || 'Project'}</TableCell>
+                    <TableCell>{record.template?.name || 'Inspection template'}</TableCell>
+                    <TableCell>
+                      <Chip label={record.status || 'submitted'} color="success" size="small" variant="outlined" />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button size="small" onClick={() => navigate(`/inspection-records/${record.id}`)}>
+                        View
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 

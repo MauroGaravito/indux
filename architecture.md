@@ -26,7 +26,7 @@ Projects store location metadata (Leaflet coordinates, default zoom, and colour-
 - **InductionTemplate** - `{ _id, name, description?, type: 'induction', config (same shape as modules), fields[ ModuleField-like schema ], createdBy?, updatedBy?, timestamps }`. Templates never hold reviews or submissions; they are cloned into projects or edited directly in admin mode.
 - **InspectionTemplate** - `{ _id, name, description?, requireSignature (default false), requirePOI (default false), categories[{ key, label, order }], items[{ key, categoryKey, label, photoRequired?, photoRequiredOnFail?, notesRequired?, notesRequiredOnFail?, enableRiskLevel?, correctiveActionRequiredOnFail? }], createdBy, updatedBy, timestamps }`.
 - **ProjectInspection** - `{ _id, projectId, templateId, type ('daily'|'weekly'|'adhoc'), active (default true), createdBy, updatedBy, timestamps }`.
-- **InspectionExecution** - `{ _id, projectInspectionId, projectId, templateSnapshot (frozen JSON), executedBy, executedAt (default now), status ('draft'|'submitted'), poiRef?, signatureDataUrl?, itemResults[], submittedAt?, timestamps }`.
+- **InspectionExecution** - `{ _id, projectInspectionId, projectId, templateId?, templateSnapshot (frozen JSON), executedBy, executedByRole ('manager'|'worker'), executedAt (default now), status ('draft'|'submitted'), poiRef?, signatureDataUrl?, itemResults[], submittedAt?, timestamps }`.
 - **User** - `{ email, name, password (hashed), role (admin|manager|worker), disabled?, position?, phone?, companyName?, avatarUrl? }`.
 
 ### Induction Field Defaults
@@ -57,6 +57,7 @@ Admins/managers can edit labels, steps, type, order, required flags, and conditi
 - **Manager / Worker** - lanzan inspecciones desde sus dashboards (Run/Open inspection). Cada acción crea o reanuda un `InspectionExecution` y abre el `InspectionWizard`.
 - **Completion** - el wizard se compone de Contexto, Checklist, Resumen, Firma y Submit. Al enviar, el execution cambia a `submitted`, queda read-only y se registra en el historial del proyecto como evidencia WHS.
 - **Sin revisión** - v1 no incluye flujo de aprobación. El submit es el final del proceso; managers y workers consultan las inspecciones completadas desde sus dashboards o el historial del proyecto.
+- **Inspection Records** - Admins usan `GET /inspection-records` con filtros por proyecto, usuario, plantilla y rango de fechas; managers consultan `GET /projects/:projectId/inspection-records` desde Project → Inspections → History; y los workers reciben `GET /my/inspection-records` en su dashboard. Todas las vistas abren el `InspectionWizard` en modo `readOnly` para mostrar snapshot del template, checklist, fotos (presign), notas, firma, POI y metadatos auditables.
 
 ### Conditional Fields (`visibleIf`)
 `InductionModuleField` supports:
@@ -114,6 +115,12 @@ The worker wizard hides conditional fields until the criteria is satisfied and h
 - `GET /inspection-executions/:id`
 - `POST /inspection-executions/:id/submit`
 
+### Inspection Records
+- `GET /inspection-records`
+- `GET /projects/:projectId/inspection-records`
+- `GET /my/inspection-records`
+- `GET /inspection-records/:id`
+
 ### Assignments
 - `POST /assignments`
 - `GET /assignments/user/:userId`
@@ -158,14 +165,14 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 3. **Configure Content** - Module Editor (admin mode) updates fields, slides, quiz, and settings while the module is draft. Admin Projects also allows deleting unused modules; removal cascades through reviews and submissions automatically.
 4. **Assign Managers & Workers** - Admin Projects provides dedicated tabs for both roles; `POST /assignments` seeds manager/worker links so managers can see their pool and workers can access the wizard. Admins can also open the per-worker module dialog here to restrict which modules each worker must complete.
 5. **Manage Inspections** - Admins curate the inspection template library via **Admin -> Inspection Templates** and activate them per project with `/projects/:projectId/inspections`, selecting cadence (daily/weekly/adhoc). Activated templates create `ProjectInspection` records that surface in project dashboards.
-6. **Monitor Reviews & Submissions** - Review Queue lists induction module reviews and worker submissions; admins can approve/decline or override. The admin navigation also exposes a dedicated **Worker Submissions** page (Inductions, Exams, Inspections tabs) and **Inspection Module Reviews** placeholder for future inspection approvals.
+6. **Monitor Reviews & Submissions** - Review Queue lists induction module reviews and worker submissions; admins can approve/decline or override. The admin navigation also exposes a dedicated **Worker Submissions** page (Inductions, Exams, Inspections tabs), **Inspection Module Reviews** placeholder for future inspection approvals, and the new **Inspection Records** surface (`GET /inspection-records`) for filtered, read-only access to every submitted inspection.
 7. **Branding & Users** - Admin Settings and Users screens manage organisational metadata and accounts.
 ### Manager Workflow
 1. **Dashboard** - Shows assigned projects, pending submissions, and modules awaiting review.
 2. **Project Register** - `ManagerProjects` lists each project with module status, quick actions, and descriptions.
 3. **Project Detail** - `ManagerProjectDetail` displays summary, assigned managers, a module selector, and actions to edit modules, request new ones (blank/template), manage workers, or open the Project Inspections tab.
 4. **Module & Template Editing** - `ManagerModuleEditor` wraps the admin editor; editing is allowed if an assignment exists and the module status is draft/declined/pending.
-5. **Project Inspections** - Assigned managers can enable new inspections via the Project Inspections dialog, choosing a template and cadence (daily/weekly/adhoc). Workers inherit these activations when launching the Inspection Wizard.
+5. **Project Inspections** - Assigned managers can enable new inspections via the Project Inspections dialog, choosing a template and cadence (daily/weekly/adhoc). Workers inherit these activations when launching the Inspection Wizard, and the same screen now includes a **History** table backed by `GET /projects/:projectId/inspection-records` for read-only review of submitted inspections.
 6. **Pending Approvals** - Review Queue (Submission Reviews + Induction Module Review Requests) filtered by assignments, plus the Worker Submissions surface for projects they manage. Managers can approve/decline worker submissions, but induction module approvals remain admin-only.
 7. **Team Management** - `ManagerTeam` uses `/assignments/project/:projectId` and `/assignments/manager/:id/team` to manage worker rosters and opens the per-worker module dialog (`PUT /assignments/:id/modules`) so managers can decide which modules each worker must complete.
 ### Worker Pipeline
@@ -177,6 +184,7 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 6. **Submission** - `POST /modules/:moduleId/submissions` stores or updates pending submissions safely, while inspections use `POST /inspection-executions/:id/submit` after checklist validation.
 7. **Review Decision** - Managers/admins approve or decline; approved submissions trigger certificate generation. Inspection submissions become immutable after submit until downstream reviews are built.
 8. **History** - `GET /workers/me/submissions` lists past submissions with certificate download links protected by assignment checks.
+9. **Inspection Records** - `GET /my/inspection-records` powers the worker dashboard "Completed inspections" table. Each record links into the read-only Inspection Wizard with the template snapshot, checklist responses, photos, notes, signature, POI, and metadata intact.
 ## Module Lifecycle
 1. **Draft** – Fully editable; workers cannot submit.
 2. **Pending** – Submitted for review; managers retain edit access until decision.

@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { Types } from 'mongoose';
+import type { FilterQuery, PopulateOptions, SortOrder } from 'mongoose';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { Assignment } from '../models/Assignment.js';
 import { ProjectInspection } from '../models/ProjectInspection.js';
 import { InspectionTemplate } from '../models/InspectionTemplate.js';
 import { InspectionExecution } from '../models/InspectionExecution.js';
+import type { IInspectionExecution } from '../models/InspectionExecution.js';
 
 const router = Router();
 
@@ -22,6 +24,128 @@ async function hasProjectAccess(
   if (!role) return false;
   const assignment = await Assignment.findOne({ user: userId, project: projectId, role });
   return !!assignment;
+}
+
+const RECORD_POPULATE: PopulateOptions[] = [
+  { path: 'projectId', select: 'name' },
+  { path: 'templateId', select: 'name' },
+  { path: 'executedBy', select: 'name role' },
+];
+
+const RECORD_SORT: Record<string, SortOrder> = { submittedAt: -1, _id: -1 };
+
+function getQueryValue(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      if (typeof entry === 'string' && entry.trim()) return entry.trim();
+    }
+    return undefined;
+  }
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function parseDateParam(value: string): Date | null {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function applyDateRangeFilter(
+  filter: FilterQuery<IInspectionExecution>,
+  fromRaw?: string,
+  toRaw?: string
+): string | null {
+  const range: Record<string, Date> = {};
+  if (fromRaw) {
+    const parsed = parseDateParam(fromRaw);
+    if (!parsed) return 'Invalid dateFrom';
+    range.$gte = parsed;
+  }
+  if (toRaw) {
+    const parsed = parseDateParam(toRaw);
+    if (!parsed) return 'Invalid dateTo';
+    range.$lte = parsed;
+  }
+  if (Object.keys(range).length) {
+    filter.submittedAt = range as any;
+  }
+  return null;
+}
+
+function toObjectIdString(value: any): string | undefined {
+  if (!value) return undefined;
+  if (typeof value === 'string') return value;
+  if (value instanceof Types.ObjectId) return value.toString();
+  if (typeof value === 'object' && value !== null) {
+    if (value._id instanceof Types.ObjectId) return value._id.toString();
+    if (typeof value._id === 'string') return value._id;
+  }
+  return undefined;
+}
+
+function buildRecordPayload(execution: any) {
+  const projectDoc: any = execution.projectId;
+  const projectId =
+    toObjectIdString(projectDoc) ||
+    (typeof execution.projectId === 'string' ? execution.projectId : undefined);
+  const projectName =
+    typeof projectDoc?.name === 'string' && projectDoc.name.trim()
+      ? projectDoc.name
+      : 'Project';
+
+  const templateDoc: any = execution.templateId;
+  const templateId =
+    toObjectIdString(templateDoc) ||
+    (typeof execution.templateId === 'string' ? execution.templateId : undefined) ||
+    (typeof execution.templateSnapshot?._id === 'string'
+      ? execution.templateSnapshot._id
+      : undefined);
+  const templateName =
+    typeof templateDoc?.name === 'string' && templateDoc.name.trim()
+      ? templateDoc.name
+      : typeof execution.templateSnapshot?.name === 'string' && execution.templateSnapshot.name.trim()
+      ? execution.templateSnapshot.name
+      : 'Inspection Template';
+
+  const executedByDoc: any = execution.executedBy;
+  const executedById =
+    toObjectIdString(executedByDoc) ||
+    (typeof execution.executedBy === 'string' ? execution.executedBy : undefined);
+  const executedByName =
+    typeof executedByDoc?.name === 'string' && executedByDoc.name.trim()
+      ? executedByDoc.name
+      : 'User';
+  const executedRole =
+    execution.executedByRole ||
+    (executedByDoc?.role === 'manager' || executedByDoc?.role === 'worker'
+      ? executedByDoc.role
+      : undefined);
+
+  return {
+    id: execution._id.toString(),
+    project: {
+      id: projectId || null,
+      name: projectName,
+    },
+    template: {
+      id: templateId || null,
+      name: templateName,
+    },
+    executedBy: {
+      id: executedById || null,
+      name: executedByName,
+      role: executedRole || executedByDoc?.role || null,
+    },
+    submittedAt: execution.submittedAt || execution.updatedAt || execution.createdAt || null,
+    status: execution.status,
+  };
+}
+
+async function fetchInspectionRecords(filter: FilterQuery<IInspectionExecution>) {
+  const docs = await InspectionExecution.find(filter)
+    .sort(RECORD_SORT)
+    .populate(RECORD_POPULATE)
+    .lean();
+  return docs.map(buildRecordPayload);
 }
 
 router.post(
@@ -54,16 +178,140 @@ router.post(
     }
 
     const snapshot = JSON.parse(JSON.stringify(template));
+    const executingRole: 'manager' | 'worker' = req.user?.role === 'worker' ? 'worker' : 'manager';
 
     const execution = await InspectionExecution.create({
       projectInspectionId,
       projectId: projectInspection.projectId,
+      templateId: projectInspection.templateId,
       templateSnapshot: snapshot,
-      executedBy: req.user?.sub as any,
+      executedBy: req.user!.sub as any,
+      executedByRole: executingRole,
       status: 'draft',
     });
 
     res.status(201).json(execution);
+  }
+);
+
+router.get(
+  '/inspection-records',
+  requireAuth,
+  requireRole('admin'),
+  async (req, res) => {
+    const filter: FilterQuery<IInspectionExecution> = { status: 'submitted' };
+    const projectIdRaw = getQueryValue(req.query.projectId);
+    if (projectIdRaw) {
+      if (!Types.ObjectId.isValid(projectIdRaw)) {
+        return res.status(400).json({ error: 'Invalid projectId' });
+      }
+      filter.projectId = new Types.ObjectId(projectIdRaw);
+    }
+    const userIdRaw = getQueryValue(req.query.userId);
+    if (userIdRaw) {
+      if (!Types.ObjectId.isValid(userIdRaw)) {
+        return res.status(400).json({ error: 'Invalid userId' });
+      }
+      filter.executedBy = new Types.ObjectId(userIdRaw);
+    }
+    const templateIdRaw = getQueryValue(req.query.templateId);
+    if (templateIdRaw) {
+      if (!Types.ObjectId.isValid(templateIdRaw)) {
+        return res.status(400).json({ error: 'Invalid templateId' });
+      }
+      filter.templateId = new Types.ObjectId(templateIdRaw);
+    }
+    const dateFromRaw = getQueryValue(req.query.dateFrom);
+    const dateToRaw = getQueryValue(req.query.dateTo);
+    const dateError = applyDateRangeFilter(filter, dateFromRaw, dateToRaw);
+    if (dateError) {
+      return res.status(400).json({ error: dateError });
+    }
+
+    const records = await fetchInspectionRecords(filter);
+    res.json({ records });
+  }
+);
+
+router.get(
+  '/projects/:projectId/inspection-records',
+  requireAuth,
+  requireRole('admin', 'manager'),
+  async (req, res) => {
+    const { projectId } = req.params;
+    if (!Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({ error: 'Invalid project id' });
+    }
+    if (
+      req.user?.role === 'manager' &&
+      !(await hasProjectAccess(req.user?.role, req.user?.sub, projectId, 'manager'))
+    ) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const filter: FilterQuery<IInspectionExecution> = {
+      status: 'submitted',
+      projectId: new Types.ObjectId(projectId),
+    };
+
+    const userIdRaw = getQueryValue(req.query.userId);
+    if (userIdRaw) {
+      if (!Types.ObjectId.isValid(userIdRaw)) {
+        return res.status(400).json({ error: 'Invalid userId' });
+      }
+      filter.executedBy = new Types.ObjectId(userIdRaw);
+    }
+    const templateIdRaw = getQueryValue(req.query.templateId);
+    if (templateIdRaw) {
+      if (!Types.ObjectId.isValid(templateIdRaw)) {
+        return res.status(400).json({ error: 'Invalid templateId' });
+      }
+      filter.templateId = new Types.ObjectId(templateIdRaw);
+    }
+    const dateFromRaw = getQueryValue(req.query.dateFrom);
+    const dateToRaw = getQueryValue(req.query.dateTo);
+    const dateError = applyDateRangeFilter(filter, dateFromRaw, dateToRaw);
+    if (dateError) {
+      return res.status(400).json({ error: dateError });
+    }
+
+    const records = await fetchInspectionRecords(filter);
+    res.json({ records });
+  }
+);
+
+router.get(
+  '/my/inspection-records',
+  requireAuth,
+  requireRole('worker'),
+  async (req, res) => {
+    const filter: FilterQuery<IInspectionExecution> = {
+      status: 'submitted',
+      executedBy: new Types.ObjectId(req.user!.sub),
+    };
+    const projectIdRaw = getQueryValue(req.query.projectId);
+    if (projectIdRaw) {
+      if (!Types.ObjectId.isValid(projectIdRaw)) {
+        return res.status(400).json({ error: 'Invalid projectId' });
+      }
+      filter.projectId = new Types.ObjectId(projectIdRaw);
+    }
+    const templateIdRaw = getQueryValue(req.query.templateId);
+    if (templateIdRaw) {
+      if (!Types.ObjectId.isValid(templateIdRaw)) {
+        return res.status(400).json({ error: 'Invalid templateId' });
+      }
+      filter.templateId = new Types.ObjectId(templateIdRaw);
+    }
+    const dateFromRaw = getQueryValue(req.query.dateFrom);
+    const dateToRaw = getQueryValue(req.query.dateTo);
+    const dateError = applyDateRangeFilter(filter, dateFromRaw, dateToRaw);
+    if (dateError) {
+      return res.status(400).json({ error: dateError });
+    }
+
+    const records = await fetchInspectionRecords(filter);
+    res.json({ records });
   }
 );
 
@@ -86,6 +334,103 @@ router.get('/inspection-executions/:id', requireAuth, async (req, res) => {
   }
   res.json(execution);
 });
+
+router.get(
+  '/inspection-records/:id',
+  requireAuth,
+  requireRole('admin', 'manager', 'worker'),
+  async (req, res) => {
+    const { id } = req.params;
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid inspection record id' });
+    }
+    const execution = await InspectionExecution.findById(id)
+      .populate(RECORD_POPULATE)
+      .lean();
+    if (!execution || execution.status !== 'submitted') {
+      return res.status(404).json({ error: 'Inspection record not found' });
+    }
+    const projectId = toObjectIdString(execution.projectId);
+    if (!projectId) {
+      return res.status(404).json({ error: 'Inspection record not found' });
+    }
+    const executedById = toObjectIdString(execution.executedBy);
+
+    if (req.user?.role === 'manager') {
+      const allowed = await hasProjectAccess(req.user.role, req.user.sub, projectId, 'manager');
+      if (!allowed) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    } else if (req.user?.role === 'worker') {
+      if (!executedById || executedById !== req.user.sub) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
+
+    const projectDoc: any = execution.projectId;
+    const templateDoc: any = execution.templateId;
+    const executedByDoc: any = execution.executedBy;
+    const templateId =
+      toObjectIdString(templateDoc) ||
+      (typeof execution.templateId === 'string' ? execution.templateId : undefined) ||
+      (typeof execution.templateSnapshot?._id === 'string'
+        ? execution.templateSnapshot._id
+        : undefined);
+    const templateName =
+      typeof templateDoc?.name === 'string' && templateDoc.name.trim()
+        ? templateDoc.name
+        : typeof execution.templateSnapshot?.name === 'string' && execution.templateSnapshot.name.trim()
+        ? execution.templateSnapshot.name
+        : 'Inspection Template';
+    const executedByName =
+      typeof executedByDoc?.name === 'string' && executedByDoc.name.trim()
+        ? executedByDoc.name
+        : 'User';
+    const executedRole =
+      execution.executedByRole ||
+      (executedByDoc?.role === 'manager' || executedByDoc?.role === 'worker'
+        ? executedByDoc.role
+        : undefined);
+
+    const projectInfo = {
+      id: projectId,
+      name:
+        typeof projectDoc?.name === 'string' && projectDoc.name.trim()
+          ? projectDoc.name
+          : 'Project',
+    };
+
+    const templateInfo = {
+      id: templateId || null,
+      name: templateName,
+    };
+
+    const executedByInfo = {
+      id: executedById || null,
+      name: executedByName,
+      role: executedRole || executedByDoc?.role || null,
+    };
+
+    res.json({
+      id: execution._id.toString(),
+      project: projectInfo,
+      template: templateInfo,
+      templateSnapshot: execution.templateSnapshot,
+      results: Array.isArray(execution.results) ? execution.results : [],
+      signatureDataUrl: execution.signatureDataUrl || null,
+      poi: execution.poiRef || null,
+      metadata: {
+        status: execution.status,
+        submittedAt: execution.submittedAt || null,
+        executedAt: execution.executedAt || null,
+        executedBy: executedByInfo,
+        projectInspectionId: toObjectIdString(execution.projectInspectionId) || null,
+        project: projectInfo,
+        template: templateInfo,
+      },
+    });
+  }
+);
 
 router.post(
   '/inspection-executions/:id/submit',

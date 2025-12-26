@@ -23,3 +23,25 @@ export async function startInspectionExecution(projectInspectionId) {
   const resp = await api.post(`/project-inspections/${projectInspectionId}/executions`)
   return resp.data
 }
+
+export async function fetchInspectionRecords(params = {}) {
+  const resp = await api.get('/inspection-records', { params })
+  return resp.data?.records || []
+}
+
+export async function fetchProjectInspectionRecords(projectId, params = {}) {
+  if (!projectId) return []
+  const resp = await api.get(`/projects/${projectId}/inspection-records`, { params })
+  return resp.data?.records || []
+}
+
+export async function fetchMyInspectionRecords(params = {}) {
+  const resp = await api.get('/my/inspection-records', { params })
+  return resp.data?.records || []
+}
+
+export async function fetchInspectionRecordDetail(recordId) {
+  if (!recordId) return null
+  const resp = await api.get(`/inspection-records/${recordId}`)
+  return resp.data
+}

@@ -17,6 +17,7 @@ import AdminProjects from './pages/admin/Projects.jsx'
 import AdminReviews from './pages/admin/Reviews.jsx'
 import InspectionTemplates from './pages/admin/InspectionTemplates.jsx'
 import InspectionReviews from './pages/admin/InspectionReviews.jsx'
+import InspectionRecords from './pages/admin/InspectionRecords.jsx'
 import AdminUsers from './pages/admin/Users.jsx'
 import AdminSettings from './pages/admin/Settings.jsx'
 import ModuleEditor from './pages/admin/ModuleEditor.jsx'
@@ -24,6 +25,7 @@ import InductionTemplates from './pages/admin/InductionTemplates.jsx'
 import AdminProjectLocation from './pages/admin/ProjectLocation.jsx'
 import AdminWorkerSubmissions from './pages/admin/WorkerSubmissions.jsx'
 import ProjectInspections from './pages/inspections/ProjectInspections.jsx'
+import InspectionRecordDetail from './pages/inspections/InspectionRecordDetail.jsx'
 import ManagerDashboard from './pages/manager/ManagerDashboard.jsx'
 import ManagerProjects from './pages/manager/ManagerProjects.jsx'
 import ManagerProjectDetail from './pages/manager/ManagerProjectDetail.jsx'
@@ -86,6 +88,7 @@ function App({ brand }) {
           <Route path="/" element={<Landing />} />
           <Route path="/wizard" element={<AuthGuard><WithLayout><InductionWizard /></WithLayout></AuthGuard>} />
           <Route path="/inspections/wizard" element={<AuthGuard><WithLayout><InspectionWizard /></WithLayout></AuthGuard>} />
+          <Route path="/inspection-records/:recordId" element={<AuthGuard><WithLayout><InspectionRecordDetail /></WithLayout></AuthGuard>} />
           <Route path="/login" element={<Login />} />
           <Route path="/review" element={<AuthGuard><WithLayout><ReviewQueue /></WithLayout></AuthGuard>} />
           <Route path="/slides-viewer" element={<SlidesViewer />} />
@@ -103,6 +106,7 @@ function App({ brand }) {
             <Route path="inspections/templates" element={<InspectionTemplates />} />
             <Route path="inspection-reviews" element={<InspectionReviews />} />
             <Route path="inspection-templates" element={<InspectionTemplates />} />
+            <Route path="inspection-records" element={<InspectionRecords />} />
             <Route path="worker-submissions" element={<AdminWorkerSubmissions />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="settings" element={<AdminSettings />} />
