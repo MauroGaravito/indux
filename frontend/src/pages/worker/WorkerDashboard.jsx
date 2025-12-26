@@ -14,6 +14,8 @@ import {
 } from '@mui/material'
 import api from '../../utils/api.js'
 import { fetchProjectModules } from '../../utils/modules.js'
+import { fetchProjectInspections, listInspectionTemplates, startInspectionExecution } from '../../utils/inspections.js'
+import { getInspectionExecutionRecord, setInspectionExecutionRecord } from '../../utils/inspectionStorage.js'
 import { useAuthStore } from '../../store/auth.js'
 import { useNavigate } from 'react-router-dom'
 
@@ -25,6 +27,18 @@ const statusPalette = {
   none: { label: 'Not configured', color: 'default' },
 }
 
+const inspectionStatusPalette = {
+  none: { label: 'Not started', color: 'default' },
+  draft: { label: 'Draft', color: 'warning' },
+  submitted: { label: 'Pending', color: 'info' },
+}
+
+const inspectionTypeLabels = {
+  daily: 'Daily',
+  weekly: 'Weekly',
+  adhoc: 'Ad-hoc',
+}
+
 export default function WorkerDashboard() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
@@ -34,6 +48,9 @@ export default function WorkerDashboard() {
   const [loading, setLoading] = useState(false)
   const [submissionMap, setSubmissionMap] = useState({})
   const [projectManagers, setProjectManagers] = useState({})
+  const [inspections, setInspections] = useState([])
+  const [inspectionLoading, setInspectionLoading] = useState(false)
+  const [inspectionError, setInspectionError] = useState('')
 
   const formatDate = (value) => {
     if (!value) return ''
@@ -123,6 +140,50 @@ export default function WorkerDashboard() {
     setProjectManagers(managerMap)
   }
 
+  const loadInspections = async (assignmentList) => {
+    if (!assignmentList?.length) {
+      setInspections([])
+      return
+    }
+    setInspectionLoading(true)
+    setInspectionError('')
+    try {
+      const templates = await listInspectionTemplates()
+      const templateMap = new Map()
+      templates.forEach((tpl) => templateMap.set(String(tpl._id), tpl.name || 'Inspection template'))
+
+      const rows = []
+      await Promise.all(
+        assignmentList.map(async (entry) => {
+          const project = entry.project || {}
+          const projectId = project._id || entry.project
+          if (!projectId) return
+          try {
+            const list = await fetchProjectInspections(projectId)
+            list.forEach((insp) => {
+              rows.push({
+                projectId,
+                projectName: project.name || 'Project',
+                projectInspectionId: insp._id,
+                templateId: insp.templateId,
+                templateName: templateMap.get(String(insp.templateId)) || 'Inspection template',
+                type: insp.type || 'daily',
+              })
+            })
+          } catch {
+            // ignore per-project failures to keep dashboard responsive
+          }
+        })
+      )
+      setInspections(rows)
+    } catch (e) {
+      setInspectionError(e?.response?.data?.error || 'Failed to load inspections.')
+      setInspections([])
+    } finally {
+      setInspectionLoading(false)
+    }
+  }
+
   const loadData = async () => {
     if (!user?.id) return
     setLoading(true)
@@ -149,6 +210,7 @@ export default function WorkerDashboard() {
       setSubmissionMap(buildSubmissionMap(submissions))
 
       await loadManagers(list)
+      await loadInspections(list)
     } catch (e) {
       setError(e?.response?.data?.error || 'Failed to load data')
       setAssignments([])
@@ -200,6 +262,38 @@ export default function WorkerDashboard() {
     return `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`
   }
 
+  const inspectionStatusFor = (inspection) => {
+    const record = getInspectionExecutionRecord(user?.id, inspection.projectInspectionId)
+    if (record?.status === 'submitted') return inspectionStatusPalette.submitted
+    if (record?.status === 'draft') return inspectionStatusPalette.draft
+    return inspectionStatusPalette.none
+  }
+
+  const handleOpenInspection = async (inspection) => {
+    if (!inspection?.projectInspectionId) return
+    const userId = user?.id
+    const stored = getInspectionExecutionRecord(userId, inspection.projectInspectionId)
+    if (stored?.executionId && stored.status !== 'submitted') {
+      navigate(`/inspections/wizard?executionId=${stored.executionId}`)
+      return
+    }
+    try {
+      const execution = await startInspectionExecution(inspection.projectInspectionId)
+      const executionId = execution?._id
+      if (executionId && userId) {
+        setInspectionExecutionRecord(userId, inspection.projectInspectionId, {
+          executionId,
+          status: execution?.status || 'draft',
+        })
+        navigate(`/inspections/wizard?executionId=${executionId}`)
+      } else {
+        navigate(`/inspections/wizard?projectInspectionId=${inspection.projectInspectionId}`)
+      }
+    } catch (e) {
+      setInspectionError(e?.response?.data?.error || 'Unable to open inspection.')
+    }
+  }
+
   return (
     <Stack spacing={3}>
       <Typography variant="h5" sx={{ fontWeight: 700 }}>Worker dashboard</Typography>
@@ -237,6 +331,41 @@ export default function WorkerDashboard() {
         <SummaryCard title="Inductions approved" value={counts.approved} color="success" />
         <SummaryCard title="Pending inductions" value={counts.pending} color="warning" />
       </Grid>
+      <Card elevation={1} sx={{ borderRadius: 2 }}>
+        <CardContent>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>My inspections</Typography>
+            <Chip size="small" label={inspections.length} />
+          </Stack>
+          {inspectionError && <Alert severity="warning" sx={{ mt: 2 }}>{inspectionError}</Alert>}
+          {inspectionLoading && <Alert severity="info" sx={{ mt: 2 }}>Loading inspections...</Alert>}
+          {!inspectionLoading && !inspections.length && (
+            <Alert severity="info" sx={{ mt: 2 }}>No inspections pending.</Alert>
+          )}
+          <Stack spacing={2} sx={{ mt: 2 }}>
+            {inspections.map((insp) => {
+              const chip = inspectionStatusFor(insp)
+              return (
+                <Card key={insp.projectInspectionId} variant="outlined" sx={{ borderRadius: 2 }}>
+                  <CardContent>
+                    <Stack spacing={1}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{insp.projectName}</Typography>
+                      <Typography variant="body2" color="text.secondary">{insp.templateName}</Typography>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip size="small" label={inspectionTypeLabels[insp.type] || insp.type} />
+                        <Chip size="small" label={chip.label} color={chip.color} variant="outlined" />
+                      </Stack>
+                      <Button variant="contained" size="small" onClick={() => handleOpenInspection(insp)}>
+                        Open inspection
+                      </Button>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </Stack>
+        </CardContent>
+      </Card>
 
       <Card elevation={1} sx={{ borderRadius: 2 }}>
         <CardContent>

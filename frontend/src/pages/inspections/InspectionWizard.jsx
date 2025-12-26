@@ -27,6 +27,7 @@ import AsyncButton from '../../components/AsyncButton.jsx'
 import { useAuthStore } from '../../store/auth.js'
 import api from '../../utils/api.js'
 import { uploadFile } from '../../utils/upload.js'
+import { setInspectionExecutionRecord } from '../../utils/inspectionStorage.js'
 
 const stepsLabels = ['Context', 'Checklist', 'Summary', 'Signature', 'Submit']
 const STATUS_OPTIONS = [
@@ -70,6 +71,16 @@ export default function InspectionWizard() {
   const requirePOI = !!template.requirePOI
   const requireSignature = !!template.requireSignature
   const locked = execution?.status === 'submitted' || submitStatus === 'success'
+
+  useEffect(() => {
+    if (!execution || !user?.id) return
+    const projectInspectionId = execution.projectInspectionId || execution.projectInspectionId?._id
+    if (!projectInspectionId || !execution._id) return
+    setInspectionExecutionRecord(user.id, String(projectInspectionId), {
+      executionId: execution._id,
+      status: execution.status || 'draft',
+    })
+  }, [execution, user])
 
   useEffect(() => {
     if (!user) return
@@ -338,6 +349,13 @@ export default function InspectionWizard() {
       setExecution(data || { ...execution, status: 'submitted' })
       setSubmitStatus('success')
       setConfirmOpen(false)
+      const projectInspectionId = data?.projectInspectionId || execution?.projectInspectionId
+      if (user?.id && projectInspectionId && executionId) {
+        setInspectionExecutionRecord(user.id, String(projectInspectionId), {
+          executionId,
+          status: 'submitted',
+        })
+      }
     } catch (err) {
       setSubmitStatus('error')
       setError(err?.response?.data?.error || 'Failed to submit inspection.')
