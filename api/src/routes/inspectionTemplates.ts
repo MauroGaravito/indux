@@ -4,7 +4,7 @@ import { InspectionTemplate } from '../models/InspectionTemplate.js';
 
 const router = Router();
 
-router.get('/', requireAuth, requireRole('admin'), async (_req, res) => {
+router.get('/', requireAuth, requireRole('admin', 'manager'), async (_req, res) => {
   const templates = await InspectionTemplate.find().sort({ name: 1 }).lean();
   res.json({ templates });
 });
