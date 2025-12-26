@@ -28,7 +28,6 @@ import { useAuthStore } from '../../store/auth.js'
 import api from '../../utils/api.js'
 import { uploadFile } from '../../utils/upload.js'
 import { setInspectionExecutionRecord, appendInspectionHistory } from '../../utils/inspectionStorage.js'
-import { setInspectionExecutionRecord } from '../../utils/inspectionStorage.js'
 
 const stepsLabels = ['Context', 'Checklist', 'Summary', 'Signature', 'Submit']
 const STATUS_OPTIONS = [
