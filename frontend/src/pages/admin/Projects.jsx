@@ -29,6 +29,9 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
 import SaveIcon from '@mui/icons-material/Save'
 import InfoIcon from '@mui/icons-material/Info'
 import AssignmentIndIcon from '@mui/icons-material/AssignmentInd'
+import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications'
+import MenuBookIcon from '@mui/icons-material/MenuBook'
+import FactCheckIcon from '@mui/icons-material/FactCheck'
 import api from '../../utils/api.js'
 import AsyncButton from '../../components/AsyncButton.jsx'
 import ProjectInfoSection from '../../components/admin/ProjectInfoSection.jsx'
@@ -60,7 +63,7 @@ export default function Projects() {
   const [archivedProjects, setArchivedProjects] = useState([])
   const [selectedId, setSelectedId] = useState('')
   const [projectForm, setProjectForm] = useState(createEmptyForm())
-  const [tab, setTab] = useState(0)
+  const [sectionTab, setSectionTab] = useState(0)
   const [assignments, setAssignments] = useState([])
   const [managerUsers, setManagerUsers] = useState([])
   const [assignOpen, setAssignOpen] = useState(false)
@@ -71,6 +74,9 @@ export default function Projects() {
   const [newProject, setNewProject] = useState({ name: '', description: '' })
   const [modules, setModules] = useState([])
   const [modulesLoading, setModulesLoading] = useState(false)
+  const [inspections, setInspections] = useState([])
+  const [inspectionsLoading, setInspectionsLoading] = useState(false)
+  const [inspectionTemplates, setInspectionTemplates] = useState([])
   const [errorMsg, setErrorMsg] = useState('')
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false)
   const [moduleActionLoading, setModuleActionLoading] = useState(false)
@@ -117,9 +123,35 @@ export default function Projects() {
     }
   }
 
+  const loadInspectionsForProject = async (projectId) => {
+    if (!projectId) {
+      setInspections([])
+      return
+    }
+    setInspectionsLoading(true)
+    try {
+      const resp = await api.get(`/projects/${projectId}/inspections`)
+      setInspections(resp.data?.inspections || [])
+    } catch {
+      setInspections([])
+    } finally {
+      setInspectionsLoading(false)
+    }
+  }
+
+  const loadInspectionTemplates = async () => {
+    try {
+      const resp = await api.get('/inspection-templates')
+      setInspectionTemplates(resp.data?.templates || resp.data || [])
+    } catch {
+      setInspectionTemplates([])
+    }
+  }
+
   // Select project based on param or first selection
   useEffect(() => {
     loadProjects()
+    loadInspectionTemplates()
   }, [])
 
   useEffect(() => {
@@ -133,6 +165,7 @@ export default function Projects() {
 
   const selectProject = async (id) => {
     setSelectedId(id)
+    setSectionTab(0)
     const p = projects.find((x) => x._id === id)
     if (p) {
       setProjectForm({
@@ -147,12 +180,13 @@ export default function Projects() {
         mapZoom: typeof p.mapZoom === 'number' ? p.mapZoom : DEFAULT_MAP_ZOOM,
         pointsOfInterest: Array.isArray(p.pointsOfInterest) ? p.pointsOfInterest : [],
       })
-      await Promise.all([loadAssignments(id), loadModulesForProject(id)])
+      await Promise.all([loadAssignments(id), loadModulesForProject(id), loadInspectionsForProject(id)])
       if (id) navigate(`/admin/projects/${id}`, { replace: true })
     } else {
       setProjectForm(createEmptyForm())
       setAssignments([])
       setModules([])
+      setInspections([])
       navigate('/admin/projects', { replace: true })
     }
   }
@@ -311,10 +345,11 @@ export default function Projects() {
     }
   }
 
-  const projectTabs = useMemo(() => ([
-    { label: 'Project details', icon: <InfoIcon /> },
-    { label: 'Assigned managers', icon: <AssignmentIndIcon /> },
-    { label: 'Assigned workers', icon: <GroupIcon /> }
+  const sectionTabs = useMemo(() => ([
+    { label: 'Overview', icon: <InfoIcon /> },
+    { label: 'Setup', icon: <SettingsApplicationsIcon /> },
+    { label: 'Induction', icon: <MenuBookIcon /> },
+    { label: 'Inspections', icon: <FactCheckIcon /> }
   ]), [])
 
   const moduleNameMap = useMemo(() => {
@@ -324,6 +359,44 @@ export default function Projects() {
     })
     return map
   }, [modules])
+
+  const inspectionTemplateMap = useMemo(() => {
+    const map = new Map()
+    inspectionTemplates.forEach((tpl) => map.set(String(tpl._id), tpl.name || 'Inspection template'))
+    return map
+  }, [inspectionTemplates])
+
+  const inspectionRows = useMemo(() => {
+    const labelMap = { daily: 'Daily', weekly: 'Weekly', adhoc: 'Ad-hoc' }
+    return inspections.map((insp) => {
+      const templateName = inspectionTemplateMap.get(String(insp.templateId)) || 'Inspection template'
+      return {
+        ...insp,
+        templateName,
+        typeLabel: labelMap[insp.type] || insp.type || 'Inspection',
+      }
+    })
+  }, [inspections, inspectionTemplateMap])
+
+  const formattedLocation =
+    projectForm.location && typeof projectForm.location.lat === 'number' && typeof projectForm.location.lng === 'number'
+      ? `${projectForm.location.lat.toFixed(4)}, ${projectForm.location.lng.toFixed(4)}`
+      : 'Not set'
+  const poiCount = Array.isArray(projectForm.pointsOfInterest) ? projectForm.pointsOfInterest.length : 0
+  const approvedModules = modules.filter((m) => m.reviewStatus === 'approved').length
+  const pendingModules = modules.length - approvedModules
+  const activeInspections = inspections.length
+  const summaryItems = [
+    { label: 'Project name', value: projectForm.name || 'Untitled project' },
+    { label: 'Address', value: projectForm.address || 'Not provided' },
+    { label: 'Location', value: formattedLocation },
+    { label: 'Default zoom', value: projectForm.mapZoom || DEFAULT_MAP_ZOOM },
+    { label: 'Points of interest', value: poiCount },
+  ]
+
+  const goToInspectionsWorkspace = () => {
+    if (selectedId) navigate(`/admin/inspections/projects/${selectedId}`)
+  }
 
   const managerAssignments = useMemo(() => assignments.filter((a) => a.role === 'manager'), [assignments])
   const workerAssignments = useMemo(() => assignments.filter((a) => a.role === 'worker'), [assignments])
@@ -390,136 +463,260 @@ export default function Projects() {
         <Card elevation={1} sx={{ borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
           <CardContent>
             {selectedId ? (
-              <>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+              <Stack spacing={3}>
+                <Stack direction="row" spacing={1} alignItems="center">
                   <Typography variant="h6">Project overview</Typography>
                   <Chip label={projectForm.status || 'draft'} />
                   <Box sx={{ flex: 1 }} />
                   {projectForm.status !== 'archived' && (
                     <Button color="error" variant="outlined" onClick={archiveProject}>Archive project</Button>
                   )}
-                  <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveProject}>Save project</AsyncButton>
+                  <AsyncButton startIcon={<SaveIcon />} variant="contained" onClick={saveProject}>Save project</AsyncButton>
                 </Stack>
 
-                {/* Modules Section */}
-                <Box sx={{ mb: 3, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
-                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-                    <Typography variant="subtitle1">Induction modules for this project</Typography>
-                  </Stack>
-                  {modulesLoading && (
-                    <Alert severity="info" sx={{ mb: 1 }}>Loading induction modules...</Alert>
-                  )}
-                  {!modulesLoading && modules.length === 0 && (
-                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">No induction modules have been created.</Typography>
-                      <Button variant="contained" onClick={() => setModuleDialogOpen(true)} sx={{ textTransform: 'none' }}>Create induction module</Button>
-                    </Stack>
-                  )}
-                  {!modulesLoading && modules.length > 0 && (
-                    <Stack spacing={1.5}>
-                      {modules.map((mod) => (
-                        <Stack key={mod._id} direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" justifyContent="space-between" sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
-                          <Stack spacing={0.5}>
-                            <Typography variant="body1">{mod.name || 'Induction module'}</Typography>
-                            <Typography variant="body2" color="text.secondary">Status: {mod.reviewStatus || 'draft'}</Typography>
-                          </Stack>
-                          <Stack direction="row" spacing={1}>
-                            <Button variant="contained" onClick={() => openModule(mod._id)} sx={{ textTransform: 'none' }}>
-                              Open module
-                            </Button>
-                            <Button
-                              color="error"
-                              variant="outlined"
-                              disabled={moduleActionLoading}
-                              onClick={() => deleteModule(mod._id)}
-                              sx={{ textTransform: 'none' }}
-                            >
-                              Remove
-                            </Button>
-                          </Stack>
-                        </Stack>
-                      ))}
-                      <Button variant="outlined" onClick={() => setModuleDialogOpen(true)} sx={{ alignSelf: 'flex-start', textTransform: 'none' }}>Create another induction module</Button>
-                    </Stack>
-                  )}
-                </Box>
-
-                <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: '1px solid #eee', '& .MuiTabs-indicator': { backgroundColor: accent } }}>
-                  {projectTabs.map((t, idx) => (
+                <Tabs value={sectionTab} onChange={(_, v) => setSectionTab(v)} sx={{ borderBottom: '1px solid #eee', '& .MuiTabs-indicator': { backgroundColor: accent } }}>
+                  {sectionTabs.map((t, idx) => (
                     <Tab key={t.label} icon={t.icon} iconPosition="start" label={t.label} sx={{ '&.Mui-selected': { color: accent } }} value={idx} />
                   ))}
                 </Tabs>
 
-                <Box sx={{ mt: 2 }} hidden={tab !== 0}>
-                  <ProjectInfoSection
-                    value={projectForm}
-                    onChange={(val) => setProjectForm(val)}
-                    onOpenFullMap={selectedId ? () => navigate(`/admin/projects/${selectedId}/location`) : undefined}
-                  />
+                <Box hidden={sectionTab !== 0}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                      <Card variant="outlined" sx={{ height: '100%' }}>
+                        <CardHeader title="Project summary" subheader="Read-only snapshot of the key context." />
+                        <CardContent>
+                          <Stack spacing={1}>
+                            {summaryItems.map((item) => (
+                              <Box key={item.label}>
+                                <Typography variant="caption" color="text.secondary">{item.label}</Typography>
+                                <Typography variant="body1">{item.value}</Typography>
+                              </Box>
+                            ))}
+                          </Stack>
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 2 }}>
+                            <Button size="small" onClick={() => setSectionTab(1)}>Edit details</Button>
+                            {selectedId && (
+                              <Button size="small" onClick={() => navigate(`/admin/projects/${selectedId}/location`)}>Open map editor</Button>
+                            )}
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Card variant="outlined" sx={{ height: '100%' }}>
+                        <CardHeader title="Project team" subheader="Current manager and worker assignments." />
+                        <CardContent>
+                          <Stack spacing={1}>
+                            <Typography variant="h4" sx={{ fontWeight: 700 }}>{managerAssignments.length}</Typography>
+                            <Typography variant="body2" color="text.secondary">Assigned managers</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 700 }}>{workerAssignments.length}</Typography>
+                            <Typography variant="body2" color="text.secondary">Assigned workers</Typography>
+                          </Stack>
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 2 }}>
+                            <Button variant="contained" onClick={() => setSectionTab(1)}>Manage team</Button>
+                            <Button variant="outlined" onClick={openAssignWorker}>Assign worker</Button>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Card variant="outlined" sx={{ height: '100%' }}>
+                        <CardHeader title="Induction modules" subheader="Active learning content within this project." />
+                        <CardContent>
+                          <Typography variant="h4" sx={{ fontWeight: 700 }}>{modules.length}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Approved: {approvedModules} · Draft/Pending: {pendingModules}
+                          </Typography>
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 2 }}>
+                            <Button variant="contained" onClick={() => setSectionTab(2)}>Manage modules</Button>
+                            <Button variant="outlined" onClick={() => setModuleDialogOpen(true)}>Create module</Button>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Card variant="outlined" sx={{ height: '100%' }}>
+                        <CardHeader title="Project inspections" subheader="Templates currently active for the Inspection Wizard." />
+                        <CardContent>
+                          <Typography variant="h4" sx={{ fontWeight: 700 }}>{activeInspections}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Activated templates ready to run inspections on-site.
+                          </Typography>
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 2 }}>
+                            <Button variant="contained" onClick={() => setSectionTab(3)}>View summary</Button>
+                            <Button variant="outlined" onClick={goToInspectionsWorkspace}>Open inspection workspace</Button>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  </Grid>
                 </Box>
 
-                <Box sx={{ mt: 2 }} hidden={tab !== 1}>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                    <GroupIcon color="action" />
-                    <Typography variant="subtitle2">Assigned managers</Typography>
-                    <Box sx={{ flex: 1 }} />
-                    <Button variant="contained" onClick={openAssign} sx={{ textTransform: 'none' }}>Assign manager</Button>
+                <Box hidden={sectionTab !== 1}>
+                  <Stack spacing={3}>
+                    <Card variant="outlined">
+                      <CardHeader title="Project configuration" subheader="Edit metadata, map settings, and points of interest." />
+                      <CardContent>
+                        <ProjectInfoSection
+                          value={projectForm}
+                          onChange={(val) => setProjectForm(val)}
+                          onOpenFullMap={selectedId ? () => navigate(`/admin/projects/${selectedId}/location`) : undefined}
+                        />
+                      </CardContent>
+                    </Card>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <Card variant="outlined">
+                          <CardHeader
+                            avatar={<AssignmentIndIcon color="action" />}
+                            title="Assigned managers"
+                            subheader="Managers control modules, reviews, and team oversight."
+                            action={<Button variant="contained" onClick={openAssign}>Assign manager</Button>}
+                          />
+                          <CardContent>
+                            <List sx={{ py: 0 }}>
+                              {managerAssignments.map((a) => (
+                                <ListItemButton key={a._id} sx={{ borderRadius: 1 }}>
+                                  <ListItemIcon sx={{ minWidth: 36 }}><GroupIcon /></ListItemIcon>
+                                  <ListItemText primary={a?.user?.name || a?.user} secondary={a?.user?.email || ''} />
+                                  <Button color="error" onClick={() => removeAssignment(a._id)}>Remove</Button>
+                                </ListItemButton>
+                              ))}
+                            </List>
+                            {!managerAssignments.length && (
+                              <Typography variant="body2" color="text.secondary">No managers assigned to this project.</Typography>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <Card variant="outlined">
+                          <CardHeader
+                            avatar={<GroupIcon color="action" />}
+                            title="Assigned workers"
+                            subheader="Control which workers can access this project and which modules they must finish."
+                            action={<Button variant="contained" onClick={openAssignWorker}>Assign worker</Button>}
+                          />
+                          <CardContent>
+                            <List sx={{ py: 0 }}>
+                              {workerAssignments.map((a) => (
+                                <ListItemButton key={a._id} sx={{ borderRadius: 1, alignItems: 'flex-start' }}>
+                                  <ListItemIcon sx={{ minWidth: 36 }}><GroupIcon /></ListItemIcon>
+                                  <ListItemText primary={a?.user?.name || a?.user} secondary={a?.user?.email || ''} />
+                                  <Stack spacing={1} alignItems="flex-end">
+                                    <Typography variant="caption" color="text.secondary">
+                                      Assigned modules:{' '}
+                                      {a.modules && a.modules.length
+                                        ? (() => {
+                                          const names = a.modules.map((id) => moduleNameMap.get(String(id)) || 'Induction module')
+                                          const preview = names.slice(0, 3).join(', ')
+                                          return names.length > 3 ? `${preview} (+${names.length - 3} more)` : preview
+                                        })()
+                                        : 'All modules'}
+                                    </Typography>
+                                    <Stack direction="row" spacing={1}>
+                                      <Button variant="outlined" size="small" onClick={() => openWorkerModuleDialog(a)}>
+                                        Assign modules
+                                      </Button>
+                                      <Button color="error" size="small" onClick={() => removeAssignment(a._id)}>Remove</Button>
+                                    </Stack>
+                                  </Stack>
+                                </ListItemButton>
+                              ))}
+                            </List>
+                            {!workerAssignments.length && (
+                              <Typography variant="body2" color="text.secondary">No workers assigned to this project.</Typography>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    </Grid>
                   </Stack>
-                  <List>
-                    {managerAssignments.map((a) => (
-                      <ListItemButton key={a._id} sx={{ borderRadius: 1 }}>
-                        <ListItemIcon sx={{ minWidth: 36 }}><GroupIcon /></ListItemIcon>
-                        <ListItemText primary={`${a?.user?.name || a?.user} - ${a.role}`} secondary={a?.user?.email || ''} />
-                        <Button color="error" onClick={() => removeAssignment(a._id)}>Remove manager</Button>
-                      </ListItemButton>
-                    ))}
-                  </List>
-                  {!managerAssignments.length && (
-                    <Typography variant="body2" sx={{ opacity: 0.7 }}>No managers assigned to this project.</Typography>
-                  )}
                 </Box>
 
-                <Box sx={{ mt: 2 }} hidden={tab !== 2}>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                  <GroupIcon color="action" />
-                  <Typography variant="subtitle2">Assigned workers</Typography>
-                  <Box sx={{ flex: 1 }} />
-                  <Button variant="contained" onClick={openAssignWorker} sx={{ textTransform: 'none' }}>Assign worker</Button>
-                </Stack>
-                <List>
-                  {workerAssignments.map((a) => (
-                    <ListItemButton key={a._id} sx={{ borderRadius: 1, alignItems: 'flex-start' }}>
-                      <ListItemIcon sx={{ minWidth: 36 }}><GroupIcon /></ListItemIcon>
-                      <ListItemText
-                        primary={`${a?.user?.name || a?.user}`}
-                        secondary={a?.user?.email || ''}
-                      />
-                      <Stack spacing={1} alignItems="flex-end">
-                        <Typography variant="caption" color="text.secondary">
-                          Assigned modules:{' '}
-                          {a.modules && a.modules.length
-                            ? (() => {
-                              const names = a.modules.map((id) => moduleNameMap.get(String(id)) || 'Induction module')
-                              const preview = names.slice(0, 3).join(', ')
-                              return names.length > 3 ? `${preview} (+${names.length - 3} more)` : preview
-                            })()
-                            : 'All modules'}
-                        </Typography>
-                        <Stack direction="row" spacing={1}>
-                          <Button variant="outlined" size="small" onClick={() => openWorkerModuleDialog(a)}>
-                            Assign modules
-                          </Button>
-                          <Button color="error" size="small" onClick={() => removeAssignment(a._id)}>Remove worker</Button>
+                <Box hidden={sectionTab !== 2}>
+                  <Card variant="outlined">
+                    <CardHeader
+                      title="Manage induction modules"
+                      subheader="Create, clone, or remove modules that workers must complete."
+                      action={<Button variant="contained" onClick={() => setModuleDialogOpen(true)}>Create module</Button>}
+                    />
+                    <CardContent>
+                      {modulesLoading && (
+                        <Alert severity="info" sx={{ mb: 1 }}>Loading induction modules...</Alert>
+                      )}
+                      {!modulesLoading && modules.length === 0 && (
+                        <Alert severity="info">No induction modules have been created. Create one to get started.</Alert>
+                      )}
+                      {!modulesLoading && modules.length > 0 && (
+                        <Stack spacing={1.5}>
+                          {modules.map((mod) => (
+                            <Stack key={mod._id} direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center" justifyContent="space-between" sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
+                              <Stack spacing={0.5}>
+                                <Typography variant="body1">{mod.name || 'Induction module'}</Typography>
+                                <Typography variant="body2" color="text.secondary">Status: {mod.reviewStatus || 'draft'}</Typography>
+                              </Stack>
+                              <Stack direction="row" spacing={1}>
+                                <Button variant="contained" onClick={() => openModule(mod._id)}>
+                                  Open module
+                                </Button>
+                                <Button
+                                  color="error"
+                                  variant="outlined"
+                                  disabled={moduleActionLoading}
+                                  onClick={() => deleteModule(mod._id)}
+                                >
+                                  Remove
+                                </Button>
+                              </Stack>
+                            </Stack>
+                          ))}
                         </Stack>
-                      </Stack>
-                    </ListItemButton>
-                  ))}
-                </List>
-                  {!workerAssignments.length && (
-                    <Typography variant="body2" sx={{ opacity: 0.7 }}>No workers assigned to this project.</Typography>
-                  )}
+                      )}
+                    </CardContent>
+                  </Card>
                 </Box>
-              </>
+
+                <Box hidden={sectionTab !== 3}>
+                  <Card variant="outlined">
+                    <CardHeader
+                      title="Project inspections"
+                      subheader="Activations control which templates appear in the Inspection Wizard."
+                      action={selectedId && (
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                          <Button variant="contained" onClick={goToInspectionsWorkspace}>Open workspace</Button>
+                          <Button variant="outlined" onClick={goToInspectionsWorkspace}>Activate template</Button>
+                        </Stack>
+                      )}
+                    />
+                    <CardContent>
+                      {inspectionsLoading && <Alert severity="info">Loading inspections...</Alert>}
+                      {!inspectionsLoading && !inspectionRows.length && (
+                        <Alert severity="info">No inspections have been activated yet.</Alert>
+                      )}
+                      {!inspectionsLoading && inspectionRows.length > 0 && (
+                        <Stack spacing={1.5}>
+                          {inspectionRows.map((insp) => (
+                            <Stack key={insp._id} direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
+                              <Stack spacing={0.5}>
+                                <Typography variant="body1">{insp.templateName}</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  Type: {insp.typeLabel}
+                                </Typography>
+                              </Stack>
+                              <Chip label="Active" color="success" size="small" />
+                            </Stack>
+                          ))}
+                        </Stack>
+                      )}
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                        Use the workspace to activate templates, launch executions, or review historical inspections.
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Box>
+              </Stack>
             ) : (
               <Typography variant="body2" sx={{ mt: 2, opacity: 0.7 }}>Select a project to view details.</Typography>
             )}
