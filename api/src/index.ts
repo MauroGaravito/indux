@@ -10,6 +10,9 @@ import moduleFieldRoutes from './routes/moduleFields.js';
 import moduleReviewRoutes from './routes/moduleReviews.js';
 import moduleSubmissionRoutes from './routes/moduleSubmissions.js';
 import inductionTemplateRoutes from './routes/inductionTemplates.js';
+import inspectionTemplateRoutes from './routes/inspectionTemplates.js';
+import projectInspectionRoutes from './routes/projectInspections.js';
+import inspectionExecutionRoutes from './routes/inspectionExecutions.js';
 import uploadRoutes from './routes/uploads.js';
 import userRoutes from './routes/users.js';
 import assignmentsRoutes from './routes/assignments.js';
@@ -91,6 +94,9 @@ app.use('/users', userRoutes);
 app.use('/assignments', assignmentsRoutes);
 app.use('/brand-config', brandConfigRoutes);
 app.use('/induction-templates', inductionTemplateRoutes);
+app.use('/inspection-templates', inspectionTemplateRoutes);
+app.use('/', projectInspectionRoutes);
+app.use('/', inspectionExecutionRoutes);
 
 // --- Start Server ---
 async function start() {
