@@ -73,6 +73,31 @@ export default function ManagerDashboard() {
     }
   }
 
+  const handleRunInspection = async (inspection) => {
+    if (!inspection?.projectInspectionId) return
+    const userId = user?.id
+    const stored = getInspectionExecutionRecord(userId, inspection.projectInspectionId)
+    if (stored?.executionId && stored.status !== 'submitted') {
+      navigate(`/inspections/wizard?executionId=${stored.executionId}`)
+      return
+    }
+    try {
+      const execution = await startInspectionExecution(inspection.projectInspectionId)
+      const executionId = execution?._id
+      if (executionId && userId) {
+        setInspectionExecutionRecord(userId, inspection.projectInspectionId, {
+          executionId,
+          status: execution?.status || 'draft',
+        })
+        navigate(`/inspections/wizard?executionId=${executionId}`)
+      } else {
+        navigate(`/inspections/wizard?projectInspectionId=${inspection.projectInspectionId}`)
+      }
+    } catch (e) {
+      setInspectionError(e?.response?.data?.error || 'Unable to start inspection.')
+    }
+  }
+
   useEffect(() => {
     if (!user?.id) return
     let isCancelled = false
@@ -185,27 +210,3 @@ export default function ManagerDashboard() {
     </Stack>
   )
 }
-  const handleRunInspection = async (inspection) => {
-    if (!inspection?.projectInspectionId) return
-    const userId = user?.id
-    const stored = getInspectionExecutionRecord(userId, inspection.projectInspectionId)
-    if (stored?.executionId && stored.status !== 'submitted') {
-      navigate(`/inspections/wizard?executionId=${stored.executionId}`)
-      return
-    }
-    try {
-      const execution = await startInspectionExecution(inspection.projectInspectionId)
-      const executionId = execution?._id
-      if (executionId && userId) {
-        setInspectionExecutionRecord(userId, inspection.projectInspectionId, {
-          executionId,
-          status: execution?.status || 'draft',
-        })
-        navigate(`/inspections/wizard?executionId=${executionId}`)
-      } else {
-        navigate(`/inspections/wizard?projectInspectionId=${inspection.projectInspectionId}`)
-      }
-    } catch (e) {
-      setInspectionError(e?.response?.data?.error || 'Unable to start inspection.')
-    }
-  }
