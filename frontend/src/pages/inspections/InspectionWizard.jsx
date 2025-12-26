@@ -419,15 +419,32 @@ export default function InspectionWizard({ mode = 'interactive', recordId: recor
           )}
           {showPhoto && (
             <Box>
-              <Button variant="outlined" component="label" disabled={disabled || uploading[item.key]}>
-                Upload photo
-                <input
-                  hidden
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handlePhotoUpload(item.key, e.target.files?.[0])}
-                />
-              </Button>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="flex-start">
+                <Button
+                  variant="contained"
+                  color="primary"
+                  component="label"
+                  disabled={disabled || uploading[item.key]}
+                >
+                  Capture photo
+                  <input
+                    hidden
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(e) => handlePhotoUpload(item.key, e.target.files?.[0])}
+                  />
+                </Button>
+                <Button variant="outlined" component="label" disabled={disabled || uploading[item.key]}>
+                  Upload photo
+                  <input
+                    hidden
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handlePhotoUpload(item.key, e.target.files?.[0])}
+                  />
+                </Button>
+              </Stack>
               {uploading[item.key] && <LinearProgress sx={{ mt: 1 }} />}
               <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap">
                 {(result.photos || []).map((photo) => (
