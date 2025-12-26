@@ -4,6 +4,7 @@ import { Project } from './models/Project.js';
 import { InductionModule } from './models/InductionModule.js';
 import { InductionModuleField } from './models/InductionModuleField.js';
 import { Assignment } from './models/Assignment.js';
+import { InspectionTemplate } from './models/InspectionTemplate.js';
 
 export async function seedAll() {
   // Users
@@ -110,6 +111,202 @@ export async function seedAll() {
   }
   if (worker) {
     await Assignment.updateOne({ user: worker._id, project: project._id }, { role: 'worker', assignedBy: manager?._id }, { upsert: true });
+  }
+
+  // Inspection templates
+  const inspectionTemplates = [
+    {
+      name: 'PPE Inspection',
+      description: 'Daily inspection to verify personal protective equipment is present and in good condition.',
+      requirePOI: false,
+      requireSignature: true,
+      categories: [
+        {
+          key: 'ppe',
+          label: 'PPE Checks',
+          order: 1,
+        },
+      ],
+      items: [
+        {
+          key: 'helmet',
+          categoryKey: 'ppe',
+          label: 'Helmet condition',
+          photoRequiredOnFail: true,
+          notesRequiredOnFail: true,
+        },
+        {
+          key: 'highVis',
+          categoryKey: 'ppe',
+          label: 'High-vis worn correctly',
+          notesRequiredOnFail: true,
+        },
+        {
+          key: 'boots',
+          categoryKey: 'ppe',
+          label: 'Safety boots worn',
+          notesRequiredOnFail: true,
+        },
+        {
+          key: 'eyeProtection',
+          categoryKey: 'ppe',
+          label: 'Eye protection available',
+          notesRequiredOnFail: true,
+        },
+      ],
+    },
+    {
+      name: 'Pre-Start Heavy Machinery Inspection',
+      description: 'Pre-start safety inspection for plant and heavy machinery.',
+      requirePOI: false,
+      requireSignature: true,
+      categories: [
+        {
+          key: 'equipment',
+          label: 'Equipment Checklist',
+          order: 1,
+        },
+      ],
+      items: [
+        {
+          key: 'leaks',
+          categoryKey: 'equipment',
+          label: 'No visible leaks',
+          photoRequiredOnFail: true,
+        },
+        {
+          key: 'emergencyStop',
+          categoryKey: 'equipment',
+          label: 'Emergency stop functional',
+          photoRequiredOnFail: true,
+        },
+        {
+          key: 'guards',
+          categoryKey: 'equipment',
+          label: 'Guards in place',
+          photoRequiredOnFail: true,
+          notesRequiredOnFail: true,
+        },
+        {
+          key: 'alarms',
+          categoryKey: 'equipment',
+          label: 'Warning alarms operational',
+          notesRequiredOnFail: true,
+        },
+      ],
+    },
+    {
+      name: 'Site Safety Inspection (HazCheck)',
+      description: 'General site safety inspection to identify hazards and unsafe conditions.',
+      requirePOI: true,
+      requireSignature: true,
+      categories: [
+        {
+          key: 'site',
+          label: 'Site Conditions',
+          order: 1,
+        },
+      ],
+      items: [
+        {
+          key: 'walkways',
+          categoryKey: 'site',
+          label: 'Walkways clear',
+          photoRequiredOnFail: true,
+          notesRequiredOnFail: true,
+        },
+        {
+          key: 'signage',
+          categoryKey: 'site',
+          label: 'Adequate signage installed',
+          photoRequiredOnFail: true,
+        },
+        {
+          key: 'hazards',
+          categoryKey: 'site',
+          label: 'No uncontrolled hazards present',
+          photoRequiredOnFail: true,
+          notesRequiredOnFail: true,
+          enableRiskLevel: true,
+        },
+      ],
+    },
+    {
+      name: 'First Aid Kit Audit',
+      description: 'Periodic audit of first aid kits and medical supplies.',
+      requirePOI: false,
+      requireSignature: false,
+      categories: [
+        {
+          key: 'firstAid',
+          label: 'First Aid Kit',
+          order: 1,
+        },
+      ],
+      items: [
+        {
+          key: 'stocked',
+          categoryKey: 'firstAid',
+          label: 'Kit fully stocked',
+          notesRequiredOnFail: true,
+        },
+        {
+          key: 'expiry',
+          categoryKey: 'firstAid',
+          label: 'Items within expiry date',
+          notesRequiredOnFail: true,
+        },
+        {
+          key: 'accessible',
+          categoryKey: 'firstAid',
+          label: 'Kit easily accessible',
+          notesRequiredOnFail: true,
+        },
+      ],
+    },
+    {
+      name: 'High-Risk Work Permit',
+      description: 'Pre-task safety inspection for high-risk activities such as hot works or working at heights.',
+      requirePOI: true,
+      requireSignature: true,
+      categories: [
+        {
+          key: 'highRisk',
+          label: 'High-Risk Controls',
+          order: 1,
+        },
+      ],
+      items: [
+        {
+          key: 'swms',
+          categoryKey: 'highRisk',
+          label: 'SWMS reviewed and approved',
+          notesRequiredOnFail: true,
+        },
+        {
+          key: 'extinguisher',
+          categoryKey: 'highRisk',
+          label: 'Fire extinguisher available',
+          photoRequiredOnFail: true,
+        },
+        {
+          key: 'fallProtection',
+          categoryKey: 'highRisk',
+          label: 'Fall protection in place',
+          photoRequiredOnFail: true,
+          notesRequiredOnFail: true,
+          enableRiskLevel: true,
+        },
+      ],
+    },
+  ];
+
+  for (const template of inspectionTemplates) {
+    const exists = await InspectionTemplate.exists({ name: template.name });
+    if (!exists) {
+      await InspectionTemplate.create(template);
+      console.log('Seeded inspection template', template.name);
+    }
   }
 }
 
