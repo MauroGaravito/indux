@@ -7,6 +7,7 @@ export interface IProjectInspection extends Document {
   templateId: Types.ObjectId;
   type: ProjectInspectionType;
   active: boolean;
+  archivedAt?: Date;
   createdBy?: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -18,6 +19,7 @@ const ProjectInspectionSchema = new Schema<IProjectInspection>(
     templateId: { type: Schema.Types.ObjectId, ref: 'InspectionTemplate', required: true },
     type: { type: String, enum: ['daily', 'weekly', 'adhoc'], default: 'daily' },
     active: { type: Boolean, default: true },
+    archivedAt: { type: Date },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }

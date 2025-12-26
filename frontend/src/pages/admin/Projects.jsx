@@ -78,6 +78,9 @@ export default function Projects() {
   const [inspectionsLoading, setInspectionsLoading] = useState(false)
   const [inspectionTemplates, setInspectionTemplates] = useState([])
   const [errorMsg, setErrorMsg] = useState('')
+  const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false)
+  const [inspectionToDeactivate, setInspectionToDeactivate] = useState(null)
+  const [deactivating, setDeactivating] = useState(false)
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false)
   const [moduleActionLoading, setModuleActionLoading] = useState(false)
   const [moduleAssignmentDialogOpen, setModuleAssignmentDialogOpen] = useState(false)
@@ -322,6 +325,33 @@ export default function Projects() {
     const seed = (assignment?.modules || []).map((id) => String(id))
     setModuleAssignmentInitial(seed)
     setModuleAssignmentDialogOpen(true)
+  }
+
+  const openDeactivateInspection = (inspection) => {
+    setInspectionToDeactivate(inspection)
+    setDeactivateDialogOpen(true)
+  }
+
+  const closeDeactivateInspection = () => {
+    if (deactivating) return
+    setDeactivateDialogOpen(false)
+    setInspectionToDeactivate(null)
+  }
+
+  const handleDeactivateInspection = async () => {
+    if (!inspectionToDeactivate?._id) return
+    setDeactivating(true)
+    try {
+      await api.patch(`/project-inspections/${inspectionToDeactivate._id}/deactivate`)
+      closeDeactivateInspection()
+      if (selectedId) {
+        await loadInspectionsForProject(selectedId)
+      }
+    } catch (e) {
+      setErrorMsg(e?.response?.data?.error || 'Failed to deactivate inspection.')
+    } finally {
+      setDeactivating(false)
+    }
   }
 
   const closeWorkerModuleDialog = () => {
@@ -698,16 +728,21 @@ export default function Projects() {
                       {!inspectionsLoading && inspectionRows.length > 0 && (
                         <Stack spacing={1.5}>
                           {inspectionRows.map((insp) => (
-                            <Stack key={insp._id} direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
-                              <Stack spacing={0.5}>
-                                <Typography variant="body1">{insp.templateName}</Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  Type: {insp.typeLabel}
-                                </Typography>
-                              </Stack>
-                              <Chip label="Active" color="success" size="small" />
-                            </Stack>
-                          ))}
+                        <Stack key={insp._id} direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }} justifyContent="space-between" sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
+                          <Stack spacing={0.5}>
+                            <Typography variant="body1">{insp.templateName}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Type: {insp.typeLabel}
+                            </Typography>
+                          </Stack>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Chip label="Active" color="success" size="small" />
+                            <Button color="error" variant="outlined" size="small" onClick={() => openDeactivateInspection(insp)}>
+                              Deactivate
+                            </Button>
+                          </Stack>
+                        </Stack>
+                      ))}
                         </Stack>
                       )}
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
@@ -775,6 +810,20 @@ export default function Projects() {
       <Stack direction="row" spacing={1} sx={{ px: 2, pb: 2, justifyContent: 'flex-end' }}>
         <Button onClick={closeAssignWorker}>Cancel</Button>
         <AsyncButton variant="contained" disabled={!assignWorkerId} onClick={doAssignWorker}>Assign</AsyncButton>
+      </Stack>
+    </Dialog>
+    <Dialog open={deactivateDialogOpen} onClose={closeDeactivateInspection} maxWidth="xs" fullWidth>
+      <CardHeader title={<Typography variant="subtitle1">Deactivate inspection</Typography>} />
+      <CardContent>
+        <Typography variant="body2">
+          This will hide the inspection "{inspectionToDeactivate?.templateName || 'Inspection'}" from the project. Executions remain in the system.
+        </Typography>
+      </CardContent>
+      <Stack direction="row" spacing={1} sx={{ px: 2, pb: 2, justifyContent: 'flex-end' }}>
+        <Button onClick={closeDeactivateInspection} disabled={deactivating}>Cancel</Button>
+        <AsyncButton variant="contained" color="error" loading={deactivating} onClick={handleDeactivateInspection}>
+          Deactivate
+        </AsyncButton>
       </Stack>
     </Dialog>
     <Snackbar open={!!errorMsg} autoHideDuration={4000} onClose={() => setErrorMsg('')}>
