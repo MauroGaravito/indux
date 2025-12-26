@@ -99,6 +99,8 @@ function App({ brand }) {
             <Route path="reviews" element={<AdminReviews />} />
             <Route path="inspections/reviews" element={<InspectionReviews />} />
             <Route path="inspections/templates" element={<InspectionTemplates />} />
+            <Route path="inspection-reviews" element={<InspectionReviews />} />
+            <Route path="inspection-templates" element={<InspectionTemplates />} />
             <Route path="worker-submissions" element={<AdminWorkerSubmissions />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="settings" element={<AdminSettings />} />

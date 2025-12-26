@@ -28,8 +28,8 @@ export default function AdminLayout() {
     { label: 'Dashboard', to: '/admin', icon: <DashboardIcon /> },
     { label: 'Projects', to: '/admin/projects', icon: <FolderIcon /> },
     { label: 'Induction Module Reviews', to: '/admin/reviews', icon: <RateReviewIcon /> },
-    { label: 'Inspection Module Reviews', to: '/admin/inspections/reviews', icon: <FactCheckIcon /> },
-    { label: 'Inspection Templates', to: '/admin/inspections/templates', icon: <LibraryBooksIcon /> },
+    { label: 'Inspection Module Reviews', to: '/admin/inspection-reviews', icon: <FactCheckIcon /> },
+    { label: 'Inspection Templates', to: '/admin/inspection-templates', icon: <LibraryBooksIcon /> },
     { label: 'Users', to: '/admin/users', icon: <PeopleIcon /> },
     { label: 'Settings', to: '/admin/settings', icon: <SettingsIcon /> },
   ]
