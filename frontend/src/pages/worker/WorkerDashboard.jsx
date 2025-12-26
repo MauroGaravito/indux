@@ -29,8 +29,8 @@ const statusPalette = {
 
 const inspectionStatusPalette = {
   none: { label: 'Not started', color: 'default' },
-  draft: { label: 'Draft', color: 'warning' },
-  submitted: { label: 'Pending', color: 'info' },
+  draft: { label: 'In progress', color: 'warning' },
+  submitted: { label: 'Completed', color: 'success' },
 }
 
 const inspectionTypeLabels = {
@@ -264,9 +264,12 @@ export default function WorkerDashboard() {
 
   const inspectionStatusFor = (inspection) => {
     const record = getInspectionExecutionRecord(user?.id, inspection.projectInspectionId)
-    if (record?.status === 'submitted') return inspectionStatusPalette.submitted
-    if (record?.status === 'draft') return inspectionStatusPalette.draft
-    return inspectionStatusPalette.none
+    const key = record?.status === 'submitted'
+      ? 'submitted'
+      : record?.status === 'draft'
+        ? 'draft'
+        : 'none'
+    return { chip: inspectionStatusPalette[key], record }
   }
 
   const handleOpenInspection = async (inspection) => {
@@ -344,7 +347,14 @@ export default function WorkerDashboard() {
           )}
           <Stack spacing={2} sx={{ mt: 2 }}>
             {inspections.map((insp) => {
-              const chip = inspectionStatusFor(insp)
+              const { chip, record } = inspectionStatusFor(insp)
+              const submittedAt = record?.submittedAt ? formatDate(record.submittedAt) : null
+              const buttonLabel =
+                record?.status === 'submitted'
+                  ? 'View inspection'
+                  : record?.status === 'draft'
+                    ? 'Resume inspection'
+                    : 'Open inspection'
               return (
                 <Card key={insp.projectInspectionId} variant="outlined" sx={{ borderRadius: 2 }}>
                   <CardContent>
@@ -355,8 +365,13 @@ export default function WorkerDashboard() {
                         <Chip size="small" label={inspectionTypeLabels[insp.type] || insp.type} />
                         <Chip size="small" label={chip.label} color={chip.color} variant="outlined" />
                       </Stack>
+                      {submittedAt && (
+                        <Typography variant="caption" color="text.secondary">
+                          Submitted on {submittedAt}
+                        </Typography>
+                      )}
                       <Button variant="contained" size="small" onClick={() => handleOpenInspection(insp)}>
-                        Open inspection
+                        {buttonLabel}
                       </Button>
                     </Stack>
                   </CardContent>

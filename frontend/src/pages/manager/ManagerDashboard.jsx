@@ -188,22 +188,46 @@ export default function ManagerDashboard() {
             <Alert severity="info" sx={{ mt: 2 }}>No inspections pending.</Alert>
           )}
           <Stack spacing={2} sx={{ mt: 2 }}>
-            {pendingInspections.map((insp) => (
-              <Card key={`${insp.projectInspectionId}`} variant="outlined" sx={{ borderRadius: 2 }}>
-                <CardContent>
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }}>
-                    <Stack spacing={0.5}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{insp.projectName}</Typography>
-                      <Typography variant="body2" color="text.secondary">{insp.templateName}</Typography>
-                      <Chip size="small" label={inspectionTypeLabels[insp.type] || insp.type} />
+            {pendingInspections.map((insp) => {
+              const record = getInspectionExecutionRecord(user?.id, insp.projectInspectionId)
+              const submittedAt = record?.submittedAt ? new Date(record.submittedAt).toLocaleString() : null
+              let statusChip = null
+              if (record?.status === 'submitted') {
+                statusChip = <Chip size="small" label="Completed" color="success" />
+              } else if (record?.status === 'draft') {
+                statusChip = <Chip size="small" label="In progress" color="warning" />
+              }
+              const buttonLabel =
+                record?.status === 'submitted'
+                  ? 'View inspection'
+                  : record?.status === 'draft'
+                    ? 'Resume inspection'
+                    : 'Run inspection'
+              return (
+                <Card key={`${insp.projectInspectionId}`} variant="outlined" sx={{ borderRadius: 2 }}>
+                  <CardContent>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }}>
+                      <Stack spacing={0.5}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{insp.projectName}</Typography>
+                        <Typography variant="body2" color="text.secondary">{insp.templateName}</Typography>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Chip size="small" label={inspectionTypeLabels[insp.type] || insp.type} />
+                          {statusChip}
+                        </Stack>
+                        {submittedAt && (
+                          <Typography variant="caption" color="text.secondary">
+                            Completed on {submittedAt}
+                          </Typography>
+                        )}
+                      </Stack>
+                      <Button variant="contained" onClick={() => handleRunInspection(insp)}>
+                        {buttonLabel}
+                      </Button>
                     </Stack>
-                    <Button variant="contained" onClick={() => handleRunInspection(insp)}>
-                      Run inspection
-                    </Button>
-                  </Stack>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              )
+            })}
           </Stack>
         </CardContent>
       </Card>

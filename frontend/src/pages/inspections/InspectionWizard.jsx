@@ -27,6 +27,7 @@ import AsyncButton from '../../components/AsyncButton.jsx'
 import { useAuthStore } from '../../store/auth.js'
 import api from '../../utils/api.js'
 import { uploadFile } from '../../utils/upload.js'
+import { setInspectionExecutionRecord, appendInspectionHistory } from '../../utils/inspectionStorage.js'
 import { setInspectionExecutionRecord } from '../../utils/inspectionStorage.js'
 
 const stepsLabels = ['Context', 'Checklist', 'Summary', 'Signature', 'Submit']
@@ -71,6 +72,23 @@ export default function InspectionWizard() {
   const requirePOI = !!template.requirePOI
   const requireSignature = !!template.requireSignature
   const locked = execution?.status === 'submitted' || submitStatus === 'success'
+
+  useEffect(() => {
+    if (!execution || !user?.id) return
+    const projectInspectionId =
+      (execution.projectInspectionId && execution.projectInspectionId.toString) ?
+        execution.projectInspectionId.toString() :
+        execution.projectInspectionId || ''
+    if (!projectInspectionId) return
+    setInspectionExecutionRecord(user.id, projectInspectionId, {
+      executionId: execution._id,
+      status: execution.status || 'draft',
+      projectId: execution.projectId || '',
+      projectName: project?.name || '',
+      templateName: template?.name || execution.templateSnapshot?.name || '',
+      submittedAt: execution.submittedAt || null,
+    })
+  }, [execution, project, template, user])
 
   useEffect(() => {
     if (!execution || !user?.id) return
@@ -346,16 +364,37 @@ export default function InspectionWizard() {
         signatureDataUrl: signature || undefined,
       }
       const { data } = await api.post(`/inspection-executions/${executionId}/submit`, payload)
-      setExecution(data || { ...execution, status: 'submitted' })
+      const updatedExecution = data || { ...execution, status: 'submitted' }
+      setExecution(updatedExecution)
       setSubmitStatus('success')
       setConfirmOpen(false)
-      const projectInspectionId = data?.projectInspectionId || execution?.projectInspectionId
+      const projectInspectionId = updatedExecution?.projectInspectionId || execution?.projectInspectionId
+      const submittedAt = new Date().toISOString()
+      const templateName =
+        template?.name ||
+        execution?.templateSnapshot?.name ||
+        updatedExecution?.templateSnapshot?.name ||
+        'Inspection template'
+      const projectName = project?.name || ''
       if (user?.id && projectInspectionId && executionId) {
         setInspectionExecutionRecord(user.id, String(projectInspectionId), {
           executionId,
           status: 'submitted',
+          projectId: updatedExecution?.projectId || execution?.projectId || '',
+          projectName,
+          templateName,
+          submittedAt,
         })
       }
+      appendInspectionHistory({
+        projectId: updatedExecution?.projectId || execution?.projectId || '',
+        projectInspectionId: projectInspectionId ? String(projectInspectionId) : '',
+        projectName,
+        templateName,
+        executedByName: user?.name || user?.email || 'User',
+        submittedAt,
+        executionId,
+      })
     } catch (err) {
       setSubmitStatus('error')
       setError(err?.response?.data?.error || 'Failed to submit inspection.')

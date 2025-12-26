@@ -76,6 +76,12 @@ The wizard hides fields until the condition is met and hidden fields never block
 - Projects activate inspection templates from the Project Inspections screen, selecting cadence (daily, weekly, adhoc) before launching the Inspection Wizard.
 - Each template stores categories/items (photo + notes rules, corrective actions, risk toggles) so executions inherit the correct validation requirements automatically.
 
+## Inspection Workflow (v1)
+- **Admin** gestiona la biblioteca de plantillas, activa o desactiva plantillas por proyecto y define la cadencia (daily, weekly, adhoc). No interviene al momento de ejecutar.
+- **Managers y Workers** asignados al proyecto ven las inspecciones activas directamente en sus dashboards. Cada tarjeta ofrece un CTA (Run/Open inspection) que crea o reanuda la ejecución y abre el `InspectionWizard`.
+- **InspectionWizard** guía el proceso (Context, Checklist, Summary, Signature, Submit). Cuando se pulsa **Submit**, la inspección queda bloqueada en modo lectura y se considera evidencia WHS.
+- **Fin del flujo**: no existe aprobación/rechazo en v1. Una vez enviada, la inspección aparece como **Completed** en los dashboards y en el historial del proyecto, lista para ser consultada como registro.
+
 ## Manager Editing Behaviour
 Managers may edit induction modules (fields, slides, quiz, settings) whenever `reviewStatus` is `draft`, `pending`, or `declined`. Only `approved` modules become read-only in manager mode. Admins may edit at any stage but usually keep approved modules locked for audit purposes. When a project does not yet have an induction module, the editor surfaces a dedicated empty state with the template-aware creation dialog so admins/managers can create the first module without leaving the page.
 

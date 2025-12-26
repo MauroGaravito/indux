@@ -21,7 +21,13 @@ import {
   CardHeader,
   Dialog,
   Chip,
-  Snackbar
+  Snackbar,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Paper
 } from '@mui/material'
 import FolderIcon from '@mui/icons-material/Folder'
 import GroupIcon from '@mui/icons-material/Group'
@@ -41,6 +47,7 @@ import CreateModuleDialog from '../../components/admin/CreateModuleDialog.jsx'
 import WorkerModuleAssignmentDialog from '../../components/WorkerModuleAssignmentDialog.jsx'
 import { fetchProjectModules } from '../../utils/modules.js'
 import { DEFAULT_MAP_ZOOM, DEFAULT_PROJECT_LOCATION } from '../../constants/location.js'
+import { getInspectionHistoryByProject } from '../../utils/inspectionStorage.js'
 
 export default function Projects() {
   const theme = useTheme()
@@ -77,6 +84,7 @@ export default function Projects() {
   const [inspections, setInspections] = useState([])
   const [inspectionsLoading, setInspectionsLoading] = useState(false)
   const [inspectionTemplates, setInspectionTemplates] = useState([])
+  const [inspectionHistory, setInspectionHistory] = useState([])
   const [errorMsg, setErrorMsg] = useState('')
   const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false)
   const [inspectionToDeactivate, setInspectionToDeactivate] = useState(null)
@@ -129,14 +137,17 @@ export default function Projects() {
   const loadInspectionsForProject = async (projectId) => {
     if (!projectId) {
       setInspections([])
+      setInspectionHistory([])
       return
     }
     setInspectionsLoading(true)
     try {
       const resp = await api.get(`/projects/${projectId}/inspections`)
       setInspections(resp.data?.inspections || [])
+      setInspectionHistory(getInspectionHistoryByProject(projectId))
     } catch {
       setInspections([])
+      setInspectionHistory([])
     } finally {
       setInspectionsLoading(false)
     }
@@ -190,6 +201,7 @@ export default function Projects() {
       setAssignments([])
       setModules([])
       setInspections([])
+      setInspectionHistory([])
       navigate('/admin/projects', { replace: true })
     }
   }
@@ -743,14 +755,41 @@ export default function Projects() {
                           </Stack>
                         </Stack>
                       ))}
-                        </Stack>
-                      )}
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                        Use the workspace to activate templates, launch executions, or review historical inspections.
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Box>
+                    </Stack>
+                  )}
+                  <Typography variant="h6" sx={{ mt: 3, fontWeight: 600 }}>Inspection history</Typography>
+                  {inspectionHistory.length ? (
+                    <Table component={Paper} size="small" sx={{ mt: 1 }}>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Template</TableCell>
+                          <TableCell>Executed by</TableCell>
+                          <TableCell>Date</TableCell>
+                          <TableCell>Status</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {inspectionHistory.map((entry) => (
+                          <TableRow key={`${entry.executionId || entry.projectInspectionId}-${entry.submittedAt}`}>
+                            <TableCell>{entry.templateName || 'Inspection'}</TableCell>
+                            <TableCell>{entry.executedByName || 'User'}</TableCell>
+                            <TableCell>{entry.submittedAt ? new Date(entry.submittedAt).toLocaleString() : '—'}</TableCell>
+                            <TableCell>
+                              <Chip label="Submitted" color="success" size="small" />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <Alert severity="info" sx={{ mt: 1 }}>No inspections submitted yet.</Alert>
+                  )}
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                    Use the workspace to activate templates or launch new inspections. Review history is read-only in v1.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Box>
               </Stack>
             ) : (
               <Typography variant="body2" sx={{ mt: 2, opacity: 0.7 }}>Select a project to view details.</Typography>

@@ -52,6 +52,12 @@ Admins/managers can edit labels, steps, type, order, required flags, and conditi
 - **Activation** - admins/managers activate templates per project via `/projects/:projectId/inspections`, selecting cadence (daily/weekly/adhoc). Each activation creates a `ProjectInspection` record.
 - **Execution Snapshotting** - when an execution is created via `/project-inspections/:projectInspectionId/executions`, the current template is embedded under `templateSnapshot` to keep historical data immutable even if the template later changes.
 
+### Inspection Workflow (v1)
+- **Admin** - curates templates, activa/desactiva plantillas por proyecto y define la cadencia. No revisa ni aprueba ejecuciones en esta fase.
+- **Manager / Worker** - lanzan inspecciones desde sus dashboards (Run/Open inspection). Cada acción crea o reanuda un `InspectionExecution` y abre el `InspectionWizard`.
+- **Completion** - el wizard se compone de Contexto, Checklist, Resumen, Firma y Submit. Al enviar, el execution cambia a `submitted`, queda read-only y se registra en el historial del proyecto como evidencia WHS.
+- **Sin revisión** - v1 no incluye flujo de aprobación. El submit es el final del proceso; managers y workers consultan las inspecciones completadas desde sus dashboards o el historial del proyecto.
+
 ### Conditional Fields (`visibleIf`)
 `InductionModuleField` supports:
 ```
