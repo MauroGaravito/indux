@@ -47,7 +47,7 @@ import CreateModuleDialog from '../../components/admin/CreateModuleDialog.jsx'
 import WorkerModuleAssignmentDialog from '../../components/WorkerModuleAssignmentDialog.jsx'
 import { fetchProjectModules } from '../../utils/modules.js'
 import { DEFAULT_MAP_ZOOM, DEFAULT_PROJECT_LOCATION } from '../../constants/location.js'
-import { getInspectionHistoryByProject } from '../../utils/inspectionStorage.js'
+import { fetchProjectInspectionRecords } from '../../utils/inspections.js'
 
 export default function Projects() {
   const theme = useTheme()
@@ -85,6 +85,8 @@ export default function Projects() {
   const [inspectionsLoading, setInspectionsLoading] = useState(false)
   const [inspectionTemplates, setInspectionTemplates] = useState([])
   const [inspectionHistory, setInspectionHistory] = useState([])
+  const [inspectionHistoryLoading, setInspectionHistoryLoading] = useState(false)
+  const [inspectionHistoryError, setInspectionHistoryError] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false)
   const [inspectionToDeactivate, setInspectionToDeactivate] = useState(null)
@@ -138,18 +140,30 @@ export default function Projects() {
     if (!projectId) {
       setInspections([])
       setInspectionHistory([])
+      setInspectionHistoryError('')
+      setInspectionHistoryLoading(false)
       return
     }
     setInspectionsLoading(true)
+    setInspectionHistoryLoading(true)
+    setInspectionHistoryError('')
     try {
       const resp = await api.get(`/projects/${projectId}/inspections`)
       setInspections(resp.data?.inspections || [])
-      setInspectionHistory(getInspectionHistoryByProject(projectId))
     } catch {
       setInspections([])
-      setInspectionHistory([])
     } finally {
       setInspectionsLoading(false)
+    }
+
+    try {
+      const records = await fetchProjectInspectionRecords(projectId)
+      setInspectionHistory(records)
+    } catch (err) {
+      setInspectionHistory([])
+      setInspectionHistoryError(err?.response?.data?.error || 'Unable to load inspection history.')
+    } finally {
+      setInspectionHistoryLoading(false)
     }
   }
 
@@ -202,6 +216,8 @@ export default function Projects() {
       setModules([])
       setInspections([])
       setInspectionHistory([])
+      setInspectionHistoryError('')
+      setInspectionHistoryLoading(false)
       navigate('/admin/projects', { replace: true })
     }
   }
@@ -758,7 +774,17 @@ export default function Projects() {
                     </Stack>
                   )}
                   <Typography variant="h6" sx={{ mt: 3, fontWeight: 600 }}>Inspection history</Typography>
-                  {inspectionHistory.length ? (
+                  {inspectionHistoryError && (
+                    <Alert severity="error" sx={{ mt: 1 }}>
+                      {inspectionHistoryError}
+                    </Alert>
+                  )}
+                  {inspectionHistoryLoading && (
+                    <Alert severity="info" sx={{ mt: 1 }}>
+                      Loading inspection history...
+                    </Alert>
+                  )}
+                  {!inspectionHistoryLoading && !inspectionHistoryError && inspectionHistory.length > 0 ? (
                     <Table component={Paper} size="small" sx={{ mt: 1 }}>
                       <TableHead>
                         <TableRow>
@@ -766,23 +792,37 @@ export default function Projects() {
                           <TableCell>Executed by</TableCell>
                           <TableCell>Date</TableCell>
                           <TableCell>Status</TableCell>
+                          <TableCell align="right">Action</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {inspectionHistory.map((entry) => (
-                          <TableRow key={`${entry.executionId || entry.projectInspectionId}-${entry.submittedAt}`}>
-                            <TableCell>{entry.templateName || 'Inspection'}</TableCell>
-                            <TableCell>{entry.executedByName || 'User'}</TableCell>
+                          <TableRow key={entry.id}>
+                            <TableCell>{entry.template?.name || 'Inspection template'}</TableCell>
+                            <TableCell>
+                              <Typography variant="body2">{entry.executedBy?.name || 'User'}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {entry.executedBy?.role || ''}
+                              </Typography>
+                            </TableCell>
                             <TableCell>{entry.submittedAt ? new Date(entry.submittedAt).toLocaleString() : '—'}</TableCell>
                             <TableCell>
-                              <Chip label="Submitted" color="success" size="small" />
+                              <Chip label={entry.status || 'submitted'} color="success" size="small" variant="outlined" />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Button size="small" onClick={() => navigate(`/inspection-records/${entry.id}`)}>
+                                View
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                  ) : (
-                    <Alert severity="info" sx={{ mt: 1 }}>No inspections submitted yet.</Alert>
+                  ) : null}
+                  {!inspectionHistoryLoading && !inspectionHistoryError && inspectionHistory.length === 0 && (
+                    <Alert severity="info" sx={{ mt: 1 }}>
+                      No inspections submitted yet.
+                    </Alert>
                   )}
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
                     Use the workspace to activate templates or launch new inspections. Review history is read-only in v1.
