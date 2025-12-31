@@ -99,6 +99,7 @@ export default function ProjectMapEditor({
   onLocationChange,
   onZoomChange,
   onPointsChange,
+  isVisible = true,
 }) {
   const safeLocation = typeof location?.lat === 'number' && typeof location?.lng === 'number'
     ? location
@@ -134,6 +135,14 @@ export default function ProjectMapEditor({
       clearTimeout(timer)
     }
   }, [mapReady])
+
+  React.useEffect(() => {
+    if (!mapReady || !isVisible) return undefined
+    const map = mapInstanceRef.current
+    if (!map) return undefined
+    const timer = setTimeout(() => map.invalidateSize(), 150)
+    return () => clearTimeout(timer)
+  }, [isVisible, mapReady])
 
 
   const getPoiIcon = (color) => {
@@ -408,4 +417,5 @@ ProjectMapEditor.propTypes = {
   onLocationChange: PropTypes.func,
   onZoomChange: PropTypes.func,
   onPointsChange: PropTypes.func,
+  isVisible: PropTypes.bool,
 }

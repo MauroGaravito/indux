@@ -634,6 +634,7 @@ export default function Projects() {
                           value={projectForm}
                           onChange={(val) => setProjectForm(val)}
                           onOpenFullMap={selectedId ? () => navigate(`/admin/projects/${selectedId}/location`) : undefined}
+                          isVisible={sectionTab === 1}
                         />
                       </CardContent>
                     </Card>
