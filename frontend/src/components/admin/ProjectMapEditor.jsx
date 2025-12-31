@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react'
+import React, { useMemo, useRef, useEffect } from 'react'
 import PropTypes from 'prop-types'
 import { Box, Button, Card, CardContent, IconButton, Menu, MenuItem, Stack, TextField, Tooltip, Typography } from '@mui/material'
 import AddLocationAltIcon from '@mui/icons-material/AddLocationAlt'
@@ -111,6 +111,8 @@ export default function ProjectMapEditor({
 
   const markerIcon = useMemo(() => defaultMainIcon, [])
   const poiIconCache = useRef(new Map())
+  const mapWrapperRef = useRef(null)
+  const mapInstanceRef = useRef(null)
   const [colorMenu, setColorMenu] = React.useState({ anchorEl: null, index: -1 })
 
   const getPoiIcon = (color) => {
@@ -204,8 +206,11 @@ export default function ProjectMapEditor({
               </Stack>
             )}
           </Stack>
-          <Box sx={{ height: 360, width: '100%', borderRadius: 2, overflow: 'hidden' }}>
+          <Box ref={mapWrapperRef} sx={{ height: 360, width: '100%', borderRadius: 2, overflow: 'hidden' }}>
             <MapContainer
+              whenCreated={(instance) => {
+                mapInstanceRef.current = instance
+              }}
               center={[safeLocation.lat, safeLocation.lng]}
               zoom={safeZoom}
               scrollWheelZoom
@@ -382,3 +387,23 @@ ProjectMapEditor.propTypes = {
   onZoomChange: PropTypes.func,
   onPointsChange: PropTypes.func,
 }
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    const wrapper = mapWrapperRef.current
+    if (!map || !wrapper || typeof ResizeObserver === 'undefined') {
+      // As a fallback, schedule a size invalidation after paint.
+      if (map) {
+        const timer = setTimeout(() => map.invalidateSize(), 100)
+        return () => clearTimeout(timer)
+      }
+      return undefined
+    }
+    // Leaflet only measures size on mount, so re-run whenever the container resizes (e.g. when tabs become visible).
+    const observer = new ResizeObserver(() => map.invalidateSize())
+    observer.observe(wrapper)
+    const timer = setTimeout(() => map.invalidateSize(), 100)
+    return () => {
+      observer.disconnect()
+      clearTimeout(timer)
+    }
+  }, [])
