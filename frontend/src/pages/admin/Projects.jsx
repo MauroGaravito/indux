@@ -61,7 +61,8 @@ export default function Projects() {
     description: '',
     address: '',
     status: 'draft',
-    location: { ...DEFAULT_PROJECT_LOCATION },
+    location: null, // keep empty until the user explicitly sets a map point
+    locationLabel: '',
     mapZoom: DEFAULT_MAP_ZOOM,
     pointsOfInterest: [],
   })
@@ -204,7 +205,8 @@ export default function Projects() {
         location:
           p.location && typeof p.location.lat === 'number' && typeof p.location.lng === 'number'
             ? p.location
-            : { ...DEFAULT_PROJECT_LOCATION },
+            : null,
+        locationLabel: p.locationLabel || '',
         mapZoom: typeof p.mapZoom === 'number' ? p.mapZoom : DEFAULT_MAP_ZOOM,
         pointsOfInterest: Array.isArray(p.pointsOfInterest) ? p.pointsOfInterest : [],
       })
@@ -227,7 +229,8 @@ export default function Projects() {
     await api.post('/projects', {
       name: newProject.name,
       description: newProject.description,
-      location: { ...DEFAULT_PROJECT_LOCATION },
+      location: null,
+      locationLabel: '',
       mapZoom: DEFAULT_MAP_ZOOM,
       pointsOfInterest: [],
     })
@@ -436,19 +439,30 @@ export default function Projects() {
     })
   }, [inspections, inspectionTemplateMap])
 
-  const formattedLocation =
-    projectForm.location && typeof projectForm.location.lat === 'number' && typeof projectForm.location.lng === 'number'
-      ? `${projectForm.location.lat.toFixed(4)}, ${projectForm.location.lng.toFixed(4)}`
+  // Summary must reflect persisted state, so derive it from the selected project fetched from the API.
+  const selectedProject = useMemo(
+    () => projects.find((p) => p._id === selectedId) || null,
+    [projects, selectedId]
+  )
+
+  const persistedLocationText =
+    selectedProject?.location && typeof selectedProject.location.lat === 'number' && typeof selectedProject.location.lng === 'number'
+      ? `${selectedProject.location.lat.toFixed(4)}, ${selectedProject.location.lng.toFixed(4)}`
       : 'Not set'
-  const poiCount = Array.isArray(projectForm.pointsOfInterest) ? projectForm.pointsOfInterest.length : 0
+  const locationDescriptor =
+    (selectedProject?.locationLabel && selectedProject.locationLabel.trim()) ||
+    (selectedProject?.address && selectedProject.address.trim()) ||
+    'Not set'
+  const poiCount = Array.isArray(selectedProject?.pointsOfInterest) ? selectedProject.pointsOfInterest.length : 0
   const approvedModules = modules.filter((m) => m.reviewStatus === 'approved').length
   const pendingModules = modules.length - approvedModules
   const activeInspections = inspections.length
   const summaryItems = [
-    { label: 'Project name', value: projectForm.name || 'Untitled project' },
-    { label: 'Address', value: projectForm.address || 'Not provided' },
-    { label: 'Location', value: formattedLocation },
-    { label: 'Default zoom', value: projectForm.mapZoom || DEFAULT_MAP_ZOOM },
+    { label: 'Project name', value: selectedProject?.name || 'Untitled project' },
+    { label: 'Address', value: selectedProject?.address || 'Not provided' },
+    { label: 'Location label', value: locationDescriptor },
+    { label: 'Location', value: persistedLocationText },
+    { label: 'Default zoom', value: typeof selectedProject?.mapZoom === 'number' ? selectedProject.mapZoom : DEFAULT_MAP_ZOOM },
     { label: 'Points of interest', value: poiCount },
   ]
 

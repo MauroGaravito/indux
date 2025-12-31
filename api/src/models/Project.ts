@@ -9,12 +9,13 @@ export interface IProject extends Document {
   name: string;
   description?: string;
   address?: string;
+  locationLabel?: string;
   managers: Types.ObjectId[];
   status: ProjectStatus;
-  location: {
+  location?: {
     lat: number;
     lng: number;
-  };
+  } | null;
   mapZoom?: number;
   pointsOfInterest: {
     label: string;
@@ -33,11 +34,12 @@ const ProjectSchema = new Schema<IProject>(
     name: { type: String, required: true, trim: true },
     description: { type: String, default: '' },
     address: { type: String },
+    locationLabel: { type: String, default: '' }, // optional human-readable descriptor
     managers: { type: [Schema.Types.ObjectId], ref: 'User', default: [] },
     location: {
-      lat: { type: Number, required: true },
-      lng: { type: Number, required: true },
-    },
+      lat: { type: Number },
+      lng: { type: Number },
+    }, // coordinates stay optional until saved explicitly
     mapZoom: { type: Number, min: 1, max: 22, default: DEFAULT_MAP_ZOOM },
     pointsOfInterest: {
       type: [

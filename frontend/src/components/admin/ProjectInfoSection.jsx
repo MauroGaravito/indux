@@ -62,6 +62,15 @@ export default function ProjectInfoSection({ value, onChange, onOpenFullMap }) {
             />
           </Grid>
           <Grid item xs={12}>
+            <TextField
+              fullWidth
+              label="Location label (optional)"
+              value={v.locationLabel || ''}
+              onChange={(e) => set('locationLabel', e.target.value)}
+              helperText="Human-friendly descriptor used in summaries."
+            />
+          </Grid>
+          <Grid item xs={12}>
             <TextField select fullWidth label="Status" value={v.status || 'draft'} onChange={(e) => set('status', e.target.value)}>
               <MenuItem value="draft">Draft</MenuItem>
               <MenuItem value="active">Active</MenuItem>

@@ -12,6 +12,7 @@ const CoordinateSchema = z.object({
   lat: z.number(),
   lng: z.number(),
 });
+const NullableCoordinateSchema = CoordinateSchema.nullable(); // coordinates can stay null until user sets them
 
 const PointOfInterestSchema = z.object({
   label: z.string().min(1),
@@ -24,8 +25,9 @@ export const ProjectCreateSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   address: z.string().optional(),
+  locationLabel: z.string().optional(), // allow saving a user-friendly label
   managers: z.array(z.string()).default([]),
-  location: CoordinateSchema,
+  location: NullableCoordinateSchema.optional().default(null),
   mapZoom: z.number().min(1).max(22).default(DEFAULT_MAP_ZOOM),
   pointsOfInterest: z.array(PointOfInterestSchema).default([]),
   status: z.enum(['draft', 'active', 'archived']).default('draft'),
@@ -35,9 +37,10 @@ export const ProjectUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   address: z.string().optional(),
+  locationLabel: z.string().optional(),
   managers: z.array(z.string()).optional(),
   status: z.enum(['draft', 'active', 'archived']).optional(),
-  location: CoordinateSchema.optional(),
+  location: NullableCoordinateSchema.optional(),
   mapZoom: z.number().min(1).max(22).optional(),
   pointsOfInterest: z.array(PointOfInterestSchema).optional(),
 });
