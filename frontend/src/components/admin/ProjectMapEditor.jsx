@@ -115,6 +115,24 @@ export default function ProjectMapEditor({
   const mapInstanceRef = useRef(null)
   const [colorMenu, setColorMenu] = React.useState({ anchorEl: null, index: -1 })
 
+  React.useEffect(() => {
+    const map = mapInstanceRef.current
+    const wrapper = mapWrapperRef.current
+    if (!map || !wrapper) return undefined
+    if (typeof ResizeObserver === 'undefined') {
+      const timer = setTimeout(() => map.invalidateSize(), 100)
+      return () => clearTimeout(timer)
+    }
+    const observer = new ResizeObserver(() => map.invalidateSize())
+    observer.observe(wrapper)
+    const timer = setTimeout(() => map.invalidateSize(), 100)
+    return () => {
+      observer.disconnect()
+      clearTimeout(timer)
+    }
+  }, [])
+
+
   const getPoiIcon = (color) => {
     const key = normalizeColor(color)
     if (!poiIconCache.current.has(key)) {
@@ -387,23 +405,3 @@ ProjectMapEditor.propTypes = {
   onZoomChange: PropTypes.func,
   onPointsChange: PropTypes.func,
 }
-  React.useEffect(() => {
-    const map = mapInstanceRef.current
-    const wrapper = mapWrapperRef.current
-    if (!map || !wrapper || typeof ResizeObserver === 'undefined') {
-      // As a fallback, schedule a size invalidation after paint.
-      if (map) {
-        const timer = setTimeout(() => map.invalidateSize(), 100)
-        return () => clearTimeout(timer)
-      }
-      return undefined
-    }
-    // Leaflet only measures size on mount, so re-run whenever the container resizes (e.g. when tabs become visible).
-    const observer = new ResizeObserver(() => map.invalidateSize())
-    observer.observe(wrapper)
-    const timer = setTimeout(() => map.invalidateSize(), 100)
-    return () => {
-      observer.disconnect()
-      clearTimeout(timer)
-    }
-  }, [])
