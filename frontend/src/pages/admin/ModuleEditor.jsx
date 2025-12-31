@@ -22,6 +22,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Tooltip,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
@@ -86,6 +87,7 @@ export default function ModuleEditor({ mode = 'admin' }) {
   const isManagerMode = mode === 'manager';
   const isTemplateMode = mode === 'template';
   const moduleStatus = module?.reviewStatus || 'draft';
+  const modulePending = moduleStatus === 'pending';
   const managerEditableStatuses = ['draft', 'declined', 'pending'];
   const canEditModule = isTemplateMode ? true : (!isManagerMode || managerEditableStatuses.includes(moduleStatus));
   const isReadOnly = isTemplateMode ? false : (isManagerMode && !managerEditableStatuses.includes(moduleStatus));
@@ -117,7 +119,8 @@ export default function ModuleEditor({ mode = 'admin' }) {
   const bannerLabel = isPendingAdminApproval ? 'Pending admin approval' : isReadOnly ? 'Read-only Mode' : 'Manager Editing Mode';
   const BannerIcon = isReadOnly ? LockIcon : EditIcon;
   const readOnlyHelperText = 'Updates are disabled while the module is approved.';
-  const pendingHelperText = 'Module sent to admin. You can keep editing until it is approved.';
+  const pendingHelperText = 'Module awaiting admin review in Pending Approvals. Continue editing if needed, but click "Send module for review" again to update the request.';
+  const pendingInfoText = 'Module is awaiting admin review via Admin → Pending Approvals. Edits stay in draft until you resend the module for review.';
   const reviewActionLabel = isManagerMode ? 'Request admin approval' : 'Send module for review';
 
   const normalizeConfig = (cfg) => ({
@@ -362,10 +365,19 @@ export default function ModuleEditor({ mode = 'admin' }) {
     return errors;
   };
 
+  const [reviewResponseMsg, setReviewResponseMsg] = useState('');
+
+  useEffect(() => {
+    if (!modulePending) {
+      setReviewResponseMsg('');
+    }
+  }, [modulePending]);
+
   const sendForReview = async () => {
     if (!canEditModule) return;
     if (!moduleId) return;
     setSubmitError('');
+    setReviewResponseMsg('');
     const errors = validateBeforeReview();
     if (errors.length) {
       setValidationMessages(errors);
@@ -375,6 +387,7 @@ export default function ModuleEditor({ mode = 'admin' }) {
     try {
       await api.post(`/modules/${moduleId}/reviews`);
       await Promise.all([loadModuleDetails(moduleId), loadReviews(moduleId)]);
+      setReviewResponseMsg('Module sent for review. Approval happens via Admin → Pending Approvals. Keep editing if needed, but remember to resend.');
     } catch (e) {
       const msg = e?.response?.data?.error || e?.message || 'Failed to send for review';
       setSubmitError(typeof msg === 'string' ? msg : 'Failed to send for review');
@@ -498,6 +511,16 @@ export default function ModuleEditor({ mode = 'admin' }) {
               {typeof submitError === 'string' ? submitError : 'Unexpected error'}
             </Alert>
           )}
+          {reviewResponseMsg && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {reviewResponseMsg}
+            </Alert>
+          )}
+          {modulePending && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              {pendingInfoText}
+            </Alert>
+          )}
           <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
             <Button startIcon={<ArrowBackIcon />} component={RouterLink} to={mode === 'manager' ? '/manager/projects' : '/admin/projects'}>Back to projects</Button>
           <Typography variant="h6">Induction module configuration</Typography>
@@ -509,7 +532,19 @@ export default function ModuleEditor({ mode = 'admin' }) {
             {showActions && (
               <>
                 <AsyncButton startIcon={<SaveIcon />} variant="outlined" onClick={saveModule}>Save changes</AsyncButton>
-                <AsyncButton startIcon={<SendIcon />} variant="contained" color="secondary" onClick={sendForReview}>{reviewActionLabel}</AsyncButton>
+                <Tooltip title={modulePending ? 'Module already pending admin approval. Approve/decline via Pending Approvals.' : ''}>
+                  <span>
+                    <AsyncButton
+                      startIcon={<SendIcon />}
+                      variant="contained"
+                      color="secondary"
+                      onClick={sendForReview}
+                      disabled={modulePending}
+                    >
+                      {reviewActionLabel}
+                    </AsyncButton>
+                  </span>
+                </Tooltip>
               </>
             )}
           </Stack>

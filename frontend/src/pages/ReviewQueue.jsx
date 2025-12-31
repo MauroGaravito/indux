@@ -226,6 +226,9 @@ export default function ReviewQueue() {
       {tab === 1 && (
         <Paper sx={{ p: 2 }}>
           <Typography variant="subtitle1" sx={{ mb: 1 }}>Induction module review requests</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Modules appear here after an admin or manager clicks “Send module for review” in the module editor. Only admins can approve or decline them.
+          </Typography>
           <Table size="small">
             <TableHead>
               <TableRow>
