@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Alert,
   Box,
@@ -13,6 +13,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material'
+import { presignGet } from '../../utils/upload.js'
 
 export function StatusChip({ status }) {
   const color = status === 'approved' ? 'success' : status === 'declined' ? 'error' : 'default'
@@ -53,7 +54,7 @@ export function SubmissionDetails({ submission }) {
           <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>Personal details</Typography>
           <Stack spacing={1}>
             {payloadEntries.map(([key, value]) => (
-              <InfoRow key={key} label={key} value={typeof value === 'object' ? JSON.stringify(value) : String(value)} />
+              <SubmissionPayloadRow key={key} label={key} value={value} />
             ))}
           </Stack>
         </Paper>
@@ -161,6 +162,60 @@ export function ModuleReviewDetails({ review }) {
             </TableBody>
           </Table>
         </Paper>
+      )}
+    </Stack>
+  )
+}
+
+const isWorkerUploadKey = (value) => typeof value === 'string' && value.startsWith('worker-uploads/')
+
+function SubmissionPayloadRow({ label, value }) {
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [loading, setLoading] = useState(false)
+  const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '')
+  const isUpload = isWorkerUploadKey(value)
+
+  useEffect(() => {
+    if (!isUpload) {
+      setPreviewUrl('')
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    presignGet(value)
+      .then(({ url }) => {
+        if (!cancelled) setPreviewUrl(url || '')
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewUrl('')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isUpload, value])
+
+  return (
+    <Stack direction="row" spacing={1} alignItems="center">
+      <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 140 }}>{label}</Typography>
+      {isUpload ? (
+        previewUrl ? (
+          <Box
+            component="img"
+            src={previewUrl}
+            alt={label}
+            sx={{ width: 160, height: 160, objectFit: 'cover', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}
+          />
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            {loading ? 'Loading preview…' : stringValue || '-'}
+          </Typography>
+        )
+      ) : (
+        <Typography variant="body2" color="text.secondary">{stringValue || '-'}</Typography>
       )}
     </Stack>
   )
