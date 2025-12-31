@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect } from 'react'
+import React, { useMemo, useRef } from 'react'
 import PropTypes from 'prop-types'
 import { Box, Button, Card, CardContent, IconButton, Menu, MenuItem, Stack, TextField, Tooltip, Typography } from '@mui/material'
 import AddLocationAltIcon from '@mui/icons-material/AddLocationAlt'
@@ -387,7 +387,7 @@ ProjectMapEditor.propTypes = {
   onZoomChange: PropTypes.func,
   onPointsChange: PropTypes.func,
 }
-  useEffect(() => {
+  React.useEffect(() => {
     const map = mapInstanceRef.current
     const wrapper = mapWrapperRef.current
     if (!map || !wrapper || typeof ResizeObserver === 'undefined') {
