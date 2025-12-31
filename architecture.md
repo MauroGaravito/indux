@@ -195,7 +195,7 @@ Managers retain edit access for states `draft`, `pending`, and `declined`; only 
 
 ### Submission Lifecycle & Certificates
 - **Pending** – Worker submission stored; new pending submissions overwrite the existing record to avoid data loss.
-- **Approved** – Certificate generated (`certs/{projectId}/{moduleId}/{submissionId}.pdf`) and stored in MinIO. Worker sees “Induction approved” and can download immediately.
+- **Approved** – Certificate generated (`certs/{projectId}/{moduleId}/{submissionId}.pdf`) and stored in MinIO. Worker sees “Induction approved” and can download immediately. Certificates are rendered in PDFKit with a decorative border, headline, worker/project/module metadata, issue date, and a signature block for on-site validation.
 - **Declined** – Submission carries a decline reason; worker resubmits via the wizard.
 
 Managers assigned to the project can approve or decline submissions directly (admins continue to have override access). Module approvals, however, remain restricted to admins.
@@ -213,6 +213,7 @@ Managers assigned to the project can approve or decline submissions directly (ad
 - **Presigned GET** (`POST /uploads/presign-get`) – Validates that the requester owns the file via module or submission context before issuing a download URL.
 - **Streaming** (`GET /uploads/stream`) – Streams objects via the API after the same ownership checks, helping browsers preview files without exposing public URLs.
 - **Storage Layout** – Slides, thumbnails, maps, worker uploads, and certificates each have dedicated prefixes; certificates follow `certs/{project}/{module}/{submission}.pdf`.
+  - Certificates are A4 documents rendered via PDFKit with a branded border, descriptive paragraph, and signature area for the Indux platform.
 
 ### Photo Capture & Retrieval
 - `photo` fields set `accept="image/*"` and `capture="environment"` so phones open the rear camera while desktop users get the webcam/file picker.
@@ -224,6 +225,14 @@ Managers assigned to the project can approve or decline submissions directly (ad
 2. Generates a PDF via `services/pdf.ts` with worker name, project name, and module type.
 3. Stores it in MinIO and saves `certificateKey` on the submission.
 4. Workers access certificates through history or the wizard once approval is complete.
+
+### Regenerating Legacy Certificates
+Existing certificates are not re-rendered automatically. To apply the latest layout to historical approvals, run:
+```
+cd api
+npx ts-node src/scripts/regenerateCertificates.ts
+```
+The script reloads each approved submission, rebuilds the PDF with the current template, and uploads it back to the same MinIO key.
 
 ## Security Model
 1. **Assignment Enforcement** – All manager/worker routes check assignments (`Assignment.findOne`). Examples: module GET/PUT, reviews, submissions, team management, uploads.

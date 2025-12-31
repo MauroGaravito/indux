@@ -82,3 +82,7 @@
 3. El Project Summary ahora solo lee del proyecto persistido, evitando que ediciones no guardadas aparezcan como definitivas; README y `architecture.md` documentan el nuevo flujo.
 ## 30 December 2025
 1. Documentamos en README/architecture que los proyectos arrancan sin coordenadas, que el Project Summary solo refleja el snapshot guardado y que el tab Setup muestra un warning cuando la ubicación draft difiere del valor persistido (los cambios siguen dependiendo de Save project).
+
+## 31 December 2025
+1. Rediseñamos el certificado PDF del worker (borde, branding, bloque de detalles, sección de firma) y añadimos el script `npx ts-node src/scripts/regenerateCertificates.ts` para reemitir certificados existentes si hace falta.
+2. `SubmissionDetails` ahora muestra las fotos de payload y la firma del worker con un layout más prolijo.

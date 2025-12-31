@@ -120,7 +120,7 @@ See `architecture.md` for the full endpoint catalogue.
 - **Induction Wizard** - Guided worker experience across project selection, personal data (with conditional fields), uploads, slides viewer, quiz, signature, and submission. Photo fields open the camera, upload to MinIO via the same presigned pipeline, and render a thumbnail preview for confidence.
 - **Inspection Wizard** - Mirrors the Induction Wizard structure with a stepper spanning Context, Checklist, Summary, Signature, and Submit. It enforces POI/signature requirements, item-level validation (photo/notes/corrective action/risk), and submit confirmation. The same component now renders a read-only audit mode that presents the template snapshot, checklist decisions, notes, corrective actions, attached photos (with secure download), POI, signature, and metadata once a record is submitted.
 - **Inspection Records** - Admin console view with filters (project, user, template, date range), the manager Project → Inspections → History table, and the worker dashboard "Completed inspections" list. Each row links into the read-only Inspection Wizard to keep evidence immutable even if templates evolve later.
-- **History & Certificates** - Secure record of submissions with certificate downloads.
+- **History & Certificates** - Secure record of submissions with certificate downloads. Each approval now issues an A4 certificate with Indux branding, worker/project/module details, and signature lines so workers can present a professional document on site.
 
 ## Tech Stack
 - **Backend** - Node.js 18+, Express, TypeScript, Mongoose, JWT authentication.
