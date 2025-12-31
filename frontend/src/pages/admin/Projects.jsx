@@ -457,6 +457,13 @@ export default function Projects() {
   const approvedModules = modules.filter((m) => m.reviewStatus === 'approved').length
   const pendingModules = modules.length - approvedModules
   const activeInspections = inspections.length
+  const locationsEqual = (a, b) => {
+    const hasCoords = (loc) => typeof loc?.lat === 'number' && typeof loc?.lng === 'number'
+    if (!hasCoords(a) && !hasCoords(b)) return true
+    if (!hasCoords(a) || !hasCoords(b)) return false
+    return Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6
+  }
+  const locationChanged = !locationsEqual(projectForm.location, selectedProject?.location)
   const summaryItems = [
     { label: 'Project name', value: selectedProject?.name || 'Untitled project' },
     { label: 'Address', value: selectedProject?.address || 'Not provided' },
@@ -635,6 +642,7 @@ export default function Projects() {
                           onChange={(val) => setProjectForm(val)}
                           onOpenFullMap={selectedId ? () => navigate(`/admin/projects/${selectedId}/location`) : undefined}
                           isVisible={sectionTab === 1}
+                          locationChanged={locationChanged}
                         />
                       </CardContent>
                     </Card>

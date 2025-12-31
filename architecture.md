@@ -5,7 +5,7 @@ This document is the single source of truth for repository layout, data models, 
 ## Repository Layout
 ```
 
-Project geography is managed via Leaflet + OpenStreetMap. The Admin Project Info panel supports click-to-set coordinates, drag-to-move Points of Interest, pick custom marker colours from a palette, adjust a default zoom level, and a CTA to open the full-screen map editor (`/admin/projects/:projectId/location`) for precise adjustments. Location, zoom, and coloured POI data surface across dashboards (manager/worker) so crews see both textual addresses and coordinates.
+Project geography is managed via Leaflet + OpenStreetMap. The Admin Project Info panel supports entering a human-readable `locationLabel`, click-to-set coordinates (which remain null until explicitly saved), drag-to-move Points of Interest, pick custom marker colours from a palette, adjust a default zoom level, and a CTA to open the full-screen map editor (`/admin/projects/:projectId/location`) for precise adjustments. Location, zoom, and coloured POI data surface across dashboards (manager/worker) so crews see both textual descriptors and coordinates, and the Setup tab shows a warning whenever the draft map position diverges from the last persisted snapshot.
 /api                  Express + TypeScript backend (Node 18)
 /frontend             React + Vite frontend (Material UI, Zustand)
 /docs                 Additional documentation
@@ -14,10 +14,10 @@ docker-compose.yml    Orchestrates API, frontend, MongoDB, MinIO
 ```
 
 ## Data Architecture
-Projects store location metadata (Leaflet coordinates, default zoom, and colour-coded POIs) and host both induction modules and project inspections. Assignments link users to projects with optional per-module restrictions, while templates provide reusable blueprints for both inductions and inspections.
+Projects store location metadata (optional location label, Leaflet coordinates captured only after the map is saved, default zoom, and colour-coded POIs) and host both induction modules and project inspections. Assignments link users to projects with optional per-module restrictions, while templates provide reusable blueprints for both inductions and inspections.
 
 ### Models
-- **Project** - `{ _id, name, description, address?, status (draft|active|archived), location: { lat, lng }, mapZoom (1-22), pointsOfInterest: [{ label, lat, lng, color }], createdBy?, updatedBy?, createdAt, updatedAt }`.
+- **Project** - `{ _id, name, description, address?, locationLabel?, status (draft|active|archived), location?: { lat, lng } | null, mapZoom (1-22), pointsOfInterest: [{ label, lat, lng, color }], createdBy?, updatedBy?, createdAt, updatedAt }`.
 - **InductionModule** - `{ _id, projectId, type: 'induction', name?, description?, reviewStatus (draft|pending|approved|declined), config { steps, slides[{ key, title?, fileKey, thumbKey?, order }], quiz{ questions[{ question, options[], answerIndex }] }, settings{ passMark, randomizeQuestions, allowRetry } }, createdBy?, updatedBy?, timestamps }`.
 - **InductionModuleField** - `{ _id, moduleId, key, label, type(text|number|date|select|file|photo|textarea|boolean), required, order, step, options?, visibleIf? }`.
 - **ModuleReview** - `{ _id, moduleId, projectId, type: 'induction', data snapshot, status (pending|approved|declined), reason?, requestedBy, reviewedBy?, timestamps }`.
@@ -160,7 +160,7 @@ Assignments (`user`, `project`, `role`) enforce the scope. Admins bypass these c
 
 ### Admin Flow
 1. **Create Project** - Admin UI or `POST /projects`.
-   - Project edits allow admins/managers to set the default map zoom, recolour POIs from the palette, and open the full-screen map editor; values flow through manager/worker dashboards and the worker map experiences.
+   - Project edits allow admins/managers to set the default map zoom, recolour POIs from the palette, capture a location label, and open the full-screen map editor; values flow through manager/worker dashboards and the worker map experiences. The Project Summary card reads from the last persisted version so unsaved edits never appear until stored, and the Setup tab warns when the draft map differs from that snapshot to remind users that **Save project** is required.
 2. **Seed Induction Modules** - `POST /projects/:projectId/modules/induction` using the creation dialog (blank or clone from template). Cloned modules automatically copy config + fields.
 3. **Configure Content** - Module Editor (admin mode) updates fields, slides, quiz, and settings while the module is draft. Admin Projects also allows deleting unused modules; removal cascades through reviews and submissions automatically.
 4. **Assign Managers & Workers** - Admin Projects provides dedicated tabs for both roles; `POST /assignments` seeds manager/worker links so managers can see their pool and workers can access the wizard. Admins can also open the per-worker module dialog here to restrict which modules each worker must complete.

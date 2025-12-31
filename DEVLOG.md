@@ -1,4 +1,4 @@
-ï»¿# Dev Log - INDUX
+# Dev Log - INDUX
 
 ## 23 November 2025 (AM)
 1. Tightened permission checks so managers can only approve/decline modules and submissions for projects where they hold an assignment.
@@ -65,13 +65,20 @@
 4. Updated README, `architecture.md`, and other docs to describe inspection workflows, seeded templates, project activation, and the worker-facing wizard so onboarding stays accurate.
 
 ## 27 December 2025
-1. Closed **Inspection Module v1** from a UX perspective: dashboards (manager/worker) now muestran cada inspecciÃ³n activada, su estado (Not started/In progress/Completed) y botones para ejecutar o ver el `InspectionWizard` en modo lectura tras el submit.
-2. El wizard registra cada envÃ­o como evidencia WHS (sin revisiÃ³n): `Submit` bloquea la inspecciÃ³n, actualiza el historial local y actualiza los estados en los dashboards.
-3. La pestaÃ±a **Project â†’ Inspections** incorpora un historial read-only con las ejecuciones enviadas (fecha, usuario, estado Submitted) mÃ¡s controles para activar/desactivar plantillas.
-4. DocumentaciÃ³n actualizada (`README`, `architecture.md`) con la secciÃ³n "Inspection Workflow (v1)" que deja claro que el backend estÃ¡ completo, que manager/worker son los ejecutores y que no existe revisiÃ³n/aprobaciÃ³n en esta versiÃ³n (se planifica para una fase futura).
+1. Closed **Inspection Module v1** from a UX perspective: dashboards (manager/worker) now muestran cada inspección activada, su estado (Not started/In progress/Completed) y botones para ejecutar o ver el `InspectionWizard` en modo lectura tras el submit.
+2. El wizard registra cada envío como evidencia WHS (sin revisión): `Submit` bloquea la inspección, actualiza el historial local y actualiza los estados en los dashboards.
+3. La pestaña **Project ? Inspections** incorpora un historial read-only con las ejecuciones enviadas (fecha, usuario, estado Submitted) más controles para activar/desactivar plantillas.
+4. Documentación actualizada (`README`, `architecture.md`) con la sección "Inspection Workflow (v1)" que deja claro que el backend está completo, que manager/worker son los ejecutores y que no existe revisión/aprobación en esta versión (se planifica para una fase futura).
 
 ## 28 December 2025
-1. ConfirmÃ© que `InspectionExecution` almacena `templateId` y `executedByRole`, aÃ±adÃ­ Ã­ndices de auditorÃ­a y dejÃ© expuestos los endpoints read-only (`GET /inspection-records`, `/projects/:projectId/inspection-records`, `/my/inspection-records`, `/inspection-records/:id`) para Admin, Manager y Worker.
-2. PubliquÃ© **Admin â†’ Inspection Records** con filtros por proyecto/usuario/plantilla/rango de fechas, tabla estilo MUI y botÃ³n **View** que abre el `InspectionWizard` en modo `readOnly`.
-3. AÃ±adÃ­ el historial por proyecto (Project â†’ Inspections â†’ History) y la tabla "Completed inspections" en el dashboard del worker, ambos alimentados por los nuevos endpoints y enlazados al wizard en modo auditorÃ­a (snapshot, checklist, fotos con presign, firma, POI, metadatos).
-4. ExtendÃ­ `InspectionWizard` con `mode="readOnly"` para reutilizar el mismo layout como visor de auditorÃ­a, y actualicÃ© `README.md` + `architecture.md` + `DEVLOG.md` para dejar marcado que el Inspection Module v1 queda cerrado y audit-ready.
+1. Confirmé que `InspectionExecution` almacena `templateId` y `executedByRole`, añadí índices de auditoría y dejé expuestos los endpoints read-only (`GET /inspection-records`, `/projects/:projectId/inspection-records`, `/my/inspection-records`, `/inspection-records/:id`) para Admin, Manager y Worker.
+2. Publiqué **Admin ? Inspection Records** con filtros por proyecto/usuario/plantilla/rango de fechas, tabla estilo MUI y botón **View** que abre el `InspectionWizard` en modo `readOnly`.
+3. Añadí el historial por proyecto (Project ? Inspections ? History) y la tabla "Completed inspections" en el dashboard del worker, ambos alimentados por los nuevos endpoints y enlazados al wizard en modo auditoría (snapshot, checklist, fotos con presign, firma, POI, metadatos).
+4. Extendí `InspectionWizard` con `mode="readOnly"` para reutilizar el mismo layout como visor de auditoría, y actualicé `README.md` + `architecture.md` + `DEVLOG.md` para dejar marcado que el Inspection Module v1 queda cerrado y audit-ready.
+
+## 29 December 2025
+1. Eliminamos las coordenadas semilla al crear proyectos nuevos: `location` comienza en `null` hasta que alguien guarda el mapa y los validadores backend ahora aceptan esa ausencia sin romper PUT heredados.
+2. Agregamos el campo opcional `locationLabel` al modelo/API/UI para describir la ubicación en texto plano y lo mostramos junto a las coordenadas dentro del Project Summary.
+3. El Project Summary ahora solo lee del proyecto persistido, evitando que ediciones no guardadas aparezcan como definitivas; README y `architecture.md` documentan el nuevo flujo.
+## 30 December 2025
+1. Documentamos en README/architecture que los proyectos arrancan sin coordenadas, que el Project Summary solo refleja el snapshot guardado y que el tab Setup muestra un warning cuando la ubicación draft difiere del valor persistido (los cambios siguen dependiendo de Save project).

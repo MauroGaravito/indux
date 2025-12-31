@@ -147,7 +147,7 @@ export default function AdminConsole() {
         </TextField>
         {selectedId && (
           <Stack spacing={3} sx={{ mt:2 }}>
-            <ProjectInfoSection value={projectForm} onChange={setProjectForm} />
+            <ProjectInfoSection value={projectForm} onChange={setProjectForm} locationChanged={false} />
             <Divider />
             <PersonalDetailsSection fields={fields} onChange={setFields} />
             <Divider />

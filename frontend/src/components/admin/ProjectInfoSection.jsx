@@ -1,6 +1,7 @@
 import React from 'react'
 import PropTypes from 'prop-types'
 import {
+  Alert,
   Button,
   Card,
   CardHeader,
@@ -17,7 +18,7 @@ import FullscreenIcon from '@mui/icons-material/Fullscreen'
 import ProjectMapEditor from './ProjectMapEditor.jsx'
 import { DEFAULT_MAP_ZOOM, DEFAULT_PROJECT_LOCATION } from '../../constants/location.js'
 
-export default function ProjectInfoSection({ value, onChange, onOpenFullMap, isVisible = true }) {
+export default function ProjectInfoSection({ value, onChange, onOpenFullMap, isVisible = true, locationChanged = false }) {
   const v = value || {}
   const set = (k, val) => onChange({ ...v, [k]: val })
   const theme = useTheme()
@@ -110,6 +111,11 @@ export default function ProjectInfoSection({ value, onChange, onOpenFullMap, isV
               onPointsChange={(points) => set('pointsOfInterest', points)}
               isVisible={isVisible}
             />
+            {locationChanged && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                Main location changed. Select <strong>Save project</strong> to confirm or leave this page to keep the previous coordinates.
+              </Alert>
+            )}
           </Grid>
         </Grid>
       </CardContent>
@@ -122,4 +128,5 @@ ProjectInfoSection.propTypes = {
   onChange: PropTypes.func.isRequired,
   onOpenFullMap: PropTypes.func,
   isVisible: PropTypes.bool,
+  locationChanged: PropTypes.bool,
 }
