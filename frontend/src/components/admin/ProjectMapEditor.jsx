@@ -114,23 +114,26 @@ export default function ProjectMapEditor({
   const mapWrapperRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const [colorMenu, setColorMenu] = React.useState({ anchorEl: null, index: -1 })
+  const [mapReady, setMapReady] = React.useState(false)
 
   React.useEffect(() => {
+    if (!mapReady) return undefined
     const map = mapInstanceRef.current
     const wrapper = mapWrapperRef.current
     if (!map || !wrapper) return undefined
+    const invalidate = () => map.invalidateSize()
     if (typeof ResizeObserver === 'undefined') {
-      const timer = setTimeout(() => map.invalidateSize(), 100)
+      const timer = setTimeout(invalidate, 120)
       return () => clearTimeout(timer)
     }
-    const observer = new ResizeObserver(() => map.invalidateSize())
+    const observer = new ResizeObserver(invalidate)
     observer.observe(wrapper)
-    const timer = setTimeout(() => map.invalidateSize(), 100)
+    const timer = setTimeout(invalidate, 120)
     return () => {
       observer.disconnect()
       clearTimeout(timer)
     }
-  }, [])
+  }, [mapReady])
 
 
   const getPoiIcon = (color) => {
@@ -228,6 +231,7 @@ export default function ProjectMapEditor({
             <MapContainer
               whenCreated={(instance) => {
                 mapInstanceRef.current = instance
+                setMapReady(true)
               }}
               center={[safeLocation.lat, safeLocation.lng]}
               zoom={safeZoom}
