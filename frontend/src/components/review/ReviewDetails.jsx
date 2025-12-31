@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   Box,
@@ -57,6 +57,17 @@ export function SubmissionDetails({ submission }) {
               <SubmissionPayloadRow key={key} label={key} value={value} />
             ))}
           </Stack>
+        </Paper>
+      )}
+      {submission.signatureDataUrl && (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="subtitle2" sx={{ textTransform: 'uppercase', fontWeight: 600, mb: 1 }}>Signature</Typography>
+          <Box
+            component="img"
+            src={submission.signatureDataUrl}
+            alt="Worker signature"
+            sx={{ width: 240, height: 160, borderRadius: 1, border: '1px solid', borderColor: 'divider', objectFit: 'contain', backgroundColor: '#fff' }}
+          />
         </Paper>
       )}
       {answers.length > 0 && (
@@ -168,11 +179,19 @@ export function ModuleReviewDetails({ review }) {
 }
 
 const isWorkerUploadKey = (value) => typeof value === 'string' && value.startsWith('worker-uploads/')
+const formatLabel = (label) => {
+  if (!label) return ''
+  return label
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim()
+}
 
 function SubmissionPayloadRow({ label, value }) {
   const [previewUrl, setPreviewUrl] = useState('')
   const [loading, setLoading] = useState(false)
-  const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '')
+  const stringValue = useMemo(() => (typeof value === 'object' ? JSON.stringify(value) : String(value ?? '')), [value])
   const isUpload = isWorkerUploadKey(value)
 
   useEffect(() => {
@@ -199,8 +218,8 @@ function SubmissionPayloadRow({ label, value }) {
   }, [isUpload, value])
 
   return (
-    <Stack direction="row" spacing={1} alignItems="center">
-      <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 140 }}>{label}</Typography>
+    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+      <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 140 }}>{formatLabel(label)}</Typography>
       {isUpload ? (
         previewUrl ? (
           <Box
