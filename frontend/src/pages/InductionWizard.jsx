@@ -45,6 +45,35 @@ const createEmptyModuleConfig = () => ({
   settings: { passMark: 80, randomizeQuestions: false, allowRetry: true }
 })
 
+const POSITION_OPTIONS = [
+  'General Worker',
+  'Forklift Operator',
+  'Electrician',
+  'Plumber',
+  'Carpenter',
+  'Scaffolder',
+  'Rigger',
+  'Dogman',
+  'Crane Operator',
+  'Plant Operator',
+  'Welder',
+  'Labourer',
+  'Site Supervisor',
+  'Site Manager',
+  'HSE Officer',
+  'Engineer',
+  'Visitor',
+  'Contractor',
+  'Other'
+]
+
+const isPositionField = (field) => {
+  if (!field) return false
+  const key = typeof field.key === 'string' ? field.key.trim().toLowerCase() : ''
+  const label = typeof field.label === 'string' ? field.label.trim().toLowerCase() : ''
+  return key === 'position' || label === 'position'
+}
+
 function DynamicField({ field, value, onChange }) {
   const [progress, setProgress] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
@@ -79,6 +108,26 @@ function DynamicField({ field, value, onChange }) {
       cancelled = true
     }
   }, [field?.type, value])
+
+  if (isPositionField(field)) {
+    return (
+      <TextField
+        fullWidth
+        select
+        label={field?.label || 'Position'}
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        SelectProps={{ native: true }}
+      >
+        <option value="">Select</option>
+        {POSITION_OPTIONS.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </TextField>
+    )
+  }
 
   if (field?.type === 'textarea') {
     return (
