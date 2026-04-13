@@ -50,3 +50,8 @@ export async function presignGet(key) {
   const { data } = await api.post('/uploads/presign-get', { key })
   return data // { url }
 }
+
+export async function createViewUrl(key, filename) {
+  const { data } = await api.post('/uploads/view-url', { key, filename })
+  return data // { url }
+}

@@ -6,7 +6,8 @@ import NavigateNextIcon from '@mui/icons-material/NavigateNext'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import PauseIcon from '@mui/icons-material/Pause'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
-import { presignGet } from '../utils/upload.js'
+import Alert from '@mui/material/Alert'
+import { createViewUrl } from '../utils/upload.js'
 
 export default function SlidesViewer() {
   const params = new URLSearchParams(location.search)
@@ -20,11 +21,16 @@ export default function SlidesViewer() {
   React.useEffect(() => {
     let cancelled = false
     async function load() {
-      try { const { url } = await presignGet(key); if (!cancelled) setUrl(url) } catch (e) { if (!cancelled) setError('Unable to load this file') }
+      try {
+        const { url } = await createViewUrl(key, name)
+        if (!cancelled) setUrl(url)
+      } catch (e) {
+        if (!cancelled) setError('Unable to load this file')
+      }
     }
     if (key) load()
     return () => { cancelled = true }
-  }, [key])
+  }, [key, name])
 
   // Detect extension from url if not provided
   React.useEffect(() => {
@@ -51,6 +57,7 @@ export default function SlidesViewer() {
       </Stack>
 
       {ext === 'pdf' ? <PdfPlayer url={url} /> : <OfficeViewer url={url} />}
+      {!url && !error ? <Alert severity="info">Preparing viewer...</Alert> : null}
       {error && <Typography color="error">{error}</Typography>}
     </Stack>
   )

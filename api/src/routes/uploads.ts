@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, AuthPayload } from '../middleware/auth.js';
 import { presignPutUrl, presignGetUrl, ensureBucket } from '../services/minio.js';
+import { verifyUploadAccessToken, signUploadAccessToken } from '../services/tokens.js';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { Submission } from '../models/Submission.js';
@@ -12,6 +13,25 @@ const router = Router();
 interface OwnershipInfo {
   projectId?: string;
   submissionUserId?: string;
+}
+
+function getContentType(nameOrKey: string) {
+  const ext = (nameOrKey.split('.').pop() || '').toLowerCase();
+  if (ext === 'pdf') return 'application/pdf';
+  if (ext === 'ppt') return 'application/vnd.ms-powerpoint';
+  if (ext === 'pptx') return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  if (ext === 'doc') return 'application/msword';
+  if (ext === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  if (ext === 'xls') return 'application/vnd.ms-excel';
+  if (ext === 'xlsx') return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  return 'application/octet-stream';
+}
+
+function sanitizeFilename(filename?: string) {
+  if (!filename) return '';
+  return filename.replace(/[^\w.\- ]+/g, '_').trim();
 }
 
 async function resolveFileOwnership(key: string): Promise<OwnershipInfo | null> {
@@ -113,6 +133,23 @@ router.post('/presign-get', requireAuth, async (req, res) => {
   }
 });
 
+router.post('/view-url', requireAuth, async (req, res) => {
+  const schema = z.object({
+    key: z.string().min(1),
+    filename: z.string().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { key, filename } = parsed.data;
+  const allowed = await canDownloadKey(req.user!, key);
+  if (!allowed) return res.status(403).json({ error: 'Forbidden', code: 403 });
+
+  const token = signUploadAccessToken({ key, filename: sanitizeFilename(filename) || undefined });
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  res.json({ url: `${baseUrl}/uploads/public/${encodeURIComponent(token)}` });
+});
+
 // Stream object via API (same-origin fallback to avoid PUBLIC_S3_ENDPOINT/CORS issues)
 router.get('/stream', requireAuth, async (req, res) => {
   const key = String((req.query as any)?.key || '');
@@ -120,15 +157,7 @@ router.get('/stream', requireAuth, async (req, res) => {
   const allowed = await canDownloadKey(req.user!, key);
   if (!allowed) return res.status(403).json({ error: 'Forbidden', code: 403 });
   try {
-    const ext = (key.split('.').pop() || '').toLowerCase();
-    const ct = ext === 'pdf'
-      ? 'application/pdf'
-      : ext === 'ppt'
-        ? 'application/vnd.ms-powerpoint'
-        : ext === 'pptx'
-          ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-          : 'application/octet-stream';
-    res.setHeader('Content-Type', ct);
+    res.setHeader('Content-Type', getContentType(key));
     res.setHeader('Content-Disposition', 'inline');
     await ensureBucket();
     const { minio, bucket } = await import('../services/minio.js');
@@ -138,4 +167,30 @@ router.get('/stream', requireAuth, async (req, res) => {
   } catch {
     res.status(400).json({ error: 'Stream failed' });
   }
-})
+});
+
+router.get('/public/:token', async (req, res) => {
+  const token = String(req.params.token || '');
+  if (!token) return res.status(400).json({ error: 'Missing token' });
+
+  try {
+    const payload = verifyUploadAccessToken(token);
+    const key = payload.key;
+    const filename = sanitizeFilename(payload.filename);
+
+    await ensureBucket();
+    res.setHeader('Content-Type', getContentType(filename || key));
+    res.setHeader(
+      'Content-Disposition',
+      filename ? `inline; filename="${filename}"` : 'inline'
+    );
+    res.setHeader('Cache-Control', 'private, max-age=600');
+
+    const { minio, bucket } = await import('../services/minio.js');
+    const obj = await minio.getObject(bucket, key);
+    obj.on('error', () => { try { res.status(404).end('Not found') } catch {} });
+    obj.pipe(res);
+  } catch {
+    res.status(403).json({ error: 'Invalid or expired token' });
+  }
+});
